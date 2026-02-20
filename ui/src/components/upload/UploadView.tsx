@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, Select, Slider } from 'antd';
 import { css } from '@emotion/react';
-import { Play } from 'lucide-react';
+import { Play, FileJson, ArrowLeft } from 'lucide-react';
 import { FileDropZone } from './FileDropZone';
 import { MetricSelector } from './MetricSelector';
 import { useTraceContext } from '../../context/TraceContext';
@@ -16,6 +16,34 @@ const uploadViewStyle = css`
 
   .header {
     margin-bottom: 16px;
+    position: relative;
+  }
+
+  .header-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .nav-button {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      background: var(--bg-elevated);
+    }
   }
 
   .title {
@@ -146,6 +174,22 @@ export const UploadView: React.FC = () => {
   return (
     <div css={uploadViewStyle}>
       <div className="header">
+        <div className="header-nav">
+          <button
+            className="nav-button"
+            onClick={() => actions.setCurrentView('welcome')}
+          >
+            <ArrowLeft size={16} />
+            Back to Welcome
+          </button>
+          <button
+            className="nav-button"
+            onClick={() => actions.setCurrentView('builder')}
+          >
+            <FileJson size={16} />
+            Open EvalSet Builder
+          </button>
+        </div>
         <h1 className="title">trace-eval</h1>
         <p className="subtitle">
           Evaluate agent behavior from OpenTelemetry traces without re-running agents

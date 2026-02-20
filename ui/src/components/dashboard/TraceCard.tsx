@@ -1,10 +1,14 @@
 import React from 'react';
 import { css } from '@emotion/react';
 import { motion } from 'framer-motion';
-import { ChevronRight, AlertTriangle } from 'lucide-react';
+import { ChevronRight, AlertTriangle, FileJson } from 'lucide-react';
+import { message, Button } from 'antd';
 import type { TraceResult } from '../../lib/types';
 import { truncateTraceId, getStatusColor, getStatusGlow, copyToClipboard } from '../../lib/utils';
 import { MetricScoreCard } from './MetricScoreCard';
+import { useTraceContext } from '../../context/TraceContext';
+import { loadJaegerTraces } from '../../lib/trace-loader';
+import { generateEvalSetFromTraces } from '../../lib/evalset-builder';
 
 interface TraceCardProps {
   traceResult: TraceResult;
@@ -114,6 +118,12 @@ const cardStyle = css`
     color: var(--accent-cyan);
     font-size: 14px;
     font-weight: 500;
+  }
+
+  .actions-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 16px;
   }
 
@@ -133,8 +143,8 @@ const cardStyle = css`
 
 export const TraceCard: React.FC<TraceCardProps> = ({ traceResult, threshold, onClick }) => {
   const { traceId, numInvocations, metricResults, conversionWarnings } = traceResult;
+  const { state, actions } = useTraceContext();
 
-  // Determine overall status
   const passedMetrics = metricResults.filter((m) => m.evalStatus === 'PASSED').length;
   const failedMetrics = metricResults.filter((m) => m.evalStatus === 'FAILED').length;
   const totalMetrics = metricResults.length;
@@ -150,6 +160,40 @@ export const TraceCard: React.FC<TraceCardProps> = ({ traceResult, threshold, on
   const handleCopyTraceId = (e: React.MouseEvent) => {
     e.stopPropagation();
     copyToClipboard(traceId);
+  };
+
+  const handleCreateEvalSet = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    try {
+      let matchingTrace = null;
+      let matchingFilename = '';
+
+      for (const file of state.traceFiles) {
+        const content = await file.text();
+        const traces = await loadJaegerTraces(content);
+        const found = traces.find(t => t.traceId === traceId);
+
+        if (found) {
+          matchingTrace = found;
+          matchingFilename = file.name.replace('.json', '');
+          break;
+        }
+      }
+
+      if (!matchingTrace) {
+        message.error('Could not find trace in uploaded files');
+        return;
+      }
+
+      const evalSet = generateEvalSetFromTraces([matchingTrace], matchingFilename);
+      actions.setBuilderEvalSet(evalSet);
+      actions.setCurrentView('builder');
+      message.success('EvalSet created! Edit and save when ready.');
+    } catch (error) {
+      console.error('Failed to create evalset:', error);
+      message.error('Failed to create evalset from trace');
+    }
   };
 
   return (
@@ -217,8 +261,17 @@ export const TraceCard: React.FC<TraceCardProps> = ({ traceResult, threshold, on
         </div>
       )}
 
-      <div className="view-details">
-        View Details <ChevronRight size={16} />
+      <div className="actions-section">
+        <Button
+          icon={<FileJson size={14} />}
+          onClick={handleCreateEvalSet}
+          size="small"
+        >
+          Create EvalSet
+        </Button>
+        <div className="view-details">
+          View Details <ChevronRight size={16} />
+        </div>
       </div>
     </motion.div>
   );

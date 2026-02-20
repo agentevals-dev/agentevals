@@ -1,8 +1,12 @@
 import React from 'react';
 import { css } from '@emotion/react';
-import { ArrowLeft, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Copy, Check, FileJson } from 'lucide-react';
+import { Button, message } from 'antd';
 import { truncateTraceId } from '../../lib/utils';
 import type { TraceResult } from '../../lib/types';
+import { useTraceContext } from '../../context/TraceContext';
+import { loadJaegerTraces } from '../../lib/trace-loader';
+import { generateEvalSetFromTraces } from '../../lib/evalset-builder';
 
 interface InspectorHeaderProps {
   traceResult: TraceResult;
@@ -14,11 +18,44 @@ export const InspectorHeader: React.FC<InspectorHeaderProps> = ({
   onBack,
 }) => {
   const [copied, setCopied] = React.useState(false);
+  const { state, actions } = useTraceContext();
 
   const handleCopyTraceId = () => {
     navigator.clipboard.writeText(traceResult.traceId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCreateEvalSet = async () => {
+    try {
+      let matchingTrace = null;
+      let matchingFilename = '';
+
+      for (const file of state.traceFiles) {
+        const content = await file.text();
+        const traces = await loadJaegerTraces(content);
+        const found = traces.find(t => t.traceId === traceResult.traceId);
+
+        if (found) {
+          matchingTrace = found;
+          matchingFilename = file.name.replace('.json', '');
+          break;
+        }
+      }
+
+      if (!matchingTrace) {
+        message.error('Could not find trace in uploaded files');
+        return;
+      }
+
+      const evalSet = generateEvalSetFromTraces([matchingTrace], matchingFilename);
+      actions.setBuilderEvalSet(evalSet);
+      actions.setCurrentView('builder');
+      message.success('EvalSet created! Edit and save when ready.');
+    } catch (error) {
+      console.error('Failed to create evalset:', error);
+      message.error('Failed to create evalset from trace');
+    }
   };
 
   const overallStatus = traceResult.metricResults.every(
@@ -74,6 +111,12 @@ export const InspectorHeader: React.FC<InspectorHeaderProps> = ({
       </div>
 
       <div css={rightSectionStyles}>
+        <Button
+          icon={<FileJson size={16} />}
+          onClick={handleCreateEvalSet}
+        >
+          Use as EvalSet Template
+        </Button>
         <div css={statusBadgeStyles(overallStatus)}>
           <div css={statusDotStyles(overallStatus)} />
           {overallStatus}
@@ -208,6 +251,7 @@ const warningValueStyles = css`
 const rightSectionStyles = css`
   display: flex;
   align-items: center;
+  gap: 12px;
 `;
 
 const statusBadgeStyles = (status: string) => css`

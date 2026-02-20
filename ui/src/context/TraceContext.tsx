@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { TraceResult, ViewType } from '../lib/types';
+import type { TraceResult, ViewType, EvalSet, EvalSetMetadata, EvalCase } from '../lib/types';
 
 export interface TraceState {
   // Upload state
@@ -18,6 +18,10 @@ export interface TraceState {
   currentView: ViewType;
   selectedTraceId: string | null;
   selectedSpanId: string | null;
+
+  // Builder state
+  builderEvalSet: EvalSet | null;
+  builderSelectedTraceIds: string[];
 }
 
 export interface TraceContextType {
@@ -33,6 +37,13 @@ export interface TraceContextType {
     selectTrace: (traceId: string | null) => void;
     selectSpan: (spanId: string | null) => void;
     clearResults: () => void;
+
+    // Builder actions
+    setBuilderEvalSet: (evalSet: EvalSet | null) => void;
+    updateEvalSetMetadata: (metadata: Partial<EvalSetMetadata>) => void;
+    updateEvalCase: (caseIndex: number, evalCase: EvalCase) => void;
+    addEvalCase: (evalCase: EvalCase) => void;
+    removeEvalCase: (caseIndex: number) => void;
   };
 }
 

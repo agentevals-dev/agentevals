@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { TraceContext } from './TraceContext';
 import type { TraceState } from './TraceContext';
-import type { ViewType } from '../lib/types';
+import type { ViewType, EvalSet, EvalSetMetadata, EvalCase } from '../lib/types';
 import { evaluateTracesAPI } from '../api/client';
 
 interface TraceProviderProps {
@@ -19,9 +19,11 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
     isEvaluating: false,
     results: [],
     errors: [],
-    currentView: 'upload',
+    currentView: 'welcome',
     selectedTraceId: null,
     selectedSpanId: null,
+    builderEvalSet: null,
+    builderSelectedTraceIds: [],
   });
 
   const actions = useMemo(
@@ -90,8 +92,55 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
           ...prev,
           results: [],
           errors: [],
-          currentView: 'upload',
+          currentView: 'welcome',
         })),
+
+      // Builder actions
+      setBuilderEvalSet: (evalSet: EvalSet | null) =>
+        setState((prev) => ({ ...prev, builderEvalSet: evalSet })),
+
+      updateEvalSetMetadata: (metadata: Partial<EvalSetMetadata>) =>
+        setState((prev) => ({
+          ...prev,
+          builderEvalSet: prev.builderEvalSet
+            ? { ...prev.builderEvalSet, ...metadata }
+            : null,
+        })),
+
+      updateEvalCase: (caseIndex: number, evalCase: EvalCase) =>
+        setState((prev) => {
+          if (!prev.builderEvalSet) return prev;
+          const newCases = [...prev.builderEvalSet.eval_cases];
+          newCases[caseIndex] = evalCase;
+          return {
+            ...prev,
+            builderEvalSet: { ...prev.builderEvalSet, eval_cases: newCases },
+          };
+        }),
+
+      addEvalCase: (evalCase: EvalCase) =>
+        setState((prev) => {
+          if (!prev.builderEvalSet) return prev;
+          return {
+            ...prev,
+            builderEvalSet: {
+              ...prev.builderEvalSet,
+              eval_cases: [...prev.builderEvalSet.eval_cases, evalCase],
+            },
+          };
+        }),
+
+      removeEvalCase: (caseIndex: number) =>
+        setState((prev) => {
+          if (!prev.builderEvalSet) return prev;
+          const newCases = prev.builderEvalSet.eval_cases.filter(
+            (_, idx) => idx !== caseIndex
+          );
+          return {
+            ...prev,
+            builderEvalSet: { ...prev.builderEvalSet, eval_cases: newCases },
+          };
+        }),
     }),
     [state.traceFiles, state.evalSetFile, state.selectedMetrics, state.judgeModel, state.threshold]
   );
