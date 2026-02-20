@@ -330,7 +330,9 @@ export const UploadView: React.FC = () => {
           loading={state.isEvaluating}
         >
           <Play size={20} />
-          {state.isEvaluating ? 'Running Evaluation...' : 'Run Evaluation'}
+          {state.isEvaluating
+            ? (state.progressMessage || 'Running Evaluation...')
+            : 'Run Evaluation'}
         </Button>
       </div>
     </div>

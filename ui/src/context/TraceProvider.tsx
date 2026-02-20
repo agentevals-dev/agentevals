@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { TraceContext } from './TraceContext';
 import type { TraceState } from './TraceContext';
 import type { ViewType, EvalSet, EvalSetMetadata, EvalCase } from '../lib/types';
-import { evaluateTracesAPI } from '../api/client';
+import { evaluateTracesStreaming } from '../api/client';
 
 interface TraceProviderProps {
   children: ReactNode;
@@ -17,6 +17,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
     judgeModel: 'gemini-2.5-flash',
     threshold: 0.8,
     isEvaluating: false,
+    progressMessage: '',
     results: [],
     errors: [],
     currentView: 'welcome',
@@ -49,30 +50,44 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
         setState((prev) => ({ ...prev, threshold })),
 
       runEvaluation: async () => {
-        setState((prev) => ({ ...prev, isEvaluating: true, errors: [] }));
+        setState((prev) => ({ ...prev, isEvaluating: true, progressMessage: '', errors: [] }));
 
         try {
-          const result = await evaluateTracesAPI(
+          await evaluateTracesStreaming(
             state.traceFiles,
             state.evalSetFile,
             {
               metrics: state.selectedMetrics,
               judgeModel: state.judgeModel,
               threshold: state.threshold,
+            },
+            (message) => {
+              setState((prev) => ({ ...prev, progressMessage: message }));
+            },
+            (result) => {
+              setState((prev) => ({
+                ...prev,
+                isEvaluating: false,
+                progressMessage: '',
+                results: result.traceResults,
+                errors: result.errors,
+                currentView: 'dashboard',
+              }));
+            },
+            (error) => {
+              setState((prev) => ({
+                ...prev,
+                isEvaluating: false,
+                progressMessage: '',
+                errors: [error.message],
+              }));
             }
           );
-
-          setState((prev) => ({
-            ...prev,
-            isEvaluating: false,
-            results: result.traceResults,
-            errors: result.errors,
-            currentView: 'dashboard',
-          }));
         } catch (error) {
           setState((prev) => ({
             ...prev,
             isEvaluating: false,
+            progressMessage: '',
             errors: [error instanceof Error ? error.message : 'Unknown error occurred'],
           }));
         }

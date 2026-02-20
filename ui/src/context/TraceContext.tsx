@@ -11,6 +11,7 @@ export interface TraceState {
 
   // Evaluation state
   isEvaluating: boolean;
+  progressMessage: string;
   results: TraceResult[];
   errors: string[];
 

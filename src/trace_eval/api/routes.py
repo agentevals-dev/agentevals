@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import tempfile
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
 from ..config import EvalRunConfig
 from ..runner import RunResult, load_eval_set, run_evaluation
@@ -304,3 +306,147 @@ async def evaluate_traces(
 
     finally:
         shutil.rmtree(temp_dir)
+
+
+@router.post("/evaluate/stream")
+async def evaluate_traces_stream(
+    trace_files: list[UploadFile] = File(...),
+    config: str = Form(...),
+    eval_set_file: Optional[UploadFile] = File(None),
+):
+    """Evaluate traces with real-time progress via SSE."""
+    temp_dir = tempfile.mkdtemp()
+
+    async def event_generator():
+        try:
+            try:
+                config_dict = json.loads(config)
+            except json.JSONDecodeError as exc:
+                yield f"data: {json.dumps({'error': f'Invalid config JSON: {exc}'})}\n\n"
+                return
+
+            trace_paths = []
+            for trace_file in trace_files:
+                if not trace_file.filename:
+                    continue
+
+                if not trace_file.filename.endswith(".json"):
+                    yield f"data: {json.dumps({'error': f'Invalid file extension for {trace_file.filename}'})}\n\n"
+                    return
+
+                trace_path = os.path.join(temp_dir, trace_file.filename)
+                with open(trace_path, "wb") as f:
+                    content = await trace_file.read()
+
+                    if len(content) > 10 * 1024 * 1024:
+                        yield f"data: {json.dumps({'error': f'File {trace_file.filename} exceeds 10MB'})}\n\n"
+                        return
+
+                    f.write(content)
+                trace_paths.append(trace_path)
+
+            if not trace_paths:
+                yield f"data: {json.dumps({'error': 'No valid trace files provided'})}\n\n"
+                return
+
+            eval_set_path = None
+            if eval_set_file and eval_set_file.filename:
+                if not eval_set_file.filename.endswith(".json"):
+                    yield f"data: {json.dumps({'error': 'Invalid file extension for eval set'})}\n\n"
+                    return
+
+                eval_set_path = os.path.join(temp_dir, eval_set_file.filename)
+                with open(eval_set_path, "wb") as f:
+                    content = await eval_set_file.read()
+                    if len(content) > 10 * 1024 * 1024:
+                        yield f"data: {json.dumps({'error': 'Eval set file exceeds 10MB'})}\n\n"
+                        return
+                    f.write(content)
+
+            metrics = config_dict.get("metrics", ["tool_trajectory_avg_score"])
+            if not metrics or not isinstance(metrics, list):
+                yield f"data: {json.dumps({'error': 'Config must include metrics as a non-empty array'})}\n\n"
+                return
+
+            threshold = config_dict.get("threshold")
+            if threshold is not None and (threshold < 0 or threshold > 1):
+                yield f"data: {json.dumps({'error': 'Threshold must be between 0 and 1'})}\n\n"
+                return
+
+            eval_config = EvalRunConfig(
+                trace_files=trace_paths,
+                eval_set_file=eval_set_path,
+                metrics=metrics,
+                trace_format=config_dict.get("trace_format", "jaeger-json"),
+                judge_model=config_dict.get("judgeModel"),
+                threshold=threshold,
+            )
+
+            queue: asyncio.Queue = asyncio.Queue()
+
+            async def progress_callback(message: str):
+                await queue.put({"message": message})
+
+            async def run_with_progress():
+                result = await run_evaluation(eval_config, progress_callback)
+                await queue.put({"done": True, "result": result})
+
+            eval_task = asyncio.create_task(run_with_progress())
+
+            try:
+                while True:
+                    event = await queue.get()
+
+                    if "done" in event:
+                        result = event["result"]
+                        final_event = {
+                            "done": True,
+                            "result": {
+                                "traceResults": [
+                                    {
+                                        "traceId": tr.trace_id,
+                                        "numInvocations": tr.num_invocations,
+                                        "metricResults": [
+                                            {
+                                                "metricName": mr.metric_name,
+                                                "score": mr.score,
+                                                "evalStatus": mr.eval_status,
+                                                "perInvocationScores": mr.per_invocation_scores,
+                                                "error": mr.error,
+                                            }
+                                            for mr in tr.metric_results
+                                        ],
+                                        "conversionWarnings": tr.conversion_warnings,
+                                    }
+                                    for tr in result.trace_results
+                                ],
+                                "errors": result.errors,
+                            },
+                        }
+                        yield f"data: {json.dumps(final_event)}\n\n"
+                        break
+                    else:
+                        yield f"data: {json.dumps(event)}\n\n"
+            finally:
+                if not eval_task.done():
+                    eval_task.cancel()
+                    try:
+                        await eval_task
+                    except asyncio.CancelledError:
+                        pass
+
+        except Exception as exc:
+            logger.exception("Evaluation stream failed")
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+        finally:
+            shutil.rmtree(temp_dir)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )

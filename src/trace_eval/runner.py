@@ -6,6 +6,7 @@ import asyncio
 import inspect
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -29,6 +30,8 @@ from .loader.base import TraceLoader
 from .loader.jaeger import JaegerJsonLoader
 
 logger = logging.getLogger(__name__)
+
+ProgressCallback = Callable[[str], Awaitable[None]]
 
 _METRICS_NEEDING_EXPECTED = {
     "tool_trajectory_avg_score",
@@ -87,7 +90,10 @@ def load_eval_set(path: str) -> EvalSet:
     return EvalSet.model_validate(data)
 
 
-async def run_evaluation(config: EvalRunConfig) -> RunResult:
+async def run_evaluation(
+    config: EvalRunConfig,
+    progress_callback: Optional[ProgressCallback] = None,
+) -> RunResult:
     result = RunResult()
 
     loader = get_loader(config.trace_format)
@@ -116,15 +122,27 @@ async def run_evaluation(config: EvalRunConfig) -> RunResult:
             logger.error(msg)
             result.errors.append(msg)
 
-    for conv_result in conversion_results:
+    total_traces = len(conversion_results)
+    if progress_callback:
+        await progress_callback(f"Evaluating {total_traces} trace{'s' if total_traces != 1 else ''}...")
+
+    for idx, conv_result in enumerate(conversion_results):
+        if progress_callback:
+            trace_id_short = conv_result.trace_id[:12] + "..." if len(conv_result.trace_id) > 12 else conv_result.trace_id
+            await progress_callback(f"Trace {idx + 1}/{total_traces}: {trace_id_short}")
+
         trace_result = await _evaluate_trace(
             conv_result=conv_result,
             metrics=config.metrics,
             eval_set=eval_set,
             judge_model=config.judge_model,
             threshold=config.threshold,
+            progress_callback=progress_callback,
         )
         result.trace_results.append(trace_result)
+
+    if progress_callback:
+        await progress_callback("Evaluation complete")
 
     return result
 
@@ -135,6 +153,7 @@ async def _evaluate_trace(
     eval_set: EvalSet | None,
     judge_model: str | None,
     threshold: float | None,
+    progress_callback: Optional[ProgressCallback] = None,
 ) -> TraceResult:
     trace_result = TraceResult(
         trace_id=conv_result.trace_id,
@@ -158,6 +177,9 @@ async def _evaluate_trace(
         expected_invocations = _find_expected_invocations(actual_invocations, eval_set)
 
     for metric_name in metrics:
+        if progress_callback:
+            await progress_callback(f"Running {metric_name}...")
+
         metric_result = await _evaluate_metric(
             metric_name=metric_name,
             actual_invocations=actual_invocations,

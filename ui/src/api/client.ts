@@ -81,6 +81,79 @@ export async function evaluateTracesAPI(
 }
 
 /**
+ * Evaluate traces with real-time progress via SSE
+ */
+export async function evaluateTracesStreaming(
+  traceFiles: File[],
+  evalSetFile: File | null,
+  config: EvalConfig,
+  onProgress: (message: string) => void,
+  onComplete: (result: RunResult) => void,
+  onError: (error: Error) => void
+): Promise<void> {
+  const formData = new FormData();
+
+  traceFiles.forEach(file => {
+    formData.append('trace_files', file);
+  });
+
+  if (evalSetFile) {
+    formData.append('eval_set_file', evalSetFile);
+  }
+
+  formData.append('config', JSON.stringify(config));
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/evaluate/stream`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const eventData = JSON.parse(line.slice(6));
+
+          if (eventData.error) {
+            onError(new Error(eventData.error));
+            return;
+          } else if (eventData.done) {
+            const converted = convertSnakeToCamel(eventData.result) as RunResult;
+            onComplete(converted);
+            return;
+          } else if (eventData.message) {
+            onProgress(eventData.message);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      onError(error);
+    } else {
+      onError(new Error('Unknown error occurred during streaming evaluation'));
+    }
+  }
+}
+
+/**
  * List available metrics from the backend
  */
 export async function listMetrics() {
