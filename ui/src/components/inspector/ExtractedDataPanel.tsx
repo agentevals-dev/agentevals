@@ -12,6 +12,8 @@ interface ExtractedDataPanelProps {
   highlightedPaths?: Set<string>;
   onSelectData?: (dataPath: string) => void;
   onSelectInvocation?: (invocationId: string) => void;
+  selectedMetrics?: string[];
+  isEvaluating?: boolean;
 }
 
 export const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
@@ -22,6 +24,8 @@ export const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
   highlightedPaths = new Set(),
   onSelectData,
   onSelectInvocation,
+  selectedMetrics = [],
+  isEvaluating = false,
 }) => {
   if (invocations.length === 0) {
     return (
@@ -59,6 +63,8 @@ export const ExtractedDataPanel: React.FC<ExtractedDataPanelProps> = ({
         <MetricResultsSection
           metricResults={metricResults}
           threshold={threshold}
+          selectedMetrics={selectedMetrics}
+          isEvaluating={isEvaluating}
         />
       </div>
     </div>

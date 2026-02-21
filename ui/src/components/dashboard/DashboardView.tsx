@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { css } from '@emotion/react';
 import { Button, Input, Select } from 'antd';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { TraceCard } from './TraceCard';
+import { TraceTable } from './TraceTable';
 import { SummaryStats } from './SummaryStats';
 import { useTraceContext } from '../../context/TraceContext';
 import type { EvalStatus } from '../../lib/types';
@@ -77,6 +78,35 @@ const dashboardStyle = css`
     margin-bottom: 4px;
   }
 
+  .progress-banner {
+    padding: 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--accent-cyan);
+    border-radius: 8px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .progress-text {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+
   @media (max-width: 968px) {
     .results-grid {
       grid-template-columns: 1fr;
@@ -143,52 +173,30 @@ export const DashboardView: React.FC = () => {
         </div>
       )}
 
-      {state.results.length > 0 && (
+      {state.tableRows.size > 0 && (
         <>
-          <SummaryStats traceResults={state.results} />
+          {state.results.length > 0 && <SummaryStats traceResults={state.results} />}
 
-          <div className="filters">
-            <Select
-              value={filterStatus}
-              onChange={setFilterStatus}
-              style={{ width: 200 }}
-              options={[
-                { label: 'All Statuses', value: 'all' },
-                { label: 'Passed', value: 'PASSED' },
-                { label: 'Failed', value: 'FAILED' },
-                { label: 'Not Evaluated', value: 'NOT_EVALUATED' },
-                { label: 'Errors', value: 'ERROR' },
-              ]}
-            />
-            <Search
-              placeholder="Search by trace ID"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: 1, maxWidth: 400 }}
-            />
-          </div>
-
-          <div className="results-grid">
-            {filteredResults.map((result) => (
-              <TraceCard
-                key={result.traceId}
-                traceResult={result}
-                threshold={state.threshold}
-                onClick={() => handleTraceClick(result.traceId)}
-              />
-            ))}
-          </div>
-
-          {filteredResults.length === 0 && (
-            <div className="empty-state">
-              <div className="empty-title">No traces match your filters</div>
-              <p>Try adjusting your filter or search criteria</p>
+          {state.isEvaluating && (
+            <div className="progress-banner">
+              <Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent-cyan)' }} />
+              <span className="progress-text">
+                {state.progressMessage || 'Evaluating traces...'}
+              </span>
             </div>
           )}
+
+          <TraceTable
+            rows={Array.from(state.tableRows.values())}
+            selectedMetrics={state.selectedMetrics}
+            threshold={state.threshold}
+            onRowClick={handleTraceClick}
+            isEvaluating={state.isEvaluating}
+          />
         </>
       )}
 
-      {state.results.length === 0 && state.errors.length === 0 && (
+      {state.tableRows.size === 0 && state.errors.length === 0 && (
         <div className="empty-state">
           <div className="empty-title">No results yet</div>
           <p>Upload trace files and run an evaluation to see results here</p>

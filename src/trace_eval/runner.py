@@ -32,6 +32,7 @@ from .loader.jaeger import JaegerJsonLoader
 logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[str], Awaitable[None]]
+TraceProgressCallback = Callable[["TraceResult"], Awaitable[None]]
 
 _METRICS_NEEDING_EXPECTED = {
     "tool_trajectory_avg_score",
@@ -93,6 +94,7 @@ def load_eval_set(path: str) -> EvalSet:
 async def run_evaluation(
     config: EvalRunConfig,
     progress_callback: Optional[ProgressCallback] = None,
+    trace_progress_callback: Optional[TraceProgressCallback] = None,
 ) -> RunResult:
     result = RunResult()
 
@@ -138,6 +140,7 @@ async def run_evaluation(
             judge_model=config.judge_model,
             threshold=config.threshold,
             progress_callback=progress_callback,
+            trace_progress_callback=trace_progress_callback,
         )
         result.trace_results.append(trace_result)
 
@@ -154,6 +157,7 @@ async def _evaluate_trace(
     judge_model: str | None,
     threshold: float | None,
     progress_callback: Optional[ProgressCallback] = None,
+    trace_progress_callback: Optional[TraceProgressCallback] = None,
 ) -> TraceResult:
     trace_result = TraceResult(
         trace_id=conv_result.trace_id,
@@ -188,6 +192,9 @@ async def _evaluate_trace(
             threshold=threshold,
         )
         trace_result.metric_results.append(metric_result)
+
+        if trace_progress_callback:
+            await trace_progress_callback(trace_result)
 
     return trace_result
 

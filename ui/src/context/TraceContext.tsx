@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
-import type { TraceResult, ViewType, EvalSet, EvalSetMetadata, EvalCase } from '../lib/types';
+import type { TraceResult, ViewType, EvalSet, EvalSetMetadata, EvalCase, TraceTableRow } from '../lib/types';
+import type { TraceMetadata } from '../lib/trace-metadata';
 
 export interface TraceState {
   // Upload state
@@ -8,12 +9,16 @@ export interface TraceState {
   selectedMetrics: string[];
   judgeModel: string;
   threshold: number;
+  traceMetadata: Map<string, TraceMetadata>;
+  isLoadingMetadata: boolean;
 
   // Evaluation state
   isEvaluating: boolean;
   progressMessage: string;
   results: TraceResult[];
   errors: string[];
+  tableRows: Map<string, TraceTableRow>;
+  expectedTraceCount: number;
 
   // UI state
   currentView: ViewType;
@@ -28,7 +33,7 @@ export interface TraceState {
 export interface TraceContextType {
   state: TraceState;
   actions: {
-    setTraceFiles: (files: File[]) => void;
+    setTraceFiles: (files: File[]) => Promise<void>;
     setEvalSet: (file: File | null) => void;
     toggleMetric: (metric: string) => void;
     setJudgeModel: (model: string) => void;

@@ -4,6 +4,7 @@ import { TraceContext } from './TraceContext';
 import type { TraceState } from './TraceContext';
 import type { ViewType, EvalSet, EvalSetMetadata, EvalCase } from '../lib/types';
 import { evaluateTracesStreaming } from '../api/client';
+import { extractMetadataFromTraceFile } from '../lib/trace-metadata';
 
 interface TraceProviderProps {
   children: ReactNode;
@@ -16,10 +17,14 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
     selectedMetrics: ['tool_trajectory_avg_score'],
     judgeModel: 'gemini-2.5-flash',
     threshold: 0.8,
+    traceMetadata: new Map(),
+    isLoadingMetadata: false,
     isEvaluating: false,
     progressMessage: '',
     results: [],
     errors: [],
+    tableRows: new Map(),
+    expectedTraceCount: 0,
     currentView: 'welcome',
     selectedTraceId: null,
     selectedSpanId: null,
@@ -29,8 +34,23 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
 
   const actions = useMemo(
     () => ({
-      setTraceFiles: (files: File[]) =>
-        setState((prev) => ({ ...prev, traceFiles: files })),
+      setTraceFiles: async (files: File[]) => {
+        setState((prev) => ({ ...prev, traceFiles: files, isLoadingMetadata: true }));
+
+        const metadataMap = new Map();
+        for (const file of files) {
+          try {
+            const metadataList = await extractMetadataFromTraceFile(file);
+            for (const metadata of metadataList) {
+              metadataMap.set(metadata.traceId, metadata);
+            }
+          } catch (error) {
+            console.error(`Failed to extract metadata from ${file.name}:`, error);
+          }
+        }
+
+        setState((prev) => ({ ...prev, traceMetadata: metadataMap, isLoadingMetadata: false }));
+      },
 
       setEvalSet: (file: File | null) =>
         setState((prev) => ({ ...prev, evalSetFile: file })),
@@ -50,7 +70,33 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
         setState((prev) => ({ ...prev, threshold })),
 
       runEvaluation: async () => {
-        setState((prev) => ({ ...prev, isEvaluating: true, progressMessage: '', errors: [] }));
+        const initialRows = new Map();
+        const metadataArray = Array.from(state.traceMetadata.values());
+
+        for (let i = 0; i < metadataArray.length; i++) {
+          const metadata = metadataArray[i];
+          initialRows.set(metadata.traceId, {
+            traceId: metadata.traceId,
+            status: 'loading' as const,
+            agentName: metadata.agentName,
+            startTime: metadata.startTime,
+            model: metadata.model,
+            userInputPreview: metadata.userInputPreview,
+            finalOutputPreview: metadata.finalOutputPreview,
+            metricResults: new Map(),
+            conversionWarnings: [],
+          });
+        }
+
+        setState((prev) => ({
+          ...prev,
+          isEvaluating: true,
+          progressMessage: '',
+          errors: [],
+          tableRows: initialRows,
+          expectedTraceCount: state.traceFiles.length,
+          currentView: 'dashboard',
+        }));
 
         try {
           await evaluateTracesStreaming(
@@ -64,6 +110,37 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
             (message) => {
               setState((prev) => ({ ...prev, progressMessage: message }));
             },
+            (traceId, status, partialResult) => {
+              setState((prev) => {
+                if (!partialResult) return prev;
+
+                const newRows = new Map(prev.tableRows);
+                const existingRow = newRows.get(traceId);
+                const metadata = prev.traceMetadata.get(traceId);
+
+                const existingMetrics = existingRow?.metricResults || new Map();
+                partialResult.metricResults.forEach(mr => {
+                  existingMetrics.set(mr.metricName, mr);
+                });
+
+                const allMetricsComplete = prev.selectedMetrics.length === partialResult.metricResults.length;
+
+                newRows.set(traceId, {
+                  traceId,
+                  status: allMetricsComplete ? 'complete' : 'loading',
+                  agentName: metadata?.agentName,
+                  startTime: metadata?.startTime,
+                  model: metadata?.model,
+                  userInputPreview: metadata?.userInputPreview,
+                  finalOutputPreview: metadata?.finalOutputPreview,
+                  metricResults: existingMetrics,
+                  numInvocations: partialResult.numInvocations,
+                  conversionWarnings: partialResult.conversionWarnings,
+                });
+
+                return { ...prev, tableRows: newRows };
+              });
+            },
             (result) => {
               setState((prev) => ({
                 ...prev,
@@ -71,7 +148,6 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
                 progressMessage: '',
                 results: result.traceResults,
                 errors: result.errors,
-                currentView: 'dashboard',
               }));
             },
             (error) => {

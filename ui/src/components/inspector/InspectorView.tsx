@@ -32,10 +32,19 @@ export const InspectorView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Find the selected trace result
+  // Find the selected trace result (check tableRows first for partial data during evaluation)
   const traceResult = useMemo(() => {
+    const tableRow = state.tableRows.get(state.selectedTraceId || '');
+    if (tableRow) {
+      return {
+        traceId: tableRow.traceId,
+        numInvocations: tableRow.numInvocations || 0,
+        metricResults: Array.from(tableRow.metricResults.values()),
+        conversionWarnings: tableRow.conversionWarnings,
+      };
+    }
     return state.results.find(r => r.traceId === state.selectedTraceId);
-  }, [state.results, state.selectedTraceId]);
+  }, [state.tableRows, state.results, state.selectedTraceId]);
 
   // Load trace data when component mounts
   useEffect(() => {
@@ -224,6 +233,8 @@ export const InspectorView: React.FC = () => {
       highlightedPaths={inspectorState.selectedDataPath ? new Set([inspectorState.selectedDataPath]) : new Set()}
       onSelectData={handleSelectData}
       onSelectInvocation={handleSelectInvocation}
+      selectedMetrics={state.selectedMetrics}
+      isEvaluating={state.isEvaluating}
     />
   );
 

@@ -387,8 +387,31 @@ async def evaluate_traces_stream(
             async def progress_callback(message: str):
                 await queue.put({"message": message})
 
+            async def trace_progress_callback(trace_result):
+                partial_result = {
+                    "traceId": trace_result.trace_id,
+                    "numInvocations": trace_result.num_invocations,
+                    "metricResults": [
+                        {
+                            "metricName": mr.metric_name,
+                            "score": mr.score,
+                            "evalStatus": mr.eval_status,
+                            "perInvocationScores": mr.per_invocation_scores,
+                            "error": mr.error,
+                        }
+                        for mr in trace_result.metric_results
+                    ],
+                    "conversionWarnings": trace_result.conversion_warnings,
+                }
+                await queue.put({
+                    "traceProgress": {
+                        "traceId": trace_result.trace_id,
+                        "partialResult": partial_result,
+                    }
+                })
+
             async def run_with_progress():
-                result = await run_evaluation(eval_config, progress_callback)
+                result = await run_evaluation(eval_config, progress_callback, trace_progress_callback)
                 await queue.put({"done": True, "result": result})
 
             eval_task = asyncio.create_task(run_with_progress())

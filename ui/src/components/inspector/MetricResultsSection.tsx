@@ -1,18 +1,25 @@
 import React from 'react';
 import { css } from '@emotion/react';
-import { CheckCircle, XCircle, AlertCircle, MinusCircle } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, MinusCircle, Loader2 } from 'lucide-react';
 import type { MetricResult } from '../../lib/types';
 import { getStatusColor } from '../../lib/utils';
 
 interface MetricResultsSectionProps {
   metricResults: MetricResult[];
   threshold: number;
+  selectedMetrics?: string[];
+  isEvaluating?: boolean;
 }
 
 export const MetricResultsSection: React.FC<MetricResultsSectionProps> = ({
   metricResults,
   threshold,
+  selectedMetrics = [],
+  isEvaluating = false,
 }) => {
+  const metricResultsMap = new Map(metricResults.map(mr => [mr.metricName, mr]));
+  const metricsToShow = selectedMetrics.length > 0 ? selectedMetrics : metricResults.map(mr => mr.metricName);
+
   return (
     <div css={containerStyles}>
       <div css={headerStyles}>
@@ -21,7 +28,34 @@ export const MetricResultsSection: React.FC<MetricResultsSectionProps> = ({
       </div>
 
       <div css={metricsListStyles}>
-        {metricResults.map((result, index) => {
+        {metricsToShow.map((metricName) => {
+          const result = metricResultsMap.get(metricName);
+
+          if (!result && isEvaluating) {
+            return (
+              <div key={metricName} css={metricItemStyles('var(--text-secondary)')}>
+                <div css={metricHeaderStyles}>
+                  <div css={iconStatusStyles('var(--text-secondary)')}>
+                    <Loader2 size={16} className="animate-spin" />
+                  </div>
+                  <span css={metricNameStyles}>{metricName}</span>
+                </div>
+                <div css={metricBodyStyles}>
+                  <div css={scoreDisplayStyles}>
+                    <span css={statusTextStyles('var(--text-secondary)')}>
+                      Evaluating...
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (!result) {
+            return null;
+          }
+
+          const index = metricsToShow.indexOf(metricName);
           const statusColor = getStatusColor(result.evalStatus);
           const StatusIcon = getStatusIcon(result.evalStatus);
 
@@ -230,5 +264,18 @@ const errorMessageStyles = css`
   span {
     flex: 1;
     line-height: 1.4;
+  }
+
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 `;

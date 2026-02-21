@@ -10,7 +10,7 @@ interface FileDropZoneProps {
   title: string;
   description: string;
   multiple?: boolean;
-  onChange: (files: File[]) => void;
+  onChange: (files: File[]) => void | Promise<void>;
   accept?: string;
 }
 

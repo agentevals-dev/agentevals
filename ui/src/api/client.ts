@@ -88,6 +88,7 @@ export async function evaluateTracesStreaming(
   evalSetFile: File | null,
   config: EvalConfig,
   onProgress: (message: string) => void,
+  onTraceProgress: (traceId: string, status: string, partialResult?: TraceResult) => void,
   onComplete: (result: RunResult) => void,
   onError: (error: Error) => void
 ): Promise<void> {
@@ -138,6 +139,12 @@ export async function evaluateTracesStreaming(
             const converted = convertSnakeToCamel(eventData.result) as RunResult;
             onComplete(converted);
             return;
+          } else if (eventData.traceProgress) {
+            const tp = eventData.traceProgress;
+            const partialResult = tp.partialResult
+              ? convertSnakeToCamel(tp.partialResult) as TraceResult
+              : undefined;
+            onTraceProgress(tp.traceId, tp.status || '', partialResult);
           } else if (eventData.message) {
             onProgress(eventData.message);
           }

@@ -152,6 +152,21 @@ const uploadViewStyle = css`
     }
   }
 
+  .spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--bg-elevated);
+    border-top-color: var(--accent-cyan);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   @media (max-width: 1024px) {
     .upload-grid {
       grid-template-columns: 1fr;
@@ -169,7 +184,11 @@ const JUDGE_MODELS = [
 export const UploadView: React.FC = () => {
   const { state, actions } = useTraceContext();
 
-  const canRunEvaluation = state.traceFiles.length > 0 && state.selectedMetrics.length > 0;
+  const canRunEvaluation =
+    state.traceFiles.length > 0 &&
+    state.selectedMetrics.length > 0 &&
+    !state.isLoadingMetadata &&
+    state.traceMetadata.size > 0;
 
   return (
     <div css={uploadViewStyle}>
@@ -237,6 +256,34 @@ export const UploadView: React.FC = () => {
                   {file.name}
                 </div>
               ))}
+              {state.isLoadingMetadata && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '6px',
+                  backgroundColor: 'var(--bg-surface)',
+                  borderRadius: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: 'var(--accent-cyan)',
+                  fontSize: '11px'
+                }}>
+                  <div className="spinner" />
+                  Extracting trace metadata...
+                </div>
+              )}
+              {!state.isLoadingMetadata && state.traceMetadata.size > 0 && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '6px',
+                  backgroundColor: 'var(--bg-surface)',
+                  borderRadius: '3px',
+                  color: 'var(--status-success)',
+                  fontSize: '11px'
+                }}>
+                  ✓ {state.traceMetadata.size} trace(s) ready
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -327,11 +374,13 @@ export const UploadView: React.FC = () => {
           className="run-button"
           onClick={actions.runEvaluation}
           disabled={!canRunEvaluation}
-          loading={state.isEvaluating}
+          loading={state.isEvaluating || state.isLoadingMetadata}
         >
           <Play size={20} />
           {state.isEvaluating
             ? (state.progressMessage || 'Running Evaluation...')
+            : state.isLoadingMetadata
+            ? 'Loading Traces...'
             : 'Run Evaluation'}
         </Button>
       </div>
