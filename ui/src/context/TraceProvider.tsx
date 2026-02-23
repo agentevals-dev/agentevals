@@ -136,9 +136,24 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
                   metricResults: existingMetrics,
                   numInvocations: partialResult.numInvocations,
                   conversionWarnings: partialResult.conversionWarnings,
+                  performanceMetrics: partialResult.performanceMetrics,
                 });
 
-                return { ...prev, tableRows: newRows };
+                // Update results array in real-time for charts
+                const newResults = [...prev.results];
+                const existingResultIndex = newResults.findIndex(r => r.traceId === traceId);
+
+                if (existingResultIndex >= 0) {
+                  newResults[existingResultIndex] = partialResult;
+                } else {
+                  newResults.push(partialResult);
+                }
+
+                return {
+                  ...prev,
+                  tableRows: newRows,
+                  results: newResults,
+                };
               });
             },
             (result) => {

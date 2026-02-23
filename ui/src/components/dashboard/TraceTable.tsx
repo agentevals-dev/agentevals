@@ -11,6 +11,7 @@ interface TraceTableProps {
   selectedMetrics: string[];
   threshold: number;
   onRowClick: (traceId: string) => void;
+  onRowHover?: (traceId: string | null) => void;
   isEvaluating: boolean;
 }
 
@@ -139,6 +140,7 @@ export const TraceTable: React.FC<TraceTableProps> = ({
   selectedMetrics,
   threshold,
   onRowClick,
+  onRowHover,
   isEvaluating,
 }) => {
   const columns: ColumnsType<TraceTableRow> = [
@@ -161,6 +163,19 @@ export const TraceTable: React.FC<TraceTableProps> = ({
             <User size={14} />
             {name}
           </div>
+        );
+      },
+    },
+    {
+      title: 'Trace ID',
+      dataIndex: 'traceId',
+      key: 'traceId',
+      width: 100,
+      render: (traceId: string) => {
+        return (
+          <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>
+            {traceId.substring(0, 8)}
+          </span>
         );
       },
     },
@@ -308,6 +323,16 @@ export const TraceTable: React.FC<TraceTableProps> = ({
           onClick: () => {
             if (record.agentName || record.startTime || record.model) {
               onRowClick(record.traceId);
+            }
+          },
+          onMouseEnter: () => {
+            if (onRowHover && (record.agentName || record.startTime || record.model)) {
+              onRowHover(record.traceId);
+            }
+          },
+          onMouseLeave: () => {
+            if (onRowHover) {
+              onRowHover(null);
             }
           },
           className: (!record.agentName && !record.startTime && !record.model) ? 'pending-row' : '',

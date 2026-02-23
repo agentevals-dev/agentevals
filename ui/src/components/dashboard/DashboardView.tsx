@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { TraceCard } from './TraceCard';
 import { TraceTable } from './TraceTable';
 import { SummaryStats } from './SummaryStats';
+import { PerformanceCharts } from './PerformanceCharts';
 import { useTraceContext } from '../../context/TraceContext';
 import type { EvalStatus } from '../../lib/types';
 
@@ -124,10 +125,9 @@ export const DashboardView: React.FC = () => {
   const { state, actions } = useTraceContext();
   const [filterStatus, setFilterStatus] = useState<'all' | EvalStatus>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [hoveredTraceId, setHoveredTraceId] = useState<string | null>(null);
 
-  // Filter results
   const filteredResults = state.results.filter((result) => {
-    // Filter by status
     if (filterStatus !== 'all') {
       const hasMatchingStatus = result.metricResults.some(
         (m) => m.evalStatus === filterStatus
@@ -135,7 +135,6 @@ export const DashboardView: React.FC = () => {
       if (!hasMatchingStatus) return false;
     }
 
-    // Filter by search term
     if (searchTerm) {
       return result.traceId.toLowerCase().includes(searchTerm.toLowerCase());
     }
@@ -146,6 +145,10 @@ export const DashboardView: React.FC = () => {
   const handleTraceClick = (traceId: string) => {
     actions.selectTrace(traceId);
     actions.setCurrentView('inspector');
+  };
+
+  const handleRowHover = (traceId: string | null) => {
+    setHoveredTraceId(traceId);
   };
 
   return (
@@ -177,6 +180,8 @@ export const DashboardView: React.FC = () => {
         <>
           {state.results.length > 0 && <SummaryStats traceResults={state.results} />}
 
+          <PerformanceCharts traceResults={state.results} hoveredTraceId={hoveredTraceId} />
+
           {state.isEvaluating && (
             <div className="progress-banner">
               <Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent-cyan)' }} />
@@ -191,6 +196,7 @@ export const DashboardView: React.FC = () => {
             selectedMetrics={state.selectedMetrics}
             threshold={state.threshold}
             onRowClick={handleTraceClick}
+            onRowHover={handleRowHover}
             isEvaluating={state.isEvaluating}
           />
         </>

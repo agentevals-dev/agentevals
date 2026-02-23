@@ -66,12 +66,14 @@ class TraceResult:
     num_invocations: int = 0
     metric_results: list[MetricResult] = field(default_factory=list)
     conversion_warnings: list[str] = field(default_factory=list)
+    performance_metrics: dict[str, Any] | None = None
 
 
 @dataclass
 class RunResult:
     trace_results: list[TraceResult] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    performance_metrics: dict[str, Any] | None = None
 
 
 def get_loader(format_name: str) -> TraceLoader:
@@ -115,6 +117,12 @@ async def run_evaluation(
 
     conversion_results = convert_traces(all_traces)
 
+    trace_map = {t.trace_id: t for t in all_traces}
+
+    perf_metrics_map: dict[str, dict[str, Any]] = {}
+    for trace in all_traces:
+        perf_metrics_map[trace.trace_id] = _extract_performance_metrics(trace)
+
     eval_set: EvalSet | None = None
     if config.eval_set_file:
         try:
@@ -133,6 +141,8 @@ async def run_evaluation(
             trace_id_short = conv_result.trace_id[:12] + "..." if len(conv_result.trace_id) > 12 else conv_result.trace_id
             await progress_callback(f"Trace {idx + 1}/{total_traces}: {trace_id_short}")
 
+        trace = trace_map.get(conv_result.trace_id)
+
         trace_result = await _evaluate_trace(
             conv_result=conv_result,
             metrics=config.metrics,
@@ -141,11 +151,38 @@ async def run_evaluation(
             threshold=config.threshold,
             progress_callback=progress_callback,
             trace_progress_callback=trace_progress_callback,
+            trace=trace,
+            performance_metrics=perf_metrics_map.get(conv_result.trace_id),
         )
+
         result.trace_results.append(trace_result)
 
     if progress_callback:
         await progress_callback("Evaluation complete")
+
+    if result.trace_results:
+        all_tokens = {"prompt": [], "output": [], "total": []}
+
+        for tr in result.trace_results:
+            if tr.performance_metrics:
+                perf = tr.performance_metrics
+                all_tokens["prompt"].append(perf["tokens"]["total_prompt"])
+                all_tokens["output"].append(perf["tokens"]["total_output"])
+                all_tokens["total"].append(perf["tokens"]["total"])
+
+        if all_tokens["total"]:
+            result.performance_metrics = {
+                "tokens": {
+                    "total_prompt": sum(all_tokens["prompt"]),
+                    "total_output": sum(all_tokens["output"]),
+                    "total": sum(all_tokens["total"]),
+                    "avg_per_trace": {
+                        "prompt": sum(all_tokens["prompt"]) / len(all_tokens["prompt"]),
+                        "output": sum(all_tokens["output"]) / len(all_tokens["output"]),
+                    },
+                },
+                "trace_count": len(result.trace_results),
+            }
 
     return result
 
@@ -158,12 +195,17 @@ async def _evaluate_trace(
     threshold: float | None,
     progress_callback: Optional[ProgressCallback] = None,
     trace_progress_callback: Optional[TraceProgressCallback] = None,
+    trace = None,
+    performance_metrics: dict[str, Any] | None = None,
 ) -> TraceResult:
     trace_result = TraceResult(
         trace_id=conv_result.trace_id,
         num_invocations=len(conv_result.invocations),
         conversion_warnings=conv_result.warnings,
     )
+
+    if performance_metrics:
+        trace_result.performance_metrics = performance_metrics
 
     if not conv_result.invocations:
         trace_result.metric_results.append(
@@ -372,3 +414,64 @@ def _get_user_text(invocation: Invocation) -> str | None:
 
 def _text_matches(a: str, b: str) -> bool:
     return a.strip().lower() == b.strip().lower()
+
+
+def _extract_performance_metrics(trace) -> dict[str, Any]:
+    """Extract latency and token usage metrics from trace spans."""
+    agent_latencies = []
+    llm_latencies = []
+    tool_latencies = []
+    prompt_tokens = []
+    output_tokens = []
+    total_tokens = []
+
+    for span in trace.all_spans:
+        duration_ms = span.duration / 1000.0
+
+        if span.operation_name.startswith("invoke_agent"):
+            agent_latencies.append(duration_ms)
+        elif span.operation_name.startswith("call_llm"):
+            llm_latencies.append(duration_ms)
+
+            llm_response_raw = span.tags.get("gcp.vertex.agent.llm_response", "{}")
+            try:
+                if isinstance(llm_response_raw, dict):
+                    llm_response = llm_response_raw
+                else:
+                    llm_response = json.loads(llm_response_raw) if llm_response_raw else {}
+
+                usage = llm_response.get("usage_metadata", {})
+                if usage:
+                    prompt_tokens.append(usage.get("prompt_token_count", 0))
+                    output_tokens.append(usage.get("candidates_token_count", 0))
+                    total_tokens.append(usage.get("total_token_count", 0))
+            except (json.JSONDecodeError, AttributeError, TypeError):
+                pass
+        elif span.operation_name.startswith("execute_tool"):
+            tool_latencies.append(duration_ms)
+
+    def calc_percentiles(values: list[float]) -> dict[str, float]:
+        if not values:
+            return {"p50": 0.0, "p95": 0.0, "p99": 0.0}
+        import statistics
+        sorted_values = sorted(values)
+        n = len(sorted_values)
+        return {
+            "p50": statistics.median(sorted_values),
+            "p95": sorted_values[int(n * 0.95)] if n > 1 else sorted_values[0],
+            "p99": sorted_values[int(n * 0.99)] if n > 1 else sorted_values[0],
+        }
+
+    return {
+        "latency": {
+            "overall": calc_percentiles(agent_latencies),
+            "llm_calls": calc_percentiles(llm_latencies),
+            "tool_executions": calc_percentiles(tool_latencies),
+        },
+        "tokens": {
+            "total_prompt": sum(prompt_tokens) if prompt_tokens else 0,
+            "total_output": sum(output_tokens) if output_tokens else 0,
+            "total": sum(total_tokens) if total_tokens else 0,
+            "per_llm_call": calc_percentiles(total_tokens) if total_tokens else {"p50": 0.0, "p95": 0.0, "p99": 0.0},
+        },
+    }

@@ -117,6 +117,7 @@ export async function evaluateTracesStreaming(
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let eventType = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -129,10 +130,22 @@ export async function evaluateTracesStreaming(
       buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
+        if (line.startsWith('event: ')) {
+          eventType = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
           const eventData = JSON.parse(line.slice(6));
 
-          if (eventData.error) {
+          if (eventType === 'performance_metrics') {
+            const partialResult: TraceResult = {
+              traceId: eventData.traceId,
+              numInvocations: 0,
+              metricResults: [],
+              conversionWarnings: [],
+              performanceMetrics: convertSnakeToCamel(eventData.performanceMetrics),
+            };
+            onTraceProgress(eventData.traceId, 'loading', partialResult);
+            eventType = '';
+          } else if (eventData.error) {
             onError(new Error(eventData.error));
             return;
           } else if (eventData.done) {
