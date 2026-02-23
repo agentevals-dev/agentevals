@@ -47,6 +47,7 @@ export const InspectorView: React.FC = () => {
         numInvocations: tableRow.numInvocations || 0,
         metricResults: Array.from(tableRow.metricResults.values()),
         conversionWarnings: tableRow.conversionWarnings,
+        performanceMetrics: tableRow.performanceMetrics,
       };
     }
     return state.results.find(r => r.traceId === state.selectedTraceId);
@@ -312,6 +313,7 @@ export const InspectorView: React.FC = () => {
       threshold={state.threshold}
       selectedMetrics={state.selectedMetrics}
       isEvaluating={state.isEvaluating}
+      performanceMetrics={traceResult.performanceMetrics}
     />
   );
 

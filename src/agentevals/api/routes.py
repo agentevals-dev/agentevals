@@ -14,7 +14,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ..config import EvalRunConfig
-from ..runner import RunResult, load_eval_set, run_evaluation
+from ..runner import RunResult, load_eval_set, run_evaluation, _extract_performance_metrics, get_loader
 
 logger = logging.getLogger(__name__)
 
@@ -382,6 +382,20 @@ async def evaluate_traces_stream(
                 threshold=threshold,
             )
 
+            loader = get_loader(eval_config.trace_format)
+            for trace_file_path in trace_paths:
+                try:
+                    traces = loader.load(trace_file_path)
+                    for trace in traces:
+                        perf_metrics = _extract_performance_metrics(trace)
+                        event_data = {
+                            "traceId": trace.trace_id,
+                            "performanceMetrics": perf_metrics,
+                        }
+                        yield f"event: performance_metrics\ndata: {json.dumps(event_data)}\n\n"
+                except Exception as e:
+                    logger.error(f"Failed to extract early performance metrics from {trace_file_path}: {e}")
+
             queue: asyncio.Queue = asyncio.Queue()
 
             async def progress_callback(message: str):
@@ -402,6 +416,7 @@ async def evaluate_traces_stream(
                         for mr in trace_result.metric_results
                     ],
                     "conversionWarnings": trace_result.conversion_warnings,
+                    "performanceMetrics": trace_result.performance_metrics,
                 }
                 await queue.put({
                     "traceProgress": {
@@ -440,10 +455,12 @@ async def evaluate_traces_stream(
                                             for mr in tr.metric_results
                                         ],
                                         "conversionWarnings": tr.conversion_warnings,
+                                        "performanceMetrics": tr.performance_metrics,
                                     }
                                     for tr in result.trace_results
                                 ],
                                 "errors": result.errors,
+                                "performanceMetrics": result.performance_metrics,
                             },
                         }
                         yield f"data: {json.dumps(final_event)}\n\n"

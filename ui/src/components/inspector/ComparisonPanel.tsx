@@ -1,8 +1,9 @@
 import React from 'react';
 import { css } from '@emotion/react';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import type { Invocation, MetricResult } from '../../lib/types';
+import type { Invocation, MetricResult, PerformanceMetrics } from '../../lib/types';
 import { MetricsComparisonSection } from './MetricsComparisonSection';
+import { PerformanceSection } from './PerformanceSection';
 
 interface ComparisonPanelProps {
   actualInvocation: Invocation | null;
@@ -11,6 +12,7 @@ interface ComparisonPanelProps {
   threshold: number;
   selectedMetrics: string[];
   isEvaluating: boolean;
+  performanceMetrics?: PerformanceMetrics;
 }
 
 export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
@@ -20,6 +22,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
   threshold,
   selectedMetrics,
   isEvaluating,
+  performanceMetrics,
 }) => {
   if (!actualInvocation) {
     return (
@@ -51,7 +54,12 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
       </div>
 
       <div css={panelContentStyles}>
-        {/* Metrics Overview Section */}
+        {performanceMetrics && (
+          <div css={performanceSectionContainerStyles}>
+            <PerformanceSection metrics={performanceMetrics} />
+          </div>
+        )}
+
         <MetricsComparisonSection
           metricResults={metricResults}
           expectedInvocation={expectedInvocation}
@@ -136,6 +144,10 @@ const panelContentStyles = css`
   &::-webkit-scrollbar-thumb:hover {
     background: var(--accent-cyan);
   }
+`;
+
+const performanceSectionContainerStyles = css`
+  margin-bottom: 16px;
 `;
 
 const emptyStateStyles = css`
