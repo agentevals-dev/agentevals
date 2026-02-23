@@ -3,7 +3,7 @@ import { css } from '@emotion/react';
 import { useTraceContext } from '../../context/TraceContext';
 import { InspectorHeader } from './InspectorHeader';
 import { InspectorLayout } from './InspectorLayout';
-import { ExtractedDataPanel } from './ExtractedDataPanel';
+import { InvocationSummaryPanel } from './InvocationSummaryPanel';
 import { SpanTreePanel } from './SpanTreePanel';
 import { ComparisonPanel } from './ComparisonPanel';
 import type { InspectorUIState, Trace, Invocation } from '../../lib/types';
@@ -11,18 +11,24 @@ import { loadJaegerTraces } from '../../lib/trace-loader';
 import { convertTracesToInvocations } from '../../lib/trace-converter';
 import { readFileAsText } from '../../lib/utils';
 
+const SHOW_EXECUTION_KEY = 'inspector-show-execution';
+
 export const InspectorView: React.FC = () => {
   const { state, actions } = useTraceContext();
 
   // Local inspector UI state
-  const [inspectorState, setInspectorState] = useState<InspectorUIState>({
-    selectedInvocationId: null,
-    selectedDataPath: null,
-    highlightedSpanIds: new Set(),
-    hoveredElement: null,
-    leftPanelWidth: 400,
-    rightPanelWidth: 400,
-    jsonScrollPosition: 0,
+  const [inspectorState, setInspectorState] = useState<InspectorUIState>(() => {
+    const showExecution = localStorage.getItem(SHOW_EXECUTION_KEY) === 'true';
+    return {
+      selectedInvocationId: null,
+      selectedDataPath: null,
+      highlightedSpanIds: new Set(),
+      hoveredElement: null,
+      leftPanelWidth: 400,
+      rightPanelWidth: 400,
+      jsonScrollPosition: 0,
+      showExecution,
+    };
   });
 
   // Loaded trace data
@@ -140,6 +146,12 @@ export const InspectorView: React.FC = () => {
     actions.setCurrentView('dashboard');
   };
 
+  // Handle execution toggle
+  const handleToggleExecution = (show: boolean) => {
+    setInspectorState(prev => ({ ...prev, showExecution: show }));
+    localStorage.setItem(SHOW_EXECUTION_KEY, String(show));
+  };
+
   // Handle data selection
   const handleSelectData = (dataPath: string) => {
     console.log('Selected data:', dataPath);
@@ -194,10 +206,19 @@ export const InspectorView: React.FC = () => {
     );
   }
 
+  // Calculate span count for the toggle button
+  const spanCount = trace?.allSpans?.length || 0;
+
   if (loading) {
     return (
       <div css={containerStyles}>
-        <InspectorHeader traceResult={traceResult} onBack={handleBack} />
+        <InspectorHeader
+          traceResult={traceResult}
+          onBack={handleBack}
+          showExecution={inspectorState.showExecution}
+          onToggleExecution={handleToggleExecution}
+          spanCount={spanCount}
+        />
         <div css={loadingContainerStyles}>
           <div css={loadingSpinnerStyles} />
           <p>Loading trace data...</p>
@@ -209,7 +230,13 @@ export const InspectorView: React.FC = () => {
   if (error) {
     return (
       <div css={containerStyles}>
-        <InspectorHeader traceResult={traceResult} onBack={handleBack} />
+        <InspectorHeader
+          traceResult={traceResult}
+          onBack={handleBack}
+          showExecution={inspectorState.showExecution}
+          onToggleExecution={handleToggleExecution}
+          spanCount={spanCount}
+        />
         <div css={errorContainerStyles}>
           <div css={errorMessageStyles}>
             <h2>Error loading trace</h2>
@@ -225,20 +252,14 @@ export const InspectorView: React.FC = () => {
 
   // Build panels
   const leftPanel = (
-    <ExtractedDataPanel
+    <InvocationSummaryPanel
       invocations={invocations}
-      metricResults={traceResult.metricResults}
-      threshold={state.threshold}
       selectedInvocationId={inspectorState.selectedInvocationId}
-      highlightedPaths={inspectorState.selectedDataPath ? new Set([inspectorState.selectedDataPath]) : new Set()}
-      onSelectData={handleSelectData}
       onSelectInvocation={handleSelectInvocation}
-      selectedMetrics={state.selectedMetrics}
-      isEvaluating={state.isEvaluating}
     />
   );
 
-  const centerPanel = trace ? (
+  const centerPanel = trace && inspectorState.showExecution ? (
     <SpanTreePanel
       trace={trace}
       spanToDataMapping={new Map()} // Will be populated in Step 5
@@ -246,12 +267,7 @@ export const InspectorView: React.FC = () => {
       onSelectSpan={handleSelectSpan}
       onHoverSpan={handleHoverSpan}
     />
-  ) : (
-    <div css={placeholderStyles}>
-      <h3>Span Tree Panel</h3>
-      <p>Loading trace data...</p>
-    </div>
-  );
+  ) : null;
 
   // Find selected or first invocation for comparison
   const selectedInvocation = inspectorState.selectedInvocationId
@@ -293,16 +309,26 @@ export const InspectorView: React.FC = () => {
       actualInvocation={selectedInvocation || null}
       expectedInvocation={expectedInvocation}
       metricResults={traceResult.metricResults}
+      threshold={state.threshold}
+      selectedMetrics={state.selectedMetrics}
+      isEvaluating={state.isEvaluating}
     />
   );
 
   return (
     <div css={containerStyles}>
-      <InspectorHeader traceResult={traceResult} onBack={handleBack} />
+      <InspectorHeader
+        traceResult={traceResult}
+        onBack={handleBack}
+        showExecution={inspectorState.showExecution}
+        onToggleExecution={handleToggleExecution}
+        spanCount={spanCount}
+      />
       <InspectorLayout
         leftPanel={leftPanel}
         centerPanel={centerPanel}
         rightPanel={rightPanel}
+        showCenterPanel={inspectorState.showExecution}
       />
     </div>
   );
