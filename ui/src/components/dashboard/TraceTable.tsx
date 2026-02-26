@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { css } from '@emotion/react';
-import { Clock, User, Cpu, MessageSquare, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Clock, User, Cpu, MessageSquare, CheckCircle2, XCircle, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
 import type { TraceTableRow } from '../../lib/types';
 import { formatTimestamp } from '../../lib/utils';
 
@@ -133,7 +133,24 @@ const tableStyle = css`
   .animate-spin {
     animation: spin 1s linear infinite;
   }
+
+  .ant-table-expanded-row > td {
+    padding: 16px 16px 16px 16px !important;
+    background: var(--bg-surface) !important;
+  }
+
+  .ant-table-expanded-row:hover > td {
+    background: var(--bg-surface) !important;
+  }
 `;
+
+const extractText = (parts: any[]): string => {
+  if (!parts) return '';
+  return parts
+    .filter(p => p.text)
+    .map(p => p.text)
+    .join(' ');
+};
 
 export const TraceTable: React.FC<TraceTableProps> = ({
   rows,
@@ -143,6 +160,7 @@ export const TraceTable: React.FC<TraceTableProps> = ({
   onRowHover,
   isEvaluating,
 }) => {
+  const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
   const columns: ColumnsType<TraceTableRow> = [
     {
       title: 'Name',
@@ -167,14 +185,15 @@ export const TraceTable: React.FC<TraceTableProps> = ({
       },
     },
     {
-      title: 'Trace ID',
-      dataIndex: 'traceId',
-      key: 'traceId',
-      width: 100,
-      render: (traceId: string) => {
+      title: 'Session ID',
+      dataIndex: 'sessionId',
+      key: 'sessionId',
+      width: 120,
+      render: (sessionId: string | undefined, record: TraceTableRow) => {
+        const displayId = sessionId || record.traceId.substring(0, 12);
         return (
-          <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>
-            {traceId.substring(0, 8)}
+          <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>
+            {displayId}
           </span>
         );
       },
@@ -201,42 +220,52 @@ export const TraceTable: React.FC<TraceTableProps> = ({
       },
     },
     {
-      title: 'Input',
-      dataIndex: 'userInputPreview',
-      key: 'userInputPreview',
-      width: 180,
+      title: 'Conversation',
+      key: 'conversation',
+      width: 300,
       ellipsis: true,
-      render: (text: string | undefined) => {
-        if (!text) {
+      render: (_: any, record: TraceTableRow) => {
+        if (!record.userInputPreview) {
           return (
             <div className="loading-cell">
               <Loader2 size={14} className="animate-spin" />
             </div>
           );
         }
+
+        const numTurns = record.invocations?.length || record.numInvocations || 1;
+        const isExpanded = expandedRowKeys.includes(record.traceId);
+
+        if (numTurns > 1) {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isExpanded) {
+                    setExpandedRowKeys(expandedRowKeys.filter(k => k !== record.traceId));
+                  } else {
+                    setExpandedRowKeys([...expandedRowKeys, record.traceId]);
+                  }
+                }}
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              >
+                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </span>
+              <MessageSquare size={14} />
+              <span className="preview-text" style={{ fontWeight: 600 }}>
+                {numTurns} turns
+              </span>
+            </div>
+          );
+        }
+
         return (
           <div className="cell-with-icon">
             <MessageSquare size={14} />
-            <span className="preview-text">{text}</span>
+            <span className="preview-text">{record.userInputPreview}</span>
           </div>
         );
-      },
-    },
-    {
-      title: 'Output',
-      dataIndex: 'finalOutputPreview',
-      key: 'finalOutputPreview',
-      width: 120,
-      ellipsis: true,
-      render: (text: string | undefined) => {
-        if (!text) {
-          return (
-            <div className="loading-cell">
-              <Loader2 size={14} className="animate-spin" />
-            </div>
-          );
-        }
-        return <span className="preview-text">{text}</span>;
       },
     },
     {
@@ -311,6 +340,129 @@ export const TraceTable: React.FC<TraceTableProps> = ({
     })),
   ];
 
+  const expandedRowRender = (record: TraceTableRow) => {
+    const invocations = record.invocations || [];
+    if (invocations.length === 0) return null;
+
+    return (
+      <div style={{
+        background: 'var(--bg-elevated)',
+        padding: '16px',
+        borderRadius: '8px',
+        marginLeft: '40px',
+      }}>
+        {invocations.map((inv, idx) => {
+          const userText = extractText(inv.userContent?.parts || []);
+          const agentText = extractText(inv.finalResponse?.parts || []);
+          const toolCalls = inv.intermediateData?.toolUses || [];
+
+          return (
+            <div
+              key={inv.invocationId}
+              style={{
+                marginBottom: idx < invocations.length - 1 ? '20px' : '0',
+                paddingBottom: idx < invocations.length - 1 ? '20px' : '0',
+                borderBottom: idx < invocations.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+              }}
+            >
+              <div style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#3b82f6',
+                marginBottom: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}>
+                Turn {idx + 1}
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  color: 'var(--text-tertiary)',
+                  marginBottom: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.3px',
+                }}>
+                  User Input
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  color: 'var(--text-primary)',
+                  lineHeight: '1.6',
+                  padding: '8px 12px',
+                  background: 'var(--bg-surface)',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #3b82f6',
+                }}>
+                  {userText || '(no text)'}
+                </div>
+              </div>
+
+              {toolCalls.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    color: 'var(--text-tertiary)',
+                    marginBottom: '6px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.3px',
+                  }}>
+                    Tool Calls
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {toolCalls.map((tc, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          fontSize: '12px',
+                          color: '#8b5cf6',
+                          fontFamily: 'monospace',
+                          background: 'rgba(139, 92, 246, 0.08)',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {tc.name}({Object.keys(tc.args || {}).length > 0 ? Object.keys(tc.args).map(k => `${k}=${JSON.stringify(tc.args[k])}`).join(', ') : ''})
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <div style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  color: 'var(--text-tertiary)',
+                  marginBottom: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.3px',
+                }}>
+                  Agent Response
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  color: 'var(--text-primary)',
+                  lineHeight: '1.6',
+                  padding: '8px 12px',
+                  background: 'var(--bg-surface)',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #10b981',
+                }}>
+                  {agentText || '(no text)'}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div css={tableStyle}>
       <Table
@@ -319,6 +471,19 @@ export const TraceTable: React.FC<TraceTableProps> = ({
         rowKey="traceId"
         pagination={false}
         scroll={{ x: 'max-content' }}
+        expandable={{
+          expandedRowKeys,
+          onExpand: (expanded, record) => {
+            if (expanded) {
+              setExpandedRowKeys([...expandedRowKeys, record.traceId]);
+            } else {
+              setExpandedRowKeys(expandedRowKeys.filter(k => k !== record.traceId));
+            }
+          },
+          expandedRowRender,
+          rowExpandable: (record) => (record.invocations?.length || 0) > 1,
+          expandIcon: () => null, // Hide default expand icon since we show it in the Conversation column
+        }}
         onRow={(record) => ({
           onClick: () => {
             if (record.agentName || record.startTime || record.model) {

@@ -16,6 +16,12 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "python-multipart>=0.0.12",
     "python-dotenv>=1.0.0",
+    "websockets>=13.0",
+]
+
+[project.optional-dependencies]
+streaming = [
+    "opentelemetry-sdk>=1.20.0",
 ]
 
 [project.scripts]

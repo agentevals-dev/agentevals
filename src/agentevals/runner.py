@@ -28,6 +28,7 @@ from .config import EvalRunConfig
 from .converter import ConversionResult, convert_traces
 from .loader.base import TraceLoader
 from .loader.jaeger import JaegerJsonLoader
+from .loader.otlp import OtlpJsonLoader
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,7 @@ class RunResult:
 def get_loader(format_name: str) -> TraceLoader:
     loaders: dict[str, type[TraceLoader]] = {
         "jaeger-json": JaegerJsonLoader,
+        "otlp-json": OtlpJsonLoader,
     }
     if format_name not in loaders:
         raise ValueError(

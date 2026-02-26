@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class EvalRunConfig(BaseModel):
-    trace_files: list[str] = Field(description="Paths to trace files (Jaeger JSON).")
+    trace_files: list[str] = Field(description="Paths to trace files (Jaeger JSON or OTLP JSON).")
 
     eval_set_file: Optional[str] = Field(
         default=None,
@@ -22,7 +22,7 @@ class EvalRunConfig(BaseModel):
 
     trace_format: str = Field(
         default="jaeger-json",
-        description="Format of the trace files.",
+        description="Format of the trace files (jaeger-json or otlp-json).",
     )
 
     judge_model: Optional[str] = Field(

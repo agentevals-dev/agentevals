@@ -77,19 +77,16 @@ const statsStyle = css`
 `;
 
 export const SummaryStats: React.FC<SummaryStatsProps> = ({ traceResults }) => {
-  // Collect all metric results
   const allMetricResults = traceResults.flatMap((tr) => tr.metricResults);
 
   const totalTraces = traceResults.length;
   const passRate = calculatePassRate(allMetricResults);
   const avgScore = calculateAvgScore(allMetricResults);
 
-  // Calculate number of passed traces (all metrics passed)
   const passedTraces = traceResults.filter((tr) =>
     tr.metricResults.every((m) => m.evalStatus === 'PASSED')
   ).length;
 
-  // Circle parameters for donut chart
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
   const passOffset = circumference - (passRate * circumference);

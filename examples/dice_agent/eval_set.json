@@ -1,0 +1,127 @@
+{
+  "eval_set_id": "dice_agent_eval",
+  "eval_cases": [
+    {
+      "case_id": "greeting",
+      "conversation": [
+        {
+          "invocation_id": "inv-1",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Hi! Can you help me?"
+              }
+            ]
+          },
+          "agent_content": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Hello! Yes, I can help you. I can roll dice and check if numbers are prime. What would you like to do?"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "roll_and_check_prime",
+      "conversation": [
+        {
+          "invocation_id": "inv-1",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Hi! Can you help me?"
+              }
+            ]
+          },
+          "agent_content": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Hello! I can help you roll dice and check prime numbers."
+              }
+            ]
+          }
+        },
+        {
+          "invocation_id": "inv-2",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Roll a 20-sided die for me"
+              }
+            ]
+          },
+          "agent_content": {
+            "role": "model",
+            "parts": [
+              {
+                "function_call": {
+                  "name": "roll_die",
+                  "args": {
+                    "sides": 20
+                  }
+                }
+              }
+            ]
+          },
+          "intermediate_data": {
+            "role": "model",
+            "parts": [
+              {
+                "function_call": {
+                  "name": "roll_die",
+                  "args": {
+                    "sides": 20
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "invocation_id": "inv-3",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Is the number you rolled prime?"
+              }
+            ]
+          },
+          "agent_content": {
+            "role": "model",
+            "parts": [
+              {
+                "function_call": {
+                  "name": "check_prime",
+                  "args": {
+                    "nums": []
+                  }
+                }
+              }
+            ]
+          },
+          "intermediate_data": {
+            "role": "model",
+            "parts": [
+              {
+                "function_call": {
+                  "name": "check_prime",
+                  "args": {
+                    "nums": []
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,398 @@
+"""WebSocket server for streaming OTel spans from agents."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import tempfile
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+from fastapi import WebSocket, WebSocketDisconnect
+
+from .session import TraceSession
+from .incremental_processor import IncrementalInvocationExtractor
+from ..converter import convert_traces
+from ..loader.base import Trace
+from ..loader.otlp import OtlpJsonLoader
+
+logger = logging.getLogger(__name__)
+
+
+class StreamingTraceManager:
+    """Manages active trace sessions from WebSocket clients.
+
+    Args:
+        session_ttl_hours: How long to keep completed sessions in memory (default: 2 hours)
+        max_sessions: Maximum number of sessions to keep (default: 100)
+    """
+
+    def __init__(self, session_ttl_hours: int = 2, max_sessions: int = 100):
+        self.sessions: dict[str, TraceSession] = {}
+        self.incremental_extractors: dict[str, IncrementalInvocationExtractor] = {}
+        self.sse_queues: list[asyncio.Queue] = []
+        self.session_ttl = timedelta(hours=session_ttl_hours)
+        self.max_sessions = max_sessions
+        self._cleanup_task: asyncio.Task | None = None
+
+    def register_sse_client(self) -> asyncio.Queue:
+        """Register a new SSE client and return its queue."""
+        queue: asyncio.Queue = asyncio.Queue()
+        self.sse_queues.append(queue)
+        return queue
+
+    def unregister_sse_client(self, queue: asyncio.Queue) -> None:
+        """Unregister an SSE client."""
+        if queue in self.sse_queues:
+            self.sse_queues.remove(queue)
+
+    def start_cleanup_task(self) -> None:
+        """Start the background task for cleaning up old sessions."""
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_old_sessions_loop())
+            logger.info("Started session cleanup task (TTL: %s, max: %d)", self.session_ttl, self.max_sessions)
+
+    async def stop_cleanup_task(self) -> None:
+        """Stop the background cleanup task."""
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
+
+    async def _cleanup_old_sessions_loop(self) -> None:
+        """Periodically clean up old sessions to prevent memory leak."""
+        while True:
+            try:
+                await asyncio.sleep(3600)
+                removed_count = self._cleanup_old_sessions()
+                if removed_count > 0:
+                    logger.info("Cleaned up %d old sessions", removed_count)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.exception("Error in cleanup task: %s", exc)
+
+    def _cleanup_old_sessions(self) -> int:
+        """Remove sessions older than TTL or enforce max session limit.
+
+        Returns:
+            Number of sessions removed
+        """
+        now = datetime.utcnow()
+        to_remove = []
+
+        for session_id, session in self.sessions.items():
+            age = now - session.started_at
+            if session.is_complete and age > self.session_ttl:
+                to_remove.append(session_id)
+
+        if len(self.sessions) - len(to_remove) > self.max_sessions:
+            sorted_sessions = sorted(
+                [(sid, s) for sid, s in self.sessions.items() if s.is_complete and sid not in to_remove],
+                key=lambda x: x[1].started_at
+            )
+            excess_count = len(self.sessions) - len(to_remove) - self.max_sessions
+            for i in range(min(excess_count, len(sorted_sessions))):
+                to_remove.append(sorted_sessions[i][0])
+
+        for session_id in to_remove:
+            del self.sessions[session_id]
+            if session_id in self.incremental_extractors:
+                del self.incremental_extractors[session_id]
+            logger.debug("Removed old session: %s", session_id)
+
+        return len(to_remove)
+
+    async def broadcast_to_ui(self, event: dict) -> None:
+        """Broadcast event to all connected SSE clients."""
+        for queue in self.sse_queues:
+            try:
+                await queue.put(event)
+            except Exception as exc:
+                logger.warning("Failed to broadcast to SSE client: %s", exc)
+
+    async def handle_connection(self, websocket: WebSocket) -> None:
+        """Handle WebSocket connection from an agent.
+
+        Manages the lifecycle of a WebSocket connection, receiving span events
+        and broadcasting updates to connected UI clients.
+
+        Args:
+            websocket: The WebSocket connection to handle
+        """
+        await websocket.accept()
+        session_id = None
+
+        try:
+            async for message in websocket.iter_text():
+                event = json.loads(message)
+
+                if event["type"] == "session_start":
+                    session_id = event["session_id"]
+                    logger.info("Received session_start event: %s", session_id)
+
+                    session = TraceSession(
+                        session_id=session_id,
+                        trace_id=event["trace_id"],
+                        eval_set_id=event.get("eval_set_id"),
+                        metadata=event.get("metadata", {}),
+                    )
+                    self.sessions[session_id] = session
+                    self.incremental_extractors[session_id] = IncrementalInvocationExtractor()
+
+                    broadcast_event = {
+                        "type": "session_started",
+                        "session": {
+                            "sessionId": session_id,
+                            "traceId": event["trace_id"],
+                            "evalSetId": event.get("eval_set_id"),
+                            "metadata": event.get("metadata", {}),
+                            "startedAt": session.started_at.isoformat(),
+                        },
+                    }
+                    logger.info("Broadcasting session_started to %d SSE clients", len(self.sse_queues))
+                    await self.broadcast_to_ui(broadcast_event)
+
+                    logger.info("Session started: %s", session_id)
+
+                elif event["type"] == "span":
+                    sid = event["session_id"]
+                    if sid not in self.sessions:
+                        logger.warning("Span for unknown session: %s", sid)
+                        continue
+
+                    session = self.sessions[sid]
+                    session.spans.append(event["span"])
+
+                    extractor = self.incremental_extractors.get(sid)
+                    if extractor:
+                        updates = extractor.process_span(event["span"])
+                        for update in updates:
+                            update["sessionId"] = sid
+                            await self.broadcast_to_ui(update)
+
+                    await self.broadcast_to_ui(
+                        {
+                            "type": "span_received",
+                            "sessionId": sid,
+                            "span": event["span"],
+                        }
+                    )
+
+                elif event["type"] == "session_end":
+                    sid = event["session_id"]
+                    logger.info("Received session_end event: %s", sid)
+                    logger.info("Current sessions: %s", list(self.sessions.keys()))
+
+                    if sid not in self.sessions:
+                        logger.warning("End for unknown session: %s", sid)
+                        continue
+
+                    session = self.sessions[sid]
+                    session.is_complete = True
+
+                    logger.info("Session ended: %s (%d spans)", sid, len(session.spans))
+
+                    invocations_data = await self._extract_invocations(session)
+                    logger.info("Extracted %d invocations from session %s", len(invocations_data), sid)
+
+                    complete_event = {
+                        "type": "session_complete",
+                        "sessionId": sid,
+                        "invocations": invocations_data,
+                    }
+                    logger.info("Broadcasting session_complete to %d SSE clients", len(self.sse_queues))
+                    await self.broadcast_to_ui(complete_event)
+
+                    if sid in self.incremental_extractors:
+                        del self.incremental_extractors[sid]
+
+                    await websocket.send_json(
+                        {"type": "session_complete", "invocations": invocations_data}
+                    )
+
+        except WebSocketDisconnect:
+            if session_id and session_id in self.sessions:
+                self.sessions[session_id].is_complete = False
+                logger.warning("Client disconnected: %s", session_id)
+
+    async def _save_spans_to_temp_file(self, session: TraceSession) -> Path:
+        """Save spans to a temporary OTLP JSONL file.
+
+        Args:
+            session: The trace session containing spans to save
+
+        Returns:
+            Path to the temporary JSONL file containing the spans
+        """
+        temp_file = Path(tempfile.gettempdir()) / f"agentevals_{session.session_id}.jsonl"
+
+        with open(temp_file, "w") as f:
+            for span in session.spans:
+                f.write(json.dumps(span) + "\n")
+
+        return temp_file
+
+    async def _extract_invocations(self, session: TraceSession) -> list[dict]:
+        """Extract invocations from session spans for UI display.
+
+        Converts raw OTLP spans into structured invocation data with user/agent messages,
+        tool calls, and model information for display in the UI.
+
+        Args:
+            session: The trace session containing spans to extract invocations from
+
+        Returns:
+            List of invocation dictionaries with the following structure:
+                - invocationId: Unique identifier for the invocation
+                - userText: User's input text
+                - agentText: Agent's response text
+                - toolCalls: List of tool calls with name and args
+                - modelInfo: Model metadata (model name, tokens, etc.)
+        """
+        try:
+            import tempfile
+            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False)
+            for span in session.spans:
+                temp_file.write(json.dumps(span) + "\n")
+            temp_file.close()
+
+            logger.info("Saved %d spans to %s", len(session.spans), temp_file.name)
+
+            loader = OtlpJsonLoader()
+            traces = loader.load(temp_file.name)
+
+            logger.info("Loaded %d traces from file", len(traces))
+
+            if not traces:
+                logger.warning("No traces loaded")
+                return []
+
+            for i, trace in enumerate(traces):
+                logger.info("Trace %d: %s... has %d spans", i+1, trace.trace_id[:12], len(trace.all_spans))
+                invoke_spans = [s for s in trace.all_spans if 'invoke_agent' in s.operation_name]
+                logger.info("  - %d invoke_agent spans", len(invoke_spans))
+
+                span_names = [s.operation_name for s in trace.all_spans]
+                logger.info("  - Span names: %s", span_names)
+
+            conversion_results = convert_traces(traces)
+            logger.info("Converted traces, got %d results", len(conversion_results))
+
+            if not conversion_results:
+                logger.warning("No conversion results")
+                return []
+
+            invocations_data = []
+
+            for trace_idx, conv_result in enumerate(conversion_results):
+                logger.info("Result %d: %d invocations", trace_idx+1, len(conv_result.invocations))
+                if conv_result.warnings:
+                    logger.warning("  Warnings: %s", conv_result.warnings)
+
+                trace = traces[trace_idx] if trace_idx < len(traces) else None
+
+                for inv_idx, inv in enumerate(conv_result.invocations):
+                    user_text = ""
+                    if inv.user_content and inv.user_content.parts:
+                        user_text = " ".join(p.text for p in inv.user_content.parts if p.text)
+
+                    agent_text = ""
+                    if inv.final_response and inv.final_response.parts:
+                        for part in inv.final_response.parts:
+                            if part.text:
+                                agent_text += part.text
+
+                    tool_calls = []
+                    if inv.intermediate_data and inv.intermediate_data.tool_uses:
+                        for tool_use in inv.intermediate_data.tool_uses:
+                            tool_calls.append({
+                                "name": tool_use.name,
+                                "args": tool_use.args if hasattr(tool_use, 'args') else {},
+                            })
+
+                    model_info = {}
+                    if trace:
+                        model_info = self._extract_model_info_from_trace(trace, inv_idx)
+
+                    invocations_data.append({
+                        "invocationId": inv.invocation_id,
+                        "userText": user_text,
+                        "agentText": agent_text,
+                        "toolCalls": tool_calls,
+                        "modelInfo": model_info,
+                    })
+
+            logger.info("Extracted %d total invocations from %d traces", len(invocations_data), len(conversion_results))
+            return invocations_data
+
+        except Exception as exc:
+            logger.exception("Failed to extract invocations")
+            return []
+
+    def _extract_model_info_from_trace(self, trace: Trace, invocation_idx: int) -> dict:
+        """Extract model information from call_llm spans in the trace.
+
+        Parses LLM request/response tags from call_llm spans to extract:
+        - Model name(s) used
+        - Total input tokens (prompt tokens)
+        - Total output tokens (response tokens)
+
+        Args:
+            trace: The trace object containing all spans
+            invocation_idx: Index of the invocation within the trace
+
+        Returns:
+            Dictionary with optional keys:
+                - models: List of model names used
+                - inputTokens: Total prompt tokens consumed
+                - outputTokens: Total response tokens generated
+        """
+        model_info = {}
+        models_used = set()
+        total_input_tokens = 0
+        total_output_tokens = 0
+
+        invoke_spans = [s for s in trace.all_spans if 'invoke_agent' in s.operation_name]
+        if invocation_idx >= len(invoke_spans):
+            return model_info
+
+        invoke_span = invoke_spans[invocation_idx]
+        call_llm_spans = [
+            s for s in trace.all_spans
+            if 'call_llm' in s.operation_name and s.parent_span_id == invoke_span.span_id
+        ]
+
+        for call_llm_span in call_llm_spans:
+            llm_request_raw = call_llm_span.get_tag("gcp.vertex.agent.llm_request", "{}")
+            try:
+                llm_request = json.loads(llm_request_raw)
+                if "model" in llm_request:
+                    models_used.add(llm_request["model"])
+            except Exception:
+                pass
+
+            llm_response_raw = call_llm_span.get_tag("gcp.vertex.agent.llm_response", "{}")
+            try:
+                llm_response = json.loads(llm_response_raw)
+                usage = llm_response.get("usage_metadata", {})
+                if "prompt_token_count" in usage:
+                    total_input_tokens += usage["prompt_token_count"]
+                if "candidates_token_count" in usage:
+                    total_output_tokens += usage["candidates_token_count"]
+            except Exception:
+                pass
+
+        if models_used:
+            model_info["models"] = list(models_used)
+        if total_input_tokens > 0:
+            model_info["inputTokens"] = total_input_tokens
+        if total_output_tokens > 0:
+            model_info["outputTokens"] = total_output_tokens
+
+        return model_info

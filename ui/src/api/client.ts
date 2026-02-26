@@ -1,7 +1,7 @@
 import type { RunResult, EvalConfig, TraceResult } from '../lib/types';
 
 // API base URL (configured for development)
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://localhost:8001/api';
 
 /**
  * Convert snake_case Python response to camelCase TypeScript types

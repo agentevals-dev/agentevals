@@ -5,6 +5,7 @@ import { UploadView } from './components/upload/UploadView';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { InspectorView } from './components/inspector/InspectorView';
 import { BuilderView } from './components/builder/BuilderView';
+import { LiveStreamingView } from './components/streaming/LiveStreamingView';
 
 function AppContent() {
   const { state } = useTraceContext();
@@ -16,7 +17,7 @@ function AppContent() {
       {state.currentView === 'dashboard' && <DashboardView />}
       {state.currentView === 'inspector' && <InspectorView />}
       {state.currentView === 'builder' && <BuilderView />}
-      {/* Comparison view will be added in later phase */}
+      {state.currentView === 'streaming' && <LiveStreamingView />}
       {state.currentView === 'comparison' && (
         <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)' }}>
           Comparison view coming soon...

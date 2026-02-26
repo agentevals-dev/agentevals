@@ -33,10 +33,13 @@ export const PerformanceCharts: React.FC<PerformanceChartsProps> = ({ traceResul
     return null;
   }
 
-  // Sort by trace ID to maintain consistent ordering
-  const sortedTraces = [...tracesWithPerf].sort((a, b) => a.traceId.localeCompare(b.traceId));
+  const sortedTraces = [...tracesWithPerf].sort((a, b) => {
+    const aSession = a.sessionId || a.traceId;
+    const bSession = b.sessionId || b.traceId;
+    return aSession.localeCompare(bSession);
+  });
 
-  const labels = sortedTraces.map(tr => tr.traceId.substring(0, 8));
+  const labels = sortedTraces.map(tr => tr.sessionId || tr.traceId.substring(0, 12));
 
   const hoveredIndex = hoveredTraceId
     ? sortedTraces.findIndex(tr => tr.traceId === hoveredTraceId)

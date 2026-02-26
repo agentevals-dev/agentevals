@@ -77,12 +77,14 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
           const metadata = metadataArray[i];
           initialRows.set(metadata.traceId, {
             traceId: metadata.traceId,
+            sessionId: metadata.sessionId,
             status: 'loading' as const,
             agentName: metadata.agentName,
             startTime: metadata.startTime,
             model: metadata.model,
             userInputPreview: metadata.userInputPreview,
             finalOutputPreview: metadata.finalOutputPreview,
+            invocations: metadata.invocations,
             metricResults: new Map(),
             conversionWarnings: [],
           });
@@ -110,7 +112,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
             (message) => {
               setState((prev) => ({ ...prev, progressMessage: message }));
             },
-            (traceId, status, partialResult) => {
+            (traceId, _status, partialResult) => {
               setState((prev) => {
                 if (!partialResult) return prev;
 
@@ -127,26 +129,32 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
 
                 newRows.set(traceId, {
                   traceId,
+                  sessionId: metadata?.sessionId,
                   status: allMetricsComplete ? 'complete' : 'loading',
                   agentName: metadata?.agentName,
                   startTime: metadata?.startTime,
                   model: metadata?.model,
                   userInputPreview: metadata?.userInputPreview,
                   finalOutputPreview: metadata?.finalOutputPreview,
+                  invocations: metadata?.invocations,
                   metricResults: existingMetrics,
                   numInvocations: partialResult.numInvocations,
                   conversionWarnings: partialResult.conversionWarnings,
                   performanceMetrics: partialResult.performanceMetrics,
                 });
 
-                // Update results array in real-time for charts
                 const newResults = [...prev.results];
                 const existingResultIndex = newResults.findIndex(r => r.traceId === traceId);
 
+                const resultWithSessionId = {
+                  ...partialResult,
+                  sessionId: metadata?.sessionId,
+                };
+
                 if (existingResultIndex >= 0) {
-                  newResults[existingResultIndex] = partialResult;
+                  newResults[existingResultIndex] = resultWithSessionId;
                 } else {
-                  newResults.push(partialResult);
+                  newResults.push(resultWithSessionId);
                 }
 
                 return {
@@ -157,13 +165,20 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
               });
             },
             (result) => {
-              setState((prev) => ({
-                ...prev,
-                isEvaluating: false,
-                progressMessage: '',
-                results: result.traceResults,
-                errors: result.errors,
-              }));
+              setState((prev) => {
+                const resultsWithSessionId = result.traceResults.map(tr => ({
+                  ...tr,
+                  sessionId: prev.traceMetadata.get(tr.traceId)?.sessionId,
+                }));
+
+                return {
+                  ...prev,
+                  isEvaluating: false,
+                  progressMessage: '',
+                  results: resultsWithSessionId,
+                  errors: result.errors,
+                };
+              });
             },
             (error) => {
               setState((prev) => ({

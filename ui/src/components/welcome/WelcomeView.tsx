@@ -1,6 +1,6 @@
 import React from 'react';
 import { css } from '@emotion/react';
-import { FileJson, Play } from 'lucide-react';
+import { FileJson, Play, Radio } from 'lucide-react';
 import { useTraceContext } from '../../context/TraceContext';
 
 export const WelcomeView: React.FC = () => {
@@ -14,33 +14,41 @@ export const WelcomeView: React.FC = () => {
     actions.setCurrentView('upload');
   };
 
+  const handleLiveStreaming = () => {
+    actions.setCurrentView('streaming');
+  };
+
   return (
     <div css={containerStyle}>
       <div css={contentStyle}>
         <div css={headerStyle}>
           <h1>agentevals</h1>
-          <p>Evaluate agent behavior from pre-recorded OpenTelemetry traces</p>
+          <p>Evaluate agent behavior from OpenTelemetry traces</p>
         </div>
 
-        <div css={questionStyle}>
-          <h2>What would you like to do?</h2>
-        </div>
+        <div css={optionsGridStyle}>
+          <button css={optionCardStyle} onClick={handleLiveStreaming}>
+            <div css={iconWrapperStyle}>
+              <Radio size={48} />
+            </div>
+            <h3>I am developing an agent locally</h3>
+            <p>Live streaming mode - see traces and evaluations in real-time as you iterate on your agent</p>
+          </button>
 
-        <div css={buttonsContainerStyle}>
-          <button css={optionButtonStyle} onClick={handleGetStarted}>
+          <button css={optionCardStyle} onClick={handleGetStarted}>
             <div css={iconWrapperStyle}>
               <FileJson size={48} />
             </div>
-            <h3>I am just getting started</h3>
-            <p>Use Builder to turn your traces into EvalSets</p>
+            <h3>EvalSet Builder</h3>
+            <p>Turn your traces into golden EvalSets</p>
           </button>
 
-          <button css={optionButtonStyle} onClick={handleExpertMode}>
+          <button css={optionCardStyle} onClick={handleExpertMode}>
             <div css={iconWrapperStyle}>
               <Play size={48} />
             </div>
-            <h3>I know what I am doing</h3>
-            <p>Upload your traces and EvalSets, then evaluate them</p>
+            <h3>Offline evaluations</h3>
+            <p>Upload traces and EvalSets to run batch evaluations</p>
           </button>
         </div>
       </div>
@@ -53,7 +61,6 @@ const containerStyle = css`
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-primary);
   padding: 24px;
 `;
 
@@ -83,29 +90,17 @@ const headerStyle = css`
   }
 `;
 
-const questionStyle = css`
-  text-align: center;
-  margin-bottom: 40px;
-
-  h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-  }
-`;
-
-const buttonsContainerStyle = css`
+const optionsGridStyle = css`
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
 
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
     grid-template-columns: 1fr;
   }
 `;
 
-const optionButtonStyle = css`
+const optionCardStyle = css`
   background: var(--bg-surface);
   border: 2px solid var(--border-default);
   border-radius: 16px;
@@ -126,7 +121,7 @@ const optionButtonStyle = css`
   }
 
   h3 {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;

@@ -98,12 +98,6 @@ export const InspectorLayout: React.FC<InspectorLayoutProps> = ({
     setIsDraggingCenter(true);
   };
 
-  // Handle right divider drag
-  const handleRightMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDraggingRight(true);
-  };
-
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
@@ -158,7 +152,7 @@ export const InspectorLayout: React.FC<InspectorLayoutProps> = ({
   return (
     <div
       ref={containerRef}
-      css={layoutStyles(leftWidth, centerWidth, rightWidth, showCenterPanel)}
+      css={layoutStyles(leftWidth, centerWidth, showCenterPanel)}
       className={isDraggingLeft || isDraggingCenter || isDraggingRight ? 'dragging' : ''}
     >
       <div css={panelStyles} className="left-panel">
@@ -192,7 +186,7 @@ export const InspectorLayout: React.FC<InspectorLayoutProps> = ({
   );
 };
 
-const layoutStyles = (leftWidth: number, centerWidth: number, rightWidth: number, showCenterPanel: boolean) => css`
+const layoutStyles = (leftWidth: number, centerWidth: number, showCenterPanel: boolean) => css`
   display: grid;
   grid-template-columns: ${showCenterPanel
     ? `${leftWidth}px 1px ${centerWidth}px 1px 1fr`

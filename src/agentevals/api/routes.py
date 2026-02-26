@@ -227,10 +227,10 @@ async def evaluate_traces(
             if not trace_file.filename:
                 continue
 
-            if not trace_file.filename.endswith(".json"):
+            if not (trace_file.filename.endswith(".json") or trace_file.filename.endswith(".jsonl")):
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid file extension for {trace_file.filename}. Only .json files are allowed.",
+                    detail=f"Invalid file extension for {trace_file.filename}. Only .json and .jsonl files are allowed.",
                 )
 
             trace_path = os.path.join(temp_dir, trace_file.filename)
@@ -251,6 +251,14 @@ async def evaluate_traces(
                 status_code=400,
                 detail="No valid trace files provided",
             )
+
+        trace_format = config_dict.get("trace_format")
+        if not trace_format:
+            first_file = trace_paths[0]
+            if first_file.endswith(".jsonl"):
+                trace_format = "otlp-json"
+            else:
+                trace_format = "jaeger-json"
 
         eval_set_path = None
         if eval_set_file and eval_set_file.filename:
@@ -288,7 +296,7 @@ async def evaluate_traces(
             trace_files=trace_paths,
             eval_set_file=eval_set_path,
             metrics=metrics,
-            trace_format=config_dict.get("trace_format", "jaeger-json"),
+            trace_format=trace_format,
             judge_model=config_dict.get("judgeModel"),  # camelCase from UI
             threshold=threshold,
         )
@@ -330,7 +338,7 @@ async def evaluate_traces_stream(
                 if not trace_file.filename:
                     continue
 
-                if not trace_file.filename.endswith(".json"):
+                if not (trace_file.filename.endswith(".json") or trace_file.filename.endswith(".jsonl")):
                     yield f"data: {json.dumps({'error': f'Invalid file extension for {trace_file.filename}'})}\n\n"
                     return
 
@@ -348,6 +356,14 @@ async def evaluate_traces_stream(
             if not trace_paths:
                 yield f"data: {json.dumps({'error': 'No valid trace files provided'})}\n\n"
                 return
+
+            trace_format = config_dict.get("trace_format")
+            if not trace_format:
+                first_file = trace_paths[0]
+                if first_file.endswith(".jsonl"):
+                    trace_format = "otlp-json"
+                else:
+                    trace_format = "jaeger-json"
 
             eval_set_path = None
             if eval_set_file and eval_set_file.filename:
@@ -377,7 +393,7 @@ async def evaluate_traces_stream(
                 trace_files=trace_paths,
                 eval_set_file=eval_set_path,
                 metrics=metrics,
-                trace_format=config_dict.get("trace_format", "jaeger-json"),
+                trace_format=trace_format,
                 judge_model=config_dict.get("judgeModel"),
                 threshold=threshold,
             )

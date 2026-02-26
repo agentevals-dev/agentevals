@@ -153,24 +153,6 @@ export const InspectorView: React.FC = () => {
     localStorage.setItem(SHOW_EXECUTION_KEY, String(show));
   };
 
-  // Handle data selection
-  const handleSelectData = (dataPath: string) => {
-    console.log('Selected data:', dataPath);
-
-    // Extract invocation ID from data path (format: inv.{invocationId}.*)
-    const match = dataPath.match(/^inv\.([^.]+)\./);
-    if (match) {
-      const invocationId = match[1];
-      setInspectorState(prev => ({
-        ...prev,
-        selectedDataPath: dataPath,
-        selectedInvocationId: invocationId,
-      }));
-    } else {
-      setInspectorState(prev => ({ ...prev, selectedDataPath: dataPath }));
-    }
-  };
-
   // Handle span selection
   const handleSelectSpan = (spanId: string) => {
     console.log('Selected span:', spanId);
@@ -417,24 +399,4 @@ const backButtonStyles = css`
   }
 `;
 
-const placeholderStyles = css`
-  padding: 24px;
-  color: var(--text-secondary);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  overflow: auto;
-
-  h3 {
-    font-size: 1.25rem;
-    color: var(--accent-cyan);
-    margin: 0;
-  }
-
-  p {
-    font-size: 0.875rem;
-    margin: 0;
-  }
-`;
 

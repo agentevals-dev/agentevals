@@ -7,10 +7,12 @@
   --bg-primary: #1a1d24;
   --bg-surface: #252a36;
   --bg-elevated: #2d3342;
+  --card-bg: #252a36;
 
   /* Text */
   --text-primary: #e8eef3;
   --text-secondary: #a8b2c1;
+  --text-tertiary: #6b7586;
   --text-muted: #6b7586;
 
   /* Accents */
@@ -26,6 +28,7 @@
   --status-info: #00d9ff;
 
   /* Borders */
+  --border: #3a4052;
   --border-default: #3a4052;
   --border-focus: #00d9ff;
 
@@ -218,4 +221,14 @@ body::before {
   opacity: 0.3;
   animation: scan 3s linear infinite;
   pointer-events: none;
+}
+
+/* Pulse animation for connection status */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }

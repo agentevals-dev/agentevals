@@ -138,7 +138,6 @@ def list_metrics() -> None:
                 click.echo(f"    Value range: {lo}, {hi}")
             click.echo()
     except ImportError as exc:
-        # Full registry needs rouge_score/numpy — show what we can
         click.echo(
             f"Could not load full metric registry ({exc}).\n"
             "Some eval dependencies may be missing. Install with:\n"
@@ -150,6 +149,77 @@ def list_metrics() -> None:
         for pm in PrebuiltMetrics:
             click.echo(f"  {pm.value}")
         click.echo()
+
+
+@main.command("serve")
+@click.option(
+    "--dev",
+    is_flag=True,
+    help="Enable dev mode with WebSocket support for live streaming.",
+)
+@click.option(
+    "--host",
+    default="0.0.0.0",
+    help="Host to bind the server to.",
+)
+@click.option(
+    "--port",
+    "-p",
+    default=8001,
+    help="Port to bind the server to.",
+)
+@click.option(
+    "--eval-sets",
+    type=click.Path(exists=True),
+    default=None,
+    help="Directory containing eval set JSON files to pre-load.",
+)
+@click.option(
+    "--headless",
+    is_flag=True,
+    help="Run in headless mode (no browser launch).",
+)
+def serve(dev: bool, host: str, port: int, eval_sets: str | None, headless: bool) -> None:
+    """Start the agentevals API server.
+
+    Use --dev to enable live streaming mode for agent development.
+    """
+    import uvicorn
+    from pathlib import Path
+
+    if dev:
+        click.echo("🚀 agentevals dev server starting...")
+        click.echo(f"   WebSocket: ws://{host}:{port}/ws/traces")
+        click.echo(f"   API:       http://{host}:{port}/api")
+        click.echo(f"   Web UI:    http://localhost:5173")
+        click.echo()
+
+        if eval_sets:
+            click.echo(f"📊 Eval sets directory: {eval_sets}")
+            click.echo()
+
+        click.echo("Waiting for agent connections...")
+        click.echo()
+
+        src_path = Path(__file__).parent.parent
+        reload_dirs = [str(src_path)]
+
+        uvicorn.run(
+            "agentevals.api.app:app",
+            host=host,
+            port=port,
+            reload=True,
+            reload_dirs=reload_dirs,
+            log_level="info",
+        )
+    else:
+        uvicorn.run(
+            "agentevals.api.app:app",
+            host=host,
+            port=port,
+            reload=False,
+            log_level="warning",
+        )
 
 
 if __name__ == "__main__":
