@@ -52,7 +52,20 @@ set_trace_manager(trace_manager)
 @app.on_event("startup")
 async def configure_logging():
     """Configure logging and start background tasks."""
-    logging.getLogger("agentevals").setLevel(logging.INFO)
+    # Configure logging level from environment or default to INFO
+    log_level_str = os.getenv("AGENTEVALS_LOG_LEVEL", "INFO").upper()
+    log_level = getattr(logging, log_level_str, logging.INFO)
+
+    # Configure root logger format
+    logging.basicConfig(
+        level=log_level,
+        format="%(levelname)s:%(name)s:%(message)s",
+        force=True,  # Override any existing configuration
+    )
+
+    # Set agentevals logger level
+    logging.getLogger("agentevals").setLevel(log_level)
+
     trace_manager.start_cleanup_task()
 
 

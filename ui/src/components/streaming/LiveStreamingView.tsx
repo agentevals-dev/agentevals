@@ -437,7 +437,7 @@ export function LiveStreamingView() {
         )}
       </div>
 
-      {selectedGoldenId && completedSessions.length > 1 && (
+      {selectedGoldenId && (
         <div style={{
           padding: '24px',
           background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
@@ -457,7 +457,7 @@ export function LiveStreamingView() {
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
             }}>
-              Golden Run Selected
+              {completedSessions.length > 1 ? 'Golden Run Selected' : 'EvalSet Selected'}
             </div>
             <p style={{
               fontSize: '16px',
@@ -472,46 +472,50 @@ export function LiveStreamingView() {
               color: 'var(--text-secondary)',
               margin: 0,
             }}>
-              Ready to evaluate {completedSessions.length - 1} session{completedSessions.length - 1 !== 1 ? 's' : ''} against this baseline
+              {completedSessions.length > 1
+                ? `Ready to evaluate ${completedSessions.length - 1} session${completedSessions.length - 1 !== 1 ? 's' : ''} against this baseline`
+                : 'Run more agent sessions to evaluate them against this baseline'}
             </p>
           </div>
 
-          <button
-            onClick={handleContinueToEvaluation}
-            disabled={isPreparingEvaluation}
-            style={{
-              height: '44px',
-              padding: '0 32px',
-              borderRadius: '8px',
-              background: isPreparingEvaluation ? 'var(--bg-surface)' : 'var(--accent-cyan)',
-              border: isPreparingEvaluation ? '1px solid var(--border-default)' : 'none',
-              color: isPreparingEvaluation ? 'var(--text-secondary)' : '#000',
-              fontSize: '15px',
-              fontWeight: 600,
-              cursor: isPreparingEvaluation ? 'not-allowed' : 'pointer',
-              opacity: isPreparingEvaluation ? 0.4 : 1,
-              transition: 'all 0.3s ease',
-              boxShadow: isPreparingEvaluation ? 'none' : '0 0 20px rgba(0, 217, 255, 0.3)',
-              whiteSpace: 'nowrap',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-            }}
-            onMouseEnter={(e) => {
-              if (!isPreparingEvaluation) {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 217, 255, 0.5)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isPreparingEvaluation) {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 217, 255, 0.3)';
-              }
-            }}
-          >
-            {isPreparingEvaluation ? 'Preparing...' : 'Continue to Evaluation →'}
-          </button>
+          {completedSessions.length > 1 && (
+            <button
+              onClick={handleContinueToEvaluation}
+              disabled={isPreparingEvaluation}
+              style={{
+                height: '44px',
+                padding: '0 32px',
+                borderRadius: '8px',
+                background: isPreparingEvaluation ? 'var(--bg-surface)' : 'var(--accent-cyan)',
+                border: isPreparingEvaluation ? '1px solid var(--border-default)' : 'none',
+                color: isPreparingEvaluation ? 'var(--text-secondary)' : '#000',
+                fontSize: '15px',
+                fontWeight: 600,
+                cursor: isPreparingEvaluation ? 'not-allowed' : 'pointer',
+                opacity: isPreparingEvaluation ? 0.4 : 1,
+                transition: 'all 0.3s ease',
+                boxShadow: isPreparingEvaluation ? 'none' : '0 0 20px rgba(0, 217, 255, 0.3)',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+              onMouseEnter={(e) => {
+                if (!isPreparingEvaluation) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 217, 255, 0.5)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isPreparingEvaluation) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 217, 255, 0.3)';
+                }
+              }}
+            >
+              {isPreparingEvaluation ? 'Preparing...' : 'Continue to Evaluation →'}
+            </button>
+          )}
         </div>
       )}
 

@@ -28,16 +28,27 @@ _TAG_TOOL_CALL_ID = "gen_ai.tool.call.id"
 _TAG_TOOL_CALL_ARGS = "gcp.vertex.agent.tool_call_args"
 _TAG_INVOCATION_ID = "gcp.vertex.agent.invocation_id"
 
+# GenAI semantic conventions
+_TAG_GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
+_TAG_GEN_AI_INPUT_MESSAGES = "gen_ai.input.messages"
+_TAG_GEN_AI_OUTPUT_MESSAGES = "gen_ai.output.messages"
+_TAG_GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
+_TAG_GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+_TAG_GEN_AI_TOOL_CALL_ARGUMENTS = "gen_ai.tool.call.arguments"
+_TAG_GEN_AI_TOOL_CALL_RESULT = "gen_ai.tool.call.result"
+
 
 class IncrementalInvocationExtractor:
-    """Extracts conversation elements from spans as they arrive."""
+    """Extracts conversation elements from spans and logs as they arrive."""
 
     def __init__(self):
-        self.seen_user_input = set()  # Track which invocations have user input sent
-        self.seen_tool_calls = {}  # invocation_id -> set of tool call IDs
-        self.seen_agent_response = set()  # Track which invocations have agent response sent
-        self.llm_spans_by_invocation = {}  # invocation_id -> list of call_llm spans
-        self.token_totals = {}  # invocation_id -> {inputTokens, outputTokens, model}
+        self.seen_user_input = set()
+        self.seen_tool_calls = {}
+        self.seen_agent_response = set()
+        self.llm_spans_by_invocation = {}
+        self.token_totals = {}
+        self.current_invocation_id = None
+        self.seen_message_contents = set()  # Track message contents to avoid duplicates
 
     def process_span(self, span: dict) -> list[dict]:
         """Process a single OTLP span and return conversation updates to broadcast.
@@ -54,16 +65,22 @@ class IncrementalInvocationExtractor:
         # Extract attributes from OTLP format
         attributes = self._extract_attributes(span.get("attributes", []))
 
-        # Only process ADK spans
-        if attributes.get(_TAG_SCOPE) != _ADK_SCOPE:
+        is_adk = attributes.get(_TAG_SCOPE) == _ADK_SCOPE
+        is_genai = attributes.get(_TAG_GEN_AI_REQUEST_MODEL) or attributes.get(_TAG_GEN_AI_INPUT_MESSAGES)
+
+        if not (is_adk or is_genai):
             return updates
 
         invocation_id = self._get_invocation_id(span, attributes)
         if not invocation_id:
             return updates
 
-        # User input detection (from first call_llm span)
-        if operation_name.startswith("call_llm"):
+        # Track current invocation ID for log processing
+        self.current_invocation_id = invocation_id
+
+        # User input detection (from call_llm or LLM call spans)
+        is_llm_span = operation_name.startswith("call_llm") or is_genai
+        if is_llm_span:
             # Track LLM span for later response extraction
             if invocation_id not in self.llm_spans_by_invocation:
                 self.llm_spans_by_invocation[invocation_id] = []
@@ -73,6 +90,7 @@ class IncrementalInvocationExtractor:
             if invocation_id not in self.seen_user_input:
                 user_text = self._extract_user_input(span, attributes)
                 if user_text:
+                    logger.debug(f"Extracted user input for invocation {invocation_id}")
                     updates.append({
                         "type": "user_input",
                         "invocationId": invocation_id,
@@ -84,6 +102,7 @@ class IncrementalInvocationExtractor:
             # Extract agent response from LLM response
             agent_text = self._extract_agent_response(span, attributes)
             if agent_text and invocation_id not in self.seen_agent_response:
+                logger.debug(f"Extracted agent response for invocation {invocation_id}")
                 updates.append({
                     "type": "agent_response",
                     "invocationId": invocation_id,
@@ -104,12 +123,10 @@ class IncrementalInvocationExtractor:
                 self.token_totals[invocation_id]["inputTokens"] += token_info.get("inputTokens", 0)
                 self.token_totals[invocation_id]["outputTokens"] += token_info.get("outputTokens", 0)
 
-                logger.info("Token update for %s: +%d input, +%d output (total: %d/%d)",
+                logger.debug("Token update for %s: +%d input, +%d output",
                     invocation_id,
                     token_info.get("inputTokens", 0),
-                    token_info.get("outputTokens", 0),
-                    self.token_totals[invocation_id]["inputTokens"],
-                    self.token_totals[invocation_id]["outputTokens"])
+                    token_info.get("outputTokens", 0))
 
                 updates.append({
                     "type": "token_update",
@@ -135,6 +152,110 @@ class IncrementalInvocationExtractor:
                         "timestamp": int(span.get("startTimeUnixNano", 0)) / 1e9,
                     })
                     self.seen_tool_calls[invocation_id].add(call_id)
+
+        return updates
+
+    def process_log(self, log_event: dict) -> list[dict]:
+        """Process a GenAI log event and extract conversation updates.
+
+        Args:
+            log_event: Log event dict with event_name, body, attributes
+
+        Returns:
+            List of update events to broadcast via SSE
+        """
+        updates = []
+        event_name = log_event.get("event_name", "")
+        body = log_event.get("body", {})
+
+        # Use current invocation ID (from most recent span)
+        if not self.current_invocation_id:
+            return updates
+
+        invocation_id = self.current_invocation_id
+
+        # Extract user messages (gen_ai.user.message)
+        if event_name == "gen_ai.user.message":
+            if isinstance(body, dict) and "content" in body:
+                user_text = body["content"]
+                message_key = f"user:{user_text}"
+                if user_text and message_key not in self.seen_message_contents:
+                    logger.debug(f"Extracted user input from log for invocation {invocation_id}")
+                    updates.append({
+                        "type": "user_input",
+                        "invocationId": invocation_id,
+                        "text": user_text,
+                        "timestamp": log_event.get("timestamp", 0),
+                    })
+                    self.seen_message_contents.add(message_key)
+                    self.seen_user_input.add(invocation_id)
+
+        # Extract assistant messages (gen_ai.assistant.message or gen_ai.choice)
+        elif event_name in ("gen_ai.assistant.message", "gen_ai.choice"):
+            agent_text = None
+
+            if isinstance(body, dict):
+                # Check for direct content
+                if "content" in body:
+                    agent_text = body["content"]
+                # Check for message.content (gen_ai.choice format)
+                elif "message" in body and isinstance(body["message"], dict):
+                    if "content" in body["message"]:
+                        agent_text = body["message"]["content"]
+
+            if agent_text:
+                message_key = f"agent:{agent_text}"
+                if message_key not in self.seen_message_contents:
+                    logger.debug(f"Extracted agent response from log for invocation {invocation_id}")
+                    updates.append({
+                        "type": "agent_response",
+                        "invocationId": invocation_id,
+                        "text": agent_text,
+                        "timestamp": log_event.get("timestamp", 0),
+                    })
+                    self.seen_message_contents.add(message_key)
+                    self.seen_agent_response.add(invocation_id)
+
+            # Extract tool calls from assistant message
+            if isinstance(body, dict):
+                tool_calls = None
+                if "tool_calls" in body:
+                    tool_calls = body["tool_calls"]
+                elif "message" in body and isinstance(body["message"], dict) and "tool_calls" in body["message"]:
+                    tool_calls = body["message"]["tool_calls"]
+
+                if tool_calls and isinstance(tool_calls, list):
+                    for tc in tool_calls:
+                        if isinstance(tc, dict):
+                            tool_id = tc.get("id", "unknown")
+                            tool_key = f"tool:{tool_id}"
+
+                            if tool_key not in self.seen_message_contents:
+                                tool_call = {
+                                    "id": tool_id,
+                                    "name": tc.get("function", {}).get("name", "unknown") if "function" in tc else tc.get("name", "unknown"),
+                                    "args": {},
+                                }
+
+                                if "function" in tc and "arguments" in tc["function"]:
+                                    import json
+                                    try:
+                                        tool_call["args"] = json.loads(tc["function"]["arguments"])
+                                    except:
+                                        tool_call["args"] = {}
+
+                                logger.debug(f"Extracted tool call from log for invocation {invocation_id}")
+                                updates.append({
+                                    "type": "tool_call",
+                                    "invocationId": invocation_id,
+                                    "toolCall": tool_call,
+                                    "timestamp": log_event.get("timestamp", 0),
+                                })
+                                self.seen_message_contents.add(tool_key)
+
+                                if invocation_id not in self.seen_tool_calls:
+                                    self.seen_tool_calls[invocation_id] = set()
+                                self.seen_tool_calls[invocation_id].add(tool_id)
 
         return updates
 
@@ -175,7 +296,26 @@ class IncrementalInvocationExtractor:
         return span.get("spanId")
 
     def _extract_user_input(self, span: dict, attributes: dict) -> str | None:
-        """Extract user text from llm_request tag in call_llm span."""
+        """Extract user text from llm_request tag (ADK) or gen_ai.input.messages (GenAI)."""
+        # Try GenAI format first
+        messages_raw = attributes.get(_TAG_GEN_AI_INPUT_MESSAGES)
+        if messages_raw:
+            try:
+                messages = json.loads(messages_raw) if isinstance(messages_raw, str) else messages_raw
+                if isinstance(messages, list):
+                    for msg in reversed(messages):
+                        if isinstance(msg, dict) and msg.get("role") in ("user", "human"):
+                            content = msg.get("content", "")
+                            if isinstance(content, str):
+                                return content
+                            elif isinstance(content, list):
+                                texts = [item.get("text", "") for item in content if isinstance(item, dict) and "text" in item]
+                                if texts:
+                                    return " ".join(texts)
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.warning("Failed to parse gen_ai.input.messages: %s", e)
+
+        # Try ADK format
         llm_request_raw = attributes.get(_TAG_LLM_REQUEST)
         if not llm_request_raw:
             return None
@@ -206,7 +346,26 @@ class IncrementalInvocationExtractor:
         return None
 
     def _extract_agent_response(self, span: dict, attributes: dict) -> str | None:
-        """Extract agent text from llm_response tag in call_llm span."""
+        """Extract agent text from llm_response tag (ADK) or gen_ai.output.messages (GenAI)."""
+        # Try GenAI format first
+        messages_raw = attributes.get(_TAG_GEN_AI_OUTPUT_MESSAGES)
+        if messages_raw:
+            try:
+                messages = json.loads(messages_raw) if isinstance(messages_raw, str) else messages_raw
+                if isinstance(messages, list):
+                    for msg in messages:
+                        if isinstance(msg, dict) and msg.get("role") in ("assistant", "model", "ai"):
+                            content = msg.get("content", "")
+                            if isinstance(content, str):
+                                return content
+                            elif isinstance(content, list):
+                                texts = [item.get("text", "") for item in content if isinstance(item, dict) and "text" in item]
+                                if texts:
+                                    return " ".join(texts)
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.warning("Failed to parse gen_ai.output.messages: %s", e)
+
+        # Try ADK format
         llm_response_raw = attributes.get(_TAG_LLM_RESPONSE)
         if not llm_response_raw:
             return None
@@ -229,7 +388,7 @@ class IncrementalInvocationExtractor:
         return None
 
     def _extract_tool_call(self, span: dict, attributes: dict) -> dict | None:
-        """Extract tool name, args, and ID from execute_tool span."""
+        """Extract tool name, args, and ID from execute_tool span or GenAI tool span."""
         tool_name = attributes.get(_TAG_TOOL_NAME)
 
         # Fallback: parse tool name from operationName "execute_tool <name>"
@@ -238,15 +397,21 @@ class IncrementalInvocationExtractor:
             if operation_name.startswith("execute_tool "):
                 tool_name = operation_name[len("execute_tool "):]
             else:
-                logger.warning("execute_tool span has no tool name")
+                logger.warning("Tool span has no tool name")
                 return None
 
         tool_call_id = attributes.get(_TAG_TOOL_CALL_ID, span.get("spanId", "unknown"))
 
-        args_raw = attributes.get(_TAG_TOOL_CALL_ARGS, "{}")
+        # Try GenAI format first
+        args_raw = attributes.get(_TAG_GEN_AI_TOOL_CALL_ARGUMENTS)
+        if not args_raw:
+            # Fall back to ADK format
+            args_raw = attributes.get(_TAG_TOOL_CALL_ARGS, "{}")
+
         try:
             args = json.loads(args_raw) if args_raw else {}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse tool args: {e}")
             args = {}
 
         return {
@@ -256,21 +421,27 @@ class IncrementalInvocationExtractor:
         }
 
     def _extract_token_info(self, span: dict, attributes: dict) -> dict | None:
-        """Extract token usage and model from call_llm span.
+        """Extract token usage and model from call_llm span (ADK or GenAI format)."""
+        # Try GenAI format first
+        input_tokens = attributes.get(_TAG_GEN_AI_USAGE_INPUT_TOKENS, 0)
+        output_tokens = attributes.get(_TAG_GEN_AI_USAGE_OUTPUT_TOKENS, 0)
+        model = attributes.get(_TAG_GEN_AI_REQUEST_MODEL, "unknown")
 
-        Token counts are typically in the llm_response metadata.
-        """
+        if input_tokens or output_tokens:
+            return {
+                "inputTokens": input_tokens,
+                "outputTokens": output_tokens,
+                "model": model,
+            }
+
+        # Fall back to ADK format
         llm_response_raw = attributes.get(_TAG_LLM_RESPONSE)
         if not llm_response_raw:
-            logger.debug("No llm_response in span attributes")
             return None
 
         try:
             llm_response = json.loads(llm_response_raw)
-            logger.debug("Parsed llm_response: %s", llm_response.keys())
-
             usage = llm_response.get("usage_metadata", {})
-            logger.debug("Usage metadata: %s", usage)
 
             input_tokens = usage.get("prompt_token_count", 0)
             output_tokens = usage.get("candidates_token_count", 0)
@@ -282,15 +453,11 @@ class IncrementalInvocationExtractor:
                 model = llm_request.get("model", "unknown")
 
             if input_tokens or output_tokens:
-                logger.info("Extracted tokens: input=%d, output=%d, model=%s",
-                    input_tokens, output_tokens, model)
                 return {
                     "inputTokens": input_tokens,
                     "outputTokens": output_tokens,
                     "model": model,
                 }
-            else:
-                logger.warning("Token counts are 0 in usage_metadata: %s", usage)
 
         except (json.JSONDecodeError, KeyError, TypeError) as e:
             logger.warning("Could not extract token info: %s", e)

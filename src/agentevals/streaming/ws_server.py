@@ -162,6 +162,8 @@ class StreamingTraceManager:
 
                 elif event["type"] == "span":
                     sid = event["session_id"]
+                    span_name = event["span"].get("name", "unknown")
+
                     if sid not in self.sessions:
                         logger.warning("Span for unknown session: %s", sid)
                         continue
@@ -184,10 +186,28 @@ class StreamingTraceManager:
                         }
                     )
 
+                elif event["type"] == "log":
+                    sid = event["session_id"]
+                    log_event = event["log"]
+
+                    if sid not in self.sessions:
+                        logger.warning("Log for unknown session: %s", sid)
+                        continue
+
+                    session = self.sessions[sid]
+                    session.logs.append(log_event)
+
+                    extractor = self.incremental_extractors.get(sid)
+                    if extractor:
+                        updates = extractor.process_log(log_event)
+                        for update in updates:
+                            update["sessionId"] = sid
+                            await self.broadcast_to_ui(update)
+                    else:
+                        logger.warning(f"No extractor found for session {sid}")
+
                 elif event["type"] == "session_end":
                     sid = event["session_id"]
-                    logger.info("Received session_end event: %s", sid)
-                    logger.info("Current sessions: %s", list(self.sessions.keys()))
 
                     if sid not in self.sessions:
                         logger.warning("End for unknown session: %s", sid)
@@ -196,10 +216,9 @@ class StreamingTraceManager:
                     session = self.sessions[sid]
                     session.is_complete = True
 
-                    logger.info("Session ended: %s (%d spans)", sid, len(session.spans))
+                    logger.info("Session ended: %s (%d spans, %d logs)", sid, len(session.spans), len(session.logs))
 
                     invocations_data = await self._extract_invocations(session)
-                    logger.info("Extracted %d invocations from session %s", len(invocations_data), sid)
 
                     complete_event = {
                         "type": "session_complete",
@@ -221,6 +240,98 @@ class StreamingTraceManager:
                 self.sessions[session_id].is_complete = False
                 logger.warning("Client disconnected: %s", session_id)
 
+    def _enrich_spans_with_logs(self, spans: list[dict], logs: list[dict], session_id: str = None) -> list[dict]:
+        """Enrich spans with message content from GenAI logs."""
+        if not logs:
+            return spans
+
+        logger.debug(f"Enriching {len(spans)} spans with {len(logs)} logs")
+
+        input_messages = []
+        output_messages = []
+        seen_user_messages = set()
+        seen_assistant_messages = set()
+
+        assistant_log_count = 0
+        for log in logs:
+            if log.get("event_name") in ("gen_ai.assistant.message", "gen_ai.choice"):
+                assistant_log_count += 1
+
+        logger.debug(f"Found {assistant_log_count} assistant log events")
+
+        for log in logs:
+            event_name = log.get("event_name", "")
+            body = log.get("body", {})
+
+            if not isinstance(body, dict):
+                continue
+
+            if event_name == "gen_ai.user.message":
+                user_content = body.get("content", "")
+                if user_content and user_content not in seen_user_messages:
+                    user_msg = {
+                        "role": "user",
+                        "content": user_content
+                    }
+                    input_messages.append(user_msg)
+                    seen_user_messages.add(user_content)
+
+            elif event_name in ("gen_ai.assistant.message", "gen_ai.choice"):
+                assistant_content = body.get("content") or ""
+                tool_calls = body.get("tool_calls", [])
+
+                message_key = f"{assistant_content}:{json.dumps(tool_calls) if tool_calls else ''}"
+
+                if assistant_content or tool_calls:
+                    if message_key not in seen_assistant_messages:
+                        assistant_msg = {
+                            "role": "assistant",
+                            "content": assistant_content
+                        }
+                        if tool_calls:
+                            assistant_msg["tool_calls"] = tool_calls
+                        output_messages.append(assistant_msg)
+                        seen_assistant_messages.add(message_key)
+
+        if not (input_messages or output_messages):
+            logger.warning("No messages extracted from logs")
+            return spans
+
+        logger.debug(f"Deduplicated: {len(input_messages)} user, {len(output_messages)} assistant messages")
+        for i, msg in enumerate(output_messages):
+            logger.debug(f"  Output message {i}: content_len={len(msg.get('content', ''))}, has_tool_calls={bool(msg.get('tool_calls'))}")
+
+        enriched_spans = []
+        for i, span in enumerate(spans):
+            span_copy = span.copy()
+
+            if "attributes" not in span_copy:
+                span_copy["attributes"] = []
+
+            attrs = span_copy["attributes"]
+
+            if input_messages:
+                attrs.append({
+                    "key": "gen_ai.input.messages",
+                    "value": {"stringValue": json.dumps(input_messages)}
+                })
+
+            if output_messages:
+                attrs.append({
+                    "key": "gen_ai.output.messages",
+                    "value": {"stringValue": json.dumps(output_messages)}
+                })
+
+            if session_id:
+                attrs.append({
+                    "key": "gen_ai.agent.name",
+                    "value": {"stringValue": session_id}
+                })
+
+            enriched_spans.append(span_copy)
+
+        return enriched_spans
+
     async def _save_spans_to_temp_file(self, session: TraceSession) -> Path:
         """Save spans to a temporary OTLP JSONL file.
 
@@ -232,9 +343,13 @@ class StreamingTraceManager:
         """
         temp_file = Path(tempfile.gettempdir()) / f"agentevals_{session.session_id}.jsonl"
 
+        enriched_spans = self._enrich_spans_with_logs(session.spans, session.logs, session.session_id)
+
         with open(temp_file, "w") as f:
-            for span in session.spans:
-                f.write(json.dumps(span) + "\n")
+            for span in enriched_spans:
+                span_copy = span.copy()
+                span_copy['traceId'] = session.trace_id
+                f.write(json.dumps(span_copy) + "\n")
 
         return temp_file
 
@@ -258,31 +373,27 @@ class StreamingTraceManager:
         try:
             import tempfile
             temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False)
-            for span in session.spans:
-                temp_file.write(json.dumps(span) + "\n")
+
+            enriched_spans = self._enrich_spans_with_logs(session.spans, session.logs, session.session_id)
+
+            for span in enriched_spans:
+                span_copy = span.copy()
+                span_copy['traceId'] = session.trace_id
+                temp_file.write(json.dumps(span_copy) + "\n")
             temp_file.close()
 
-            logger.info("Saved %d spans to %s", len(session.spans), temp_file.name)
+            logger.debug("Saved %d enriched spans to %s", len(enriched_spans), temp_file.name)
 
             loader = OtlpJsonLoader()
             traces = loader.load(temp_file.name)
 
-            logger.info("Loaded %d traces from file", len(traces))
-
             if not traces:
-                logger.warning("No traces loaded")
+                logger.warning("No traces loaded from session %s", session.session_id)
                 return []
 
-            for i, trace in enumerate(traces):
-                logger.info("Trace %d: %s... has %d spans", i+1, trace.trace_id[:12], len(trace.all_spans))
-                invoke_spans = [s for s in trace.all_spans if 'invoke_agent' in s.operation_name]
-                logger.info("  - %d invoke_agent spans", len(invoke_spans))
-
-                span_names = [s.operation_name for s in trace.all_spans]
-                logger.info("  - Span names: %s", span_names)
+            logger.debug("Loaded %d traces", len(traces))
 
             conversion_results = convert_traces(traces)
-            logger.info("Converted traces, got %d results", len(conversion_results))
 
             if not conversion_results:
                 logger.warning("No conversion results")
@@ -291,9 +402,8 @@ class StreamingTraceManager:
             invocations_data = []
 
             for trace_idx, conv_result in enumerate(conversion_results):
-                logger.info("Result %d: %d invocations", trace_idx+1, len(conv_result.invocations))
                 if conv_result.warnings:
-                    logger.warning("  Warnings: %s", conv_result.warnings)
+                    logger.warning("Conversion warnings: %s", conv_result.warnings)
 
                 trace = traces[trace_idx] if trace_idx < len(traces) else None
 
@@ -328,7 +438,7 @@ class StreamingTraceManager:
                         "modelInfo": model_info,
                     })
 
-            logger.info("Extracted %d total invocations from %d traces", len(invocations_data), len(conversion_results))
+            logger.debug("Extracted %d invocations from %d traces", len(invocations_data), len(conversion_results))
             return invocations_data
 
         except Exception as exc:

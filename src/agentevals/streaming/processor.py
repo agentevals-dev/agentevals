@@ -1,4 +1,4 @@
-"""OpenTelemetry SpanProcessor for streaming spans to agentevals dev server."""
+"""OpenTelemetry SpanProcessor and LogRecordProcessor for streaming to agentevals dev server."""
 
 from __future__ import annotations
 
@@ -41,7 +41,6 @@ class AgentEvalsStreamingProcessor:
         self._pending_sends: set[asyncio.Task] = set()
 
     async def connect(self, eval_set_id: str | None = None, metadata: dict | None = None):
-        """Connect to WebSocket server and send session_start."""
         try:
             self.websocket = await websockets.connect(self.ws_url)
             self.loop = asyncio.get_event_loop()
@@ -66,40 +65,38 @@ class AgentEvalsStreamingProcessor:
             self._connected = False
 
     def on_start(self, span: ReadableSpan, parent_context=None) -> None:
-        """Called when span starts (not used for streaming)."""
         pass
 
     def on_end(self, span: ReadableSpan) -> None:
-        """Called when span ends - send immediately for real-time streaming."""
         if not self._connected or not self.websocket or not self.loop:
+            logger.debug(f"Skipping span {span.name}: not connected")
             return
 
         try:
             otlp_span = self._span_to_otlp(span)
             self._span_buffer.append(otlp_span)
 
-            task = self.loop.create_task(self._send_span(otlp_span))
-            self._pending_sends.add(task)
+            future = asyncio.run_coroutine_threadsafe(self._send_span(otlp_span), self.loop)
+            self._pending_sends.add(future)
 
-            def handle_send_complete(future: asyncio.Task) -> None:
-                self._pending_sends.discard(future)
+            def handle_send_complete(fut):
+                self._pending_sends.discard(fut)
                 try:
-                    future.result()
+                    fut.result()
+                    logger.debug(f"Sent span: {span.name}")
                 except Exception as exc:
-                    logger.warning("Failed to send span in real-time: %s", exc)
+                    logger.error(f"Failed to send span {span.name}: {exc}")
                     self._failed_spans.append(otlp_span)
 
-            task.add_done_callback(handle_send_complete)
+            future.add_done_callback(handle_send_complete)
 
         except Exception as exc:
             logger.warning("Failed to convert span: %s", exc)
 
     def shutdown(self) -> None:
-        """Shutdown processor (sync version for OTel SDK compatibility)."""
         pass
 
     async def shutdown_async(self) -> None:
-        """Shutdown processor and close connection (async version)."""
         if self.websocket and self._connected:
             try:
                 await self._send_session_end()
@@ -107,29 +104,29 @@ class AgentEvalsStreamingProcessor:
                 logger.warning("Failed to shutdown cleanly: %s", exc)
 
     async def _send_span(self, otlp_span: dict) -> None:
-        """Send a single span to the server."""
         if not self.websocket:
             raise ConnectionError("WebSocket not connected")
 
-        await self.websocket.send(
-            json.dumps(
-                {
-                    "type": "span",
-                    "session_id": self.session_id,
-                    "span": otlp_span,
-                }
-            )
-        )
+        message = {
+            "type": "span",
+            "session_id": self.session_id,
+            "span": otlp_span,
+        }
+        await self.websocket.send(json.dumps(message))
+        logger.debug(f"Sent span: {otlp_span.get('name')}")
 
     async def _send_session_end(self) -> None:
-        """Wait for pending sends, retry failed spans, send session_end, and close connection."""
         try:
             if not self.websocket:
                 return
 
             if self._pending_sends:
                 logger.info("Waiting for %d pending span sends to complete...", len(self._pending_sends))
-                await asyncio.gather(*self._pending_sends, return_exceptions=True)
+                for future in list(self._pending_sends):
+                    try:
+                        future.result(timeout=5)
+                    except Exception as exc:
+                        logger.warning("Pending send failed during shutdown: %s", exc)
                 logger.info("All pending sends completed")
 
             if self._failed_spans:
@@ -156,11 +153,9 @@ class AgentEvalsStreamingProcessor:
             logger.error("Failed to send session_end: %s", exc)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        """Force flush (no-op for streaming)."""
         return True
 
     def _span_to_otlp(self, span: ReadableSpan) -> dict:
-        """Convert OTel ReadableSpan to OTLP/JSON format."""
         scope_name = span.instrumentation_scope.name if span.instrumentation_scope else ""
         scope_version = span.instrumentation_scope.version if span.instrumentation_scope else ""
 
@@ -195,7 +190,6 @@ class AgentEvalsStreamingProcessor:
         }
 
     def _to_otlp_attribute(self, key: str, value: Any) -> dict:
-        """Convert Python value to OTLP attribute format."""
         if isinstance(value, bool):
             return {"key": key, "value": {"boolValue": value}}
         elif isinstance(value, int):
@@ -204,3 +198,73 @@ class AgentEvalsStreamingProcessor:
             return {"key": key, "value": {"doubleValue": value}}
         else:
             return {"key": key, "value": {"stringValue": str(value)}}
+
+
+class AgentEvalsLogStreamingProcessor:
+    """OTel log processor that streams GenAI logs to agentevals dev server via WebSocket.
+
+    This processor shares the same WebSocket connection and session as AgentEvalsStreamingProcessor.
+    It extracts input/output messages from GenAI semantic convention logs and streams them.
+    """
+
+    def __init__(self, span_processor: AgentEvalsStreamingProcessor):
+        """Initialize with a reference to the span processor for shared connection."""
+        self.span_processor = span_processor
+
+    def on_emit(self, log_data):
+        """Called when a log record is emitted."""
+        log_record = log_data.log_record
+
+        # Only process GenAI message logs
+        if not log_record.event_name or not log_record.event_name.startswith("gen_ai."):
+            return
+
+        logger.info(f"Log emitted: event={log_record.event_name}")
+
+        if not self.span_processor._connected or not self.span_processor.websocket or not self.span_processor.loop:
+            return
+
+        try:
+            log_json = {
+                "event_name": log_record.event_name,
+                "timestamp": str(log_record.timestamp) if log_record.timestamp else None,
+                "body": log_record.body,
+                "attributes": {},
+            }
+
+            if log_record.attributes:
+                for key, value in log_record.attributes.items():
+                    log_json["attributes"][key] = value
+
+            future = asyncio.run_coroutine_threadsafe(
+                self._send_log(log_json),
+                self.span_processor.loop
+            )
+
+            def handle_send_complete(fut):
+                try:
+                    fut.result()
+                except Exception as exc:
+                    logger.error(f"Failed to send log: {exc}")
+
+            future.add_done_callback(handle_send_complete)
+
+        except Exception as exc:
+            logger.warning("Failed to process log: %s", exc)
+
+    async def _send_log(self, log_json: dict) -> None:
+        if not self.span_processor.websocket:
+            raise ConnectionError("WebSocket not connected")
+
+        message = {
+            "type": "log",
+            "session_id": self.span_processor.session_id,
+            "log": log_json,
+        }
+        await self.span_processor.websocket.send(json.dumps(message))
+
+    def shutdown(self):
+        pass
+
+    def force_flush(self, timeout_millis: int = 30000):
+        return True

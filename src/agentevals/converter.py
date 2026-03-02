@@ -1,14 +1,10 @@
 """Convert trace spans into ADK Invocation objects.
 
-Bridges OTel trace data (from a TraceLoader) to ADK's evaluation framework.
+Supports two trace formats:
+1. ADK format (gcp.vertex.agent scope with ADK-specific attributes)
+2. GenAI semantic conventions (standard gen_ai.* attributes from LangChain, LlamaIndex, etc.)
 
-For each ``invoke_agent`` span in a trace:
-1. Find child ``call_llm`` spans (sorted by start time).
-2. From the first ``call_llm``'s ``llm_request``, extract user input
-   (last ``role=user`` content with text parts, skipping function_response parts).
-3. From the last ``call_llm``'s ``llm_response``, extract the final text response.
-4. From ``execute_tool`` spans, extract FunctionCall/FunctionResponse pairs.
-5. Build an Invocation with user_content, final_response, and intermediate_data.
+Automatically detects the format and routes to the appropriate converter.
 """
 
 from __future__ import annotations
@@ -46,6 +42,28 @@ class ConversionResult:
 
 
 def convert_trace(trace: Trace) -> ConversionResult:
+    trace_format = _detect_trace_format(trace)
+    logger.info(f"Auto-detected trace format: {trace_format}")
+
+    if trace_format == "genai":
+        from .genai_converter import convert_genai_trace
+        return convert_genai_trace(trace)
+    else:
+        return _convert_adk_trace(trace)
+
+
+def _detect_trace_format(trace: Trace) -> str:
+    for span in trace.all_spans[:10]:
+        if span.get_tag(_TAG_SCOPE) == _ADK_SCOPE:
+            return "adk"
+
+        if span.get_tag("gen_ai.request.model") or span.get_tag("gen_ai.input.messages"):
+            return "genai"
+
+    return "adk"
+
+
+def _convert_adk_trace(trace: Trace) -> ConversionResult:
     result = ConversionResult(trace_id=trace.trace_id)
 
     invoke_spans = _find_adk_spans(trace, "invoke_agent")

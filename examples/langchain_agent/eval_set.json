@@ -1,0 +1,29 @@
+{
+  "eval_set_id": "langchain_agent_eval",
+  "eval_cases": [
+    {
+      "case_id": "greeting",
+      "conversation": [
+        {
+          "invocation_id": "inv-1",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Hi! Can you help me?"
+              }
+            ]
+          },
+          "agent_content": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Hello! Yes, I can help you. I have access to tools that can roll dice and check if numbers are prime. What would you like me to do?"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

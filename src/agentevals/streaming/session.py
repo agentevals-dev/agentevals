@@ -14,6 +14,7 @@ class TraceSession:
     trace_id: str
     eval_set_id: str | None
     spans: list[dict] = field(default_factory=list)
+    logs: list[dict] = field(default_factory=list)
     started_at: datetime = field(default_factory=datetime.utcnow)
     is_complete: bool = False
     metadata: dict = field(default_factory=dict)

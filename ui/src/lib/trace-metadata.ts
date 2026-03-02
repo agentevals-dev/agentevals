@@ -99,7 +99,29 @@ function buildSpanTree(trace: Trace): void {
   );
 }
 
+function detectTraceFormat(trace: Trace): 'adk' | 'genai' {
+  for (const span of trace.allSpans.slice(0, 10)) {
+    if (span.tags?.[TAG_SCOPE] === ADK_SCOPE) {
+      return 'adk';
+    }
+    if (span.tags?.['gen_ai.request.model'] || span.tags?.['gen_ai.system']) {
+      return 'genai';
+    }
+  }
+  return 'adk';
+}
+
 export function extractTraceMetadata(trace: Trace): TraceMetadata {
+  const format = detectTraceFormat(trace);
+
+  if (format === 'genai') {
+    return extractGenAIMetadata(trace);
+  } else {
+    return extractADKMetadata(trace);
+  }
+}
+
+function extractADKMetadata(trace: Trace): TraceMetadata {
   const metadata: TraceMetadata = {
     traceId: trace.traceId,
   };
@@ -131,6 +153,85 @@ export function extractTraceMetadata(trace: Trace): TraceMetadata {
   metadata.sessionId = metadata.agentName || trace.traceId.substring(0, 12);
 
   return metadata;
+}
+
+function extractGenAIMetadata(trace: Trace): TraceMetadata {
+  const metadata: TraceMetadata = {
+    traceId: trace.traceId,
+  };
+
+  const llmSpans = trace.allSpans.filter(span =>
+    span.tags?.['gen_ai.request.model'] || span.tags?.['gen_ai.system']
+  );
+
+  if (llmSpans.length > 0) {
+    const firstLlm = llmSpans[0];
+    metadata.model = firstLlm.tags?.['gen_ai.request.model'];
+    metadata.startTime = firstLlm.startTime;
+
+    const agentName = firstLlm.tags?.['gen_ai.agent.name'];
+    if (agentName) {
+      metadata.agentName = agentName;
+      metadata.sessionId = agentName;
+    } else {
+      const rootSpan = trace.rootSpans[0];
+      metadata.agentName = rootSpan?.operationName || 'GenAI Agent';
+      metadata.sessionId = trace.traceId.substring(0, 12);
+    }
+
+    const messagesAttr = firstLlm.tags?.['gen_ai.prompt'] ||
+                        firstLlm.tags?.['gen_ai.request.messages'] ||
+                        firstLlm.tags?.['gen_ai.input.messages'];
+
+    if (messagesAttr) {
+      metadata.userInputPreview = extractGenAIUserPreview(messagesAttr);
+    }
+
+    const lastLlm = llmSpans[llmSpans.length - 1];
+    const completionAttr = lastLlm.tags?.['gen_ai.completion'] ||
+                          lastLlm.tags?.['gen_ai.response.messages'] ||
+                          lastLlm.tags?.['gen_ai.output.messages'];
+
+    if (completionAttr) {
+      metadata.finalOutputPreview = extractGenAIOutputPreview(completionAttr);
+    }
+  } else {
+    const rootSpan = trace.rootSpans[0];
+    metadata.agentName = 'GenAI Agent';
+    metadata.sessionId = trace.traceId.substring(0, 12);
+  }
+
+  return metadata;
+}
+
+function extractGenAIUserPreview(messagesAttr: string): string {
+  const messages = safeJsonParse<any[]>(messagesAttr, []);
+  if (!Array.isArray(messages)) return '';
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === 'user' && msg.content) {
+      const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+      return extractTextPreview(content);
+    }
+  }
+
+  return '';
+}
+
+function extractGenAIOutputPreview(completionAttr: string): string {
+  const messages = safeJsonParse<any[]>(completionAttr, []);
+  if (!Array.isArray(messages)) return '';
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === 'assistant' && msg.content) {
+      const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+      return extractTextPreview(content);
+    }
+  }
+
+  return '';
 }
 
 function parseOtlpJsonl(content: string): Trace[] {

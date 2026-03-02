@@ -8,54 +8,70 @@ interface ConversionResult {
   warnings: string[];
 }
 
-/**
- * Convert traces to ADK Invocations
- */
+function detectTraceFormat(trace: Trace): 'adk' | 'genai' {
+  for (const span of trace.allSpans.slice(0, 10)) {
+    if (span.tags['otel.scope.name'] === ADK_SCOPE) {
+      return 'adk';
+    }
+    if (span.tags['gen_ai.request.model'] || span.tags['gen_ai.system']) {
+      return 'genai';
+    }
+  }
+  return 'adk';
+}
+
 export function convertTracesToInvocations(traces: Trace[]): Map<string, ConversionResult> {
   const results = new Map<string, ConversionResult>();
 
   for (const trace of traces) {
-    const warnings: string[] = [];
-    const invocations: Invocation[] = [];
-
-    console.log(`Converting trace ${trace.traceId}:`);
+    const format = detectTraceFormat(trace);
+    console.log(`Converting trace ${trace.traceId} (format: ${format}):`);
     console.log(`  Total spans: ${trace.allSpans.length}`);
 
-    // Debug: log all span operation names and scopes
-    trace.allSpans.forEach((span, idx) => {
-      console.log(`  Span ${idx}: ${span.operationName}, scope: ${span.tags['otel.scope.name']}`);
-    });
-
-    // Find all invoke_agent spans
-    const agentSpans = trace.allSpans.filter(
-      (span) =>
-        span.operationName.includes('invoke_agent') &&
-        span.tags['otel.scope.name'] === ADK_SCOPE
-    );
-
-    console.log(`  Found ${agentSpans.length} invoke_agent spans with ADK scope`);
-
-    for (const agentSpan of agentSpans) {
-      try {
-        const invocation = convertAgentSpanToInvocation(agentSpan);
-        if (invocation) {
-          invocations.push(invocation);
-          console.log(`  Created invocation: ${invocation.invocationId}`);
-        } else {
-          console.log(`  convertAgentSpanToInvocation returned null for span ${agentSpan.spanId}`);
-        }
-      } catch (error) {
-        const errorMsg = `Failed to convert span ${agentSpan.spanId}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        warnings.push(errorMsg);
-        console.error(`  ${errorMsg}`);
-      }
+    if (format === 'genai') {
+      results.set(trace.traceId, convertGenAITrace(trace));
+    } else {
+      results.set(trace.traceId, convertADKTrace(trace));
     }
-
-    console.log(`  Final invocations count: ${invocations.length}`);
-    results.set(trace.traceId, { invocations, warnings });
   }
 
   return results;
+}
+
+function convertADKTrace(trace: Trace): ConversionResult {
+  const warnings: string[] = [];
+  const invocations: Invocation[] = [];
+
+  trace.allSpans.forEach((span, idx) => {
+    console.log(`  Span ${idx}: ${span.operationName}, scope: ${span.tags['otel.scope.name']}`);
+  });
+
+  const agentSpans = trace.allSpans.filter(
+    (span) =>
+      span.operationName.includes('invoke_agent') &&
+      span.tags['otel.scope.name'] === ADK_SCOPE
+  );
+
+  console.log(`  Found ${agentSpans.length} invoke_agent spans with ADK scope`);
+
+  for (const agentSpan of agentSpans) {
+    try {
+      const invocation = convertAgentSpanToInvocation(agentSpan);
+      if (invocation) {
+        invocations.push(invocation);
+        console.log(`  Created invocation: ${invocation.invocationId}`);
+      } else {
+        console.log(`  convertAgentSpanToInvocation returned null for span ${agentSpan.spanId}`);
+      }
+    } catch (error) {
+      const errorMsg = `Failed to convert span ${agentSpan.spanId}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      warnings.push(errorMsg);
+      console.error(`  ${errorMsg}`);
+    }
+  }
+
+  console.log(`  Final invocations count: ${invocations.length}`);
+  return { invocations, warnings };
 }
 
 /**
@@ -228,6 +244,343 @@ function extractToolTrajectory(
             args: part.functionCall.args || {},
             id: part.functionCall.id,
           });
+        }
+      }
+    }
+  }
+
+  return { toolUses, toolResponses };
+}
+
+function convertGenAITrace(trace: Trace): ConversionResult {
+  const warnings: string[] = [];
+  const invocations: Invocation[] = [];
+
+  const llmSpans = trace.allSpans.filter(span =>
+    span.tags['gen_ai.request.model'] || span.tags['gen_ai.system']
+  );
+
+  console.log(`  Found ${llmSpans.length} GenAI LLM spans`);
+
+  if (llmSpans.length === 0) {
+    console.log(`  No GenAI LLM spans found, treating trace as single invocation`);
+    return { invocations: [], warnings };
+  }
+
+  // Multi-turn detection: if > 1 LLM span, convert as multi-turn conversation
+  if (llmSpans.length > 1) {
+    console.log(`  Multi-turn conversation detected (${llmSpans.length} LLM spans)`);
+    const multiTurnInvocations = convertGenAIMultiTurn(llmSpans, trace);
+    invocations.push(...multiTurnInvocations);
+  } else {
+    // Single invocation
+    console.log(`  Single invocation trace`);
+    const rootSpan = trace.rootSpans[0];
+    if (rootSpan) {
+      try {
+        const invocation = convertGenAIRootSpan(rootSpan, trace);
+        if (invocation) {
+          invocations.push(invocation);
+        }
+      } catch (error) {
+        warnings.push(`Failed to convert root span: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+  }
+
+  console.log(`  Final invocations count: ${invocations.length}`);
+  return { invocations, warnings };
+}
+
+function convertGenAIMultiTurn(llmSpans: Span[], trace: Trace): Invocation[] {
+  const invocations: Invocation[] = [];
+
+  // Get messages from the first LLM span (should have full conversation history)
+  const firstLlmSpan = llmSpans[0];
+  const inputMessagesAttr = firstLlmSpan.tags['gen_ai.input.messages'] ||
+                           firstLlmSpan.tags['gen_ai.prompt'] ||
+                           '[]';
+  const outputMessagesAttr = firstLlmSpan.tags['gen_ai.output.messages'] ||
+                            firstLlmSpan.tags['gen_ai.completion'] ||
+                            '[]';
+
+  const allInputMessages = safeJsonParse<any[]>(inputMessagesAttr, []);
+  const allOutputMessages = safeJsonParse<any[]>(outputMessagesAttr, []);
+
+  if (!Array.isArray(allInputMessages) || !Array.isArray(allOutputMessages)) {
+    console.warn('  Input or output messages are not arrays, falling back to single invocation');
+    const invocation = convertGenAIRootSpan(firstLlmSpan, trace);
+    return invocation ? [invocation] : [];
+  }
+
+  const userMessages = allInputMessages.filter(msg =>
+    msg.role === 'user' || msg.role === 'human'
+  );
+  const assistantMessages = allOutputMessages.filter(msg =>
+    msg.role === 'assistant' || msg.role === 'model' || msg.role === 'ai'
+  );
+
+  console.log(`  Multi-turn: ${userMessages.length} user, ${assistantMessages.length} assistant messages`);
+
+  let assistantIdx = 0;
+
+  for (let userIdx = 0; userIdx < userMessages.length; userIdx++) {
+    const userMsg = userMessages[userIdx];
+    const userText = userMsg.content || '';
+
+    if (!userText) {
+      continue;
+    }
+
+    const userContent: Content = {
+      role: 'user',
+      parts: [{ text: userText }]
+    };
+
+    const toolUses: ToolCall[] = [];
+    let finalResponseText = '';
+
+    // Collect all assistant messages until we find one with content
+    while (assistantIdx < assistantMessages.length) {
+      const assistantMsg = assistantMessages[assistantIdx];
+
+      // Extract tool calls from this message
+      if (assistantMsg.tool_calls && Array.isArray(assistantMsg.tool_calls)) {
+        for (const tc of assistantMsg.tool_calls) {
+          if (tc.type === 'function' && tc.function) {
+            const args = safeJsonParse<Record<string, any>>(tc.function.arguments || '{}', {});
+            toolUses.push({
+              name: tc.function.name,
+              args,
+              id: tc.id
+            });
+          }
+        }
+      }
+
+      // Check for final response text
+      if (assistantMsg.content) {
+        finalResponseText = assistantMsg.content;
+        assistantIdx++;
+        break;
+      }
+
+      assistantIdx++;
+    }
+
+    const finalResponse: Content = {
+      role: 'model',
+      parts: [{ text: finalResponseText }]
+    };
+
+    const intermediateData: IntermediateData = {
+      toolUses,
+      toolResponses: []
+    };
+
+    invocations.push({
+      invocationId: `genai-turn-${userIdx + 1}-${firstLlmSpan.spanId.substring(0, 8)}`,
+      userContent,
+      finalResponse,
+      intermediateData,
+      creationTimestamp: firstLlmSpan.startTime
+    });
+  }
+
+  return invocations;
+}
+
+function isDescendantOf(span: Span, ancestor: Span): boolean {
+  const queue = [...ancestor.children];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current.spanId === span.spanId) {
+      return true;
+    }
+    queue.push(...current.children);
+  }
+  return false;
+}
+
+function convertGenAIRootSpan(rootSpan: Span, trace: Trace): Invocation | null {
+  const llmSpans = findDescendantLLMSpans(rootSpan);
+  const toolSpans = findDescendantToolSpans(rootSpan);
+
+  console.log(`    Converting GenAI root span ${rootSpan.spanId}:`);
+  console.log(`      LLM spans: ${llmSpans.length}, Tool spans: ${toolSpans.length}`);
+
+  if (llmSpans.length === 0) {
+    console.log(`      Skipping: No LLM spans found`);
+    return null;
+  }
+
+  const userContent = extractGenAIUserContent(llmSpans[0]);
+  if (!userContent) {
+    console.log(`      Skipping: Failed to extract user content`);
+    return null;
+  }
+
+  const finalResponse = extractGenAIFinalResponse(llmSpans[llmSpans.length - 1]);
+  if (!finalResponse) {
+    console.log(`      Skipping: Failed to extract final response`);
+    return null;
+  }
+
+  // Extract tool calls from both tool spans and LLM output messages
+  const { toolUses, toolResponses } = extractGenAIToolTrajectory(toolSpans, llmSpans);
+
+  return {
+    invocationId: rootSpan.spanId,
+    userContent,
+    finalResponse,
+    intermediateData: {
+      toolUses,
+      toolResponses,
+    },
+    creationTimestamp: rootSpan.startTime,
+  };
+}
+
+function findDescendantLLMSpans(root: Span): Span[] {
+  const results: Span[] = [];
+  const queue = [root];
+
+  while (queue.length > 0) {
+    const span = queue.shift()!;
+    if (span.tags['gen_ai.request.model'] || span.tags['gen_ai.system']) {
+      results.push(span);
+    }
+    queue.push(...span.children);
+  }
+
+  results.sort((a, b) => a.startTime - b.startTime);
+  return results;
+}
+
+function findDescendantToolSpans(root: Span): Span[] {
+  const results: Span[] = [];
+  const queue = [root];
+
+  while (queue.length > 0) {
+    const span = queue.shift()!;
+    if (span.tags['gen_ai.tool.name']) {
+      results.push(span);
+    }
+    queue.push(...span.children);
+  }
+
+  results.sort((a, b) => a.startTime - b.startTime);
+  return results;
+}
+
+function extractGenAIUserContent(llmSpan: Span): Content | null {
+  const messagesAttr = llmSpan.tags['gen_ai.prompt'] ||
+                      llmSpan.tags['gen_ai.request.messages'] ||
+                      llmSpan.tags['gen_ai.input.messages'];
+
+  if (!messagesAttr) return null;
+
+  const messages = safeJsonParse<any[]>(messagesAttr, null);
+  if (!messages || !Array.isArray(messages)) return null;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === 'user' && msg.content) {
+      return {
+        role: 'user',
+        parts: [{ text: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content) }],
+      };
+    }
+  }
+
+  return null;
+}
+
+function extractGenAIFinalResponse(llmSpan: Span): Content | null {
+  const completionAttr = llmSpan.tags['gen_ai.completion'] ||
+                        llmSpan.tags['gen_ai.response.messages'] ||
+                        llmSpan.tags['gen_ai.output.messages'];
+
+  if (!completionAttr) return null;
+
+  const messages = safeJsonParse<any[]>(completionAttr, null);
+  if (!messages || !Array.isArray(messages)) return null;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === 'assistant' || msg.role === 'model' || msg.role === 'ai') {
+      // Handle text content
+      if (msg.content) {
+        const contentText = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+        if (contentText) {
+          return {
+            role: 'model',
+            parts: [{ text: contentText }],
+          };
+        }
+      }
+
+      // If no text content, return empty content (tool calls will be in intermediateData)
+      return {
+        role: 'model',
+        parts: [{ text: '' }],
+      };
+    }
+  }
+
+  return null;
+}
+
+function extractGenAIToolTrajectory(toolSpans: Span[], llmSpans: Span[]): { toolUses: ToolCall[]; toolResponses: ToolResponse[] } {
+  const toolUses: ToolCall[] = [];
+  const toolResponses: ToolResponse[] = [];
+
+  for (const toolSpan of toolSpans) {
+    const toolName = toolSpan.tags['gen_ai.tool.name'];
+    const toolCallId = toolSpan.tags['gen_ai.tool.call.id'];
+    const argsAttr = toolSpan.tags['gen_ai.tool.call.arguments'] || toolSpan.tags['gen_ai.tool.arguments'];
+    const resultAttr = toolSpan.tags['gen_ai.tool.call.result'] || toolSpan.tags['gen_ai.tool.result'];
+
+    if (toolName) {
+      const args = safeJsonParse<Record<string, any>>(argsAttr || '{}', {});
+      toolUses.push({
+        name: toolName,
+        args,
+        id: toolCallId,
+      });
+
+      if (resultAttr) {
+        const response = safeJsonParse<Record<string, any>>(resultAttr, {});
+        toolResponses.push({
+          name: toolName,
+          response,
+          id: toolCallId,
+        });
+      }
+    }
+  }
+
+  for (const llmSpan of llmSpans) {
+    const completionAttr = llmSpan.tags['gen_ai.completion'] ||
+                          llmSpan.tags['gen_ai.response.messages'] ||
+                          llmSpan.tags['gen_ai.output.messages'];
+
+    if (!completionAttr) continue;
+
+    const messages = safeJsonParse<any[]>(completionAttr, null);
+    if (!messages || !Array.isArray(messages)) continue;
+
+    for (const msg of messages) {
+      if ((msg.role === 'assistant' || msg.role === 'model' || msg.role === 'ai') && msg.tool_calls) {
+        for (const toolCall of msg.tool_calls) {
+          if (toolCall.type === 'function' && toolCall.function) {
+            const args = safeJsonParse<Record<string, any>>(toolCall.function.arguments || '{}', {});
+            toolUses.push({
+              name: toolCall.function.name,
+              args,
+              id: toolCall.id,
+            });
+          }
         }
       }
     }
