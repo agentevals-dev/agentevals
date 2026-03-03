@@ -179,13 +179,30 @@ def list_metrics() -> None:
     is_flag=True,
     help="Run in headless mode (no browser launch).",
 )
-def serve(dev: bool, host: str, port: int, eval_sets: str | None, headless: bool) -> None:
+@click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    help="Increase verbosity (-v for INFO, -vv for DEBUG).",
+)
+def serve(dev: bool, host: str, port: int, eval_sets: str | None, headless: bool, verbose: int) -> None:
     """Start the agentevals API server.
 
     Use --dev to enable live streaming mode for agent development.
     """
     import uvicorn
     from pathlib import Path
+
+    # Configure logging for agentevals modules
+    level = logging.WARNING
+    if verbose == 1:
+        level = logging.INFO
+    elif verbose >= 2:
+        level = logging.DEBUG
+    logging.basicConfig(
+        level=level,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
 
     if dev:
         click.echo("🚀 agentevals dev server starting...")

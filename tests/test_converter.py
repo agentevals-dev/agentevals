@@ -304,3 +304,75 @@ class TestConverter:
         assert len(inv.intermediate_data.tool_responses) == 0
         assert inv.final_response is not None
         assert inv.final_response.parts[0].text
+
+    def test_explicit_format_parameter(self):
+        trace = _make_adk_trace()
+        result = convert_trace(trace, format="adk")
+
+        assert len(result.invocations) == 1
+        assert len(result.warnings) == 0
+
+    def test_format_detection_with_genai_span_late_in_trace(self):
+        non_llm_spans = []
+        for i in range(15):
+            non_llm_spans.append(Span(
+                trace_id="test-trace",
+                span_id=f"http-{i}",
+                parent_span_id=None,
+                operation_name="http.request",
+                start_time=1000 + i * 100,
+                duration=50,
+                tags={},
+                children=[],
+            ))
+
+        genai_span = Span(
+            trace_id="test-trace",
+            span_id="llm1",
+            parent_span_id=None,
+            operation_name="chat",
+            start_time=3000,
+            duration=1000,
+            tags={
+                "gen_ai.request.model": "gpt-3.5-turbo",
+                "gen_ai.input.messages": json.dumps([{"role": "user", "content": "Hello"}]),
+                "gen_ai.output.messages": json.dumps([{"role": "assistant", "content": "Hi"}]),
+            },
+            children=[],
+        )
+
+        all_spans = non_llm_spans + [genai_span]
+
+        trace = Trace(
+            trace_id="test-trace",
+            root_spans=all_spans,
+            all_spans=all_spans,
+        )
+
+        result = convert_trace(trace)
+
+        assert len(result.invocations) == 1
+        assert result.invocations[0].user_content.parts[0].text == "Hello"
+
+    def test_format_detection_defaults_to_adk_when_no_indicators(self):
+        plain_span = Span(
+            trace_id="test-trace",
+            span_id="span1",
+            parent_span_id=None,
+            operation_name="generic_operation",
+            start_time=1000,
+            duration=1000,
+            tags={},
+            children=[],
+        )
+
+        trace = Trace(
+            trace_id="test-trace",
+            root_spans=[plain_span],
+            all_spans=[plain_span],
+        )
+
+        result = convert_trace(trace)
+
+        assert len(result.warnings) > 0
+        assert "no invoke_agent spans found" in result.warnings[0]

@@ -14,6 +14,7 @@ from ..converter import convert_traces
 from ..loader.otlp import OtlpJsonLoader
 from ..runner import run_evaluation
 from ..config import EvalRunConfig
+from ..utils.log_enrichment import enrich_spans_with_logs
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,11 @@ async def create_eval_set_from_session(request: CreateEvalSetRequest):
         all_invocations = []
         for conv_result in conversion_results:
             all_invocations.extend(conv_result.invocations)
+
+        logger.debug(f"Creating eval set from {len(all_invocations)} invocations")
+        for i, inv in enumerate(all_invocations):
+            tool_count = len(inv.intermediate_data.tool_uses) if inv.intermediate_data else 0
+            logger.debug(f"  Invocation {i}: {tool_count} tool calls")
 
         conversation = []
         for inv in all_invocations:
@@ -282,6 +288,8 @@ async def download_file(filename: str):
     return FileResponse(file_path, media_type="application/json", filename=filename)
 
 
+
+
 @streaming_router.post("/get-trace")
 async def get_trace(request: GetTraceRequest):
     """Get the OTLP JSONL trace content for a session."""
@@ -296,7 +304,25 @@ async def get_trace(request: GetTraceRequest):
 
         unified_trace_id = session.trace_id
 
-        for span in session.spans:
+        has_genai_spans = any(
+            span.get("attributes", [])
+            and any(
+                attr.get("key") in ("gen_ai.request.model", "gen_ai.input.messages")
+                for attr in span.get("attributes", [])
+            )
+            for span in session.spans
+        )
+
+        if has_genai_spans and not session.logs:
+            logger.warning(
+                "Session %s has GenAI spans but no logs. "
+                "Message content will be missing unless spans already enriched.",
+                request.session_id
+            )
+
+        enriched_spans = enrich_spans_with_logs(session.spans, session.logs)
+
+        for span in enriched_spans:
             span_copy = span.copy()
             span_copy['traceId'] = unified_trace_id
             temp_file.write(json.dumps(span_copy) + "\n")
@@ -309,7 +335,7 @@ async def get_trace(request: GetTraceRequest):
         return {
             "session_id": request.session_id,
             "trace_content": trace_content,
-            "num_spans": len(session.spans),
+            "num_spans": len(enriched_spans),
         }
 
     except Exception as exc:

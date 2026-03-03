@@ -468,29 +468,51 @@ def _extract_performance_metrics(trace) -> dict[str, Any]:
     output_tokens = []
     total_tokens = []
 
+    has_adk_invoke = any(s.operation_name.startswith("invoke_agent") for s in trace.all_spans)
+
+    if not has_adk_invoke and trace.root_spans:
+        for root_span in trace.root_spans:
+            root_duration_ms = root_span.duration / 1000.0
+            agent_latencies.append(root_duration_ms)
+
     for span in trace.all_spans:
         duration_ms = span.duration / 1000.0
 
-        if span.operation_name.startswith("invoke_agent"):
+        is_adk_invoke = span.operation_name.startswith("invoke_agent")
+        is_adk_llm = span.operation_name.startswith("call_llm")
+        is_adk_tool = span.operation_name.startswith("execute_tool")
+        is_genai_llm = span.tags.get("gen_ai.request.model") is not None
+        is_genai_tool = span.tags.get("gen_ai.tool.name") is not None
+
+        if is_adk_invoke:
             agent_latencies.append(duration_ms)
-        elif span.operation_name.startswith("call_llm"):
+        elif is_adk_llm or is_genai_llm:
             llm_latencies.append(duration_ms)
 
-            llm_response_raw = span.tags.get("gcp.vertex.agent.llm_response", "{}")
-            try:
-                if isinstance(llm_response_raw, dict):
-                    llm_response = llm_response_raw
-                else:
-                    llm_response = json.loads(llm_response_raw) if llm_response_raw else {}
+            if is_adk_llm:
+                llm_response_raw = span.tags.get("gcp.vertex.agent.llm_response", "{}")
+                try:
+                    if isinstance(llm_response_raw, dict):
+                        llm_response = llm_response_raw
+                    else:
+                        llm_response = json.loads(llm_response_raw) if llm_response_raw else {}
 
-                usage = llm_response.get("usage_metadata", {})
-                if usage:
-                    prompt_tokens.append(usage.get("prompt_token_count", 0))
-                    output_tokens.append(usage.get("candidates_token_count", 0))
-                    total_tokens.append(usage.get("total_token_count", 0))
-            except (json.JSONDecodeError, AttributeError, TypeError):
-                pass
-        elif span.operation_name.startswith("execute_tool"):
+                    usage = llm_response.get("usage_metadata", {})
+                    if usage:
+                        prompt_tokens.append(usage.get("prompt_token_count", 0))
+                        output_tokens.append(usage.get("candidates_token_count", 0))
+                        total_tokens.append(usage.get("total_token_count", 0))
+                except (json.JSONDecodeError, AttributeError, TypeError):
+                    pass
+            elif is_genai_llm:
+                input_toks = span.tags.get("gen_ai.usage.input_tokens", 0)
+                output_toks = span.tags.get("gen_ai.usage.output_tokens", 0)
+                if isinstance(input_toks, (int, float)) and isinstance(output_toks, (int, float)):
+                    prompt_tokens.append(int(input_toks))
+                    output_tokens.append(int(output_toks))
+                    total_tokens.append(int(input_toks) + int(output_toks))
+
+        elif is_adk_tool or is_genai_tool:
             tool_latencies.append(duration_ms)
 
     def calc_percentiles(values: list[float]) -> dict[str, float]:

@@ -1,14 +1,12 @@
 """Convert trace spans into ADK Invocation objects.
 
-Bridges OTel trace data (from a TraceLoader) to ADK's evaluation framework.
+Supports two trace formats:
+1. ADK format (gcp.vertex.agent scope with ADK-specific attributes)
+2. GenAI semantic conventions (standard gen_ai.* attributes from LangChain, LlamaIndex, etc.)
 
-For each ``invoke_agent`` span in a trace:
-1. Find child ``call_llm`` spans (sorted by start time).
-2. From the first ``call_llm``'s ``llm_request``, extract user input
-   (last ``role=user`` content with text parts, skipping function_response parts).
-3. From the last ``call_llm``'s ``llm_response``, extract the final text response.
-4. From ``execute_tool`` spans, extract FunctionCall/FunctionResponse pairs.
-5. Build an Invocation with user_content, final_response, and intermediate_data.
+Automatically detects the format and routes to the appropriate converter.
+Format detection checks span attributes and falls back to checking all spans if needed.
+Explicit format can be specified via the format parameter to convert_trace().
 """
 
 from __future__ import annotations
@@ -24,6 +22,8 @@ from google.genai import types as genai_types
 from .loader.base import Span, Trace
 
 logger = logging.getLogger(__name__)
+
+FORMAT_DETECTION_SPAN_LIMIT = 10
 
 # Tag keys used by the ADK OTel instrumentation (gcp.vertex.agent scope).
 _TAG_SCOPE = "otel.scope.name"
@@ -45,7 +45,78 @@ class ConversionResult:
     warnings: list[str] = field(default_factory=list)
 
 
-def convert_trace(trace: Trace) -> ConversionResult:
+def convert_trace(trace: Trace, format: str | None = None) -> ConversionResult:
+    """Convert a trace to Invocation objects.
+
+    Args:
+        trace: The trace to convert
+        format: Optional explicit format ("adk" or "genai"). If None, auto-detects.
+
+    Returns:
+        ConversionResult with invocations and any warnings
+    """
+    if format is None:
+        trace_format = _detect_trace_format(trace)
+        logger.info(f"Auto-detected trace format: {trace_format} for trace {trace.trace_id}")
+    else:
+        trace_format = format
+        logger.info(f"Using explicit trace format: {trace_format} for trace {trace.trace_id}")
+
+    if trace_format == "genai":
+        from .genai_converter import convert_genai_trace
+        return convert_genai_trace(trace)
+    else:
+        return _convert_adk_trace(trace)
+
+
+def _detect_trace_format(trace: Trace) -> str:
+    """Detect trace format by inspecting span attributes.
+
+    Checks spans for format indicators:
+    - ADK: otel.scope.name == "gcp.vertex.agent"
+    - GenAI: gen_ai.request.model or gen_ai.input.messages attributes
+
+    First checks a limited number of spans for performance, then falls back
+    to checking all spans if inconclusive.
+
+    Returns:
+        "adk" or "genai"
+    """
+    def check_spans(spans: list[Span]) -> str | None:
+        for span in spans:
+            if span.get_tag(_TAG_SCOPE) == _ADK_SCOPE:
+                return "adk"
+
+            if span.get_tag("gen_ai.request.model") or span.get_tag("gen_ai.input.messages"):
+                return "genai"
+        return None
+
+    initial_check = check_spans(trace.all_spans[:FORMAT_DETECTION_SPAN_LIMIT])
+    if initial_check:
+        logger.debug(
+            f"Trace {trace.trace_id}: detected {initial_check} format "
+            f"in first {FORMAT_DETECTION_SPAN_LIMIT} spans"
+        )
+        return initial_check
+
+    if len(trace.all_spans) > FORMAT_DETECTION_SPAN_LIMIT:
+        logger.debug(
+            f"Trace {trace.trace_id}: checking all {len(trace.all_spans)} spans "
+            f"for format detection"
+        )
+        full_check = check_spans(trace.all_spans)
+        if full_check:
+            logger.debug(f"Trace {trace.trace_id}: detected {full_check} format in full scan")
+            return full_check
+
+    logger.warning(
+        f"Trace {trace.trace_id}: no format indicators found in {len(trace.all_spans)} spans, "
+        f"defaulting to ADK format"
+    )
+    return "adk"
+
+
+def _convert_adk_trace(trace: Trace) -> ConversionResult:
     result = ConversionResult(trace_id=trace.trace_id)
 
     invoke_spans = _find_adk_spans(trace, "invoke_agent")
