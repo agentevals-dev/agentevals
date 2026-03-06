@@ -296,6 +296,8 @@ export const InspectorView: React.FC = () => {
       selectedMetrics={state.selectedMetrics}
       isEvaluating={state.isEvaluating}
       performanceMetrics={traceResult.performanceMetrics}
+      allActualInvocations={invocations}
+      allExpectedInvocations={expectedInvocations}
     />
   );
 

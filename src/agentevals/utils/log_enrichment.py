@@ -60,8 +60,16 @@ def enrich_spans_with_logs(
                 seen_user_messages.add(user_content)
 
         elif event_name in ("gen_ai.assistant.message", "gen_ai.choice"):
-            assistant_content = body.get("content") or ""
-            tool_calls = body.get("tool_calls", [])
+            if event_name == "gen_ai.choice":
+                # gen_ai.choice from openai-v2 nests content under body["message"].
+                # Only extract text content here — tool_calls come from gen_ai.assistant.message
+                # events emitted by subsequent LLM calls' input context.
+                nested = body.get("message", {}) if isinstance(body.get("message"), dict) else {}
+                assistant_content = body.get("content") or nested.get("content") or ""
+                tool_calls = []
+            else:
+                assistant_content = body.get("content") or ""
+                tool_calls = body.get("tool_calls", [])
 
             message_key = f"{assistant_content}:{json.dumps(tool_calls) if tool_calls else ''}"
 

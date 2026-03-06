@@ -20,7 +20,7 @@ export const InvocationSummaryPanel: React.FC<InvocationSummaryPanelProps> = ({
   };
 
   // Helper to truncate text
-  const truncateText = (text: string, maxLength: number = 80) => {
+  const truncateText = (text: string, maxLength: number = 200) => {
     if (!text || text.length === 0) return 'No content';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';

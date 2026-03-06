@@ -13,6 +13,8 @@ interface ComparisonPanelProps {
   selectedMetrics: string[];
   isEvaluating: boolean;
   performanceMetrics?: PerformanceMetrics;
+  allActualInvocations?: Invocation[];
+  allExpectedInvocations?: Invocation[];
 }
 
 export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
@@ -23,6 +25,8 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
   selectedMetrics,
   isEvaluating,
   performanceMetrics,
+  allActualInvocations,
+  allExpectedInvocations,
 }) => {
   if (!actualInvocation) {
     return (
@@ -67,6 +71,8 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
           threshold={threshold}
           selectedMetrics={selectedMetrics}
           isEvaluating={isEvaluating}
+          allActualInvocations={allActualInvocations}
+          allExpectedInvocations={allExpectedInvocations}
         />
       </div>
     </div>

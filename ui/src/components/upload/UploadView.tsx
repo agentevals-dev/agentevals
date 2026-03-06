@@ -196,10 +196,10 @@ export const UploadView: React.FC = () => {
         <div className="header-nav">
           <button
             className="nav-button"
-            onClick={() => actions.setCurrentView('welcome')}
+            onClick={() => actions.setCurrentView(state.evaluationOrigin === 'streaming' ? 'streaming' : 'welcome')}
           >
             <ArrowLeft size={16} />
-            Back to Welcome
+            {state.evaluationOrigin === 'streaming' ? 'Back to Live View' : 'Back to Welcome'}
           </button>
           <div style={{ display: 'flex', gap: '8px' }}>
             {state.annotationQueues.some(q => q.items.length > 0) && (
@@ -227,114 +227,208 @@ export const UploadView: React.FC = () => {
       </div>
 
       <div className="upload-grid">
-        <div className="section">
-          <div className="section-title">Trace Files</div>
-          <FileDropZone
-            title="Drop trace files here"
-            description="Upload one or more Jaeger JSON trace files"
-            multiple
-            onChange={actions.setTraceFiles}
-          />
-          {state.traceFiles.length > 0 && (
-            <div style={{
-              marginTop: 12,
-              padding: '10px',
-              backgroundColor: 'var(--bg-elevated)',
-              borderRadius: '4px',
-              border: '1px solid var(--border-default)'
-            }}>
+        {state.evaluationOrigin === 'streaming' ? (
+          <>
+            <div className="section">
+              <div className="section-title">Trace Files</div>
               <div style={{
-                color: 'var(--text-primary)',
-                fontSize: '12px',
-                fontWeight: 600,
-                marginBottom: '6px'
+                padding: '10px',
+                backgroundColor: 'var(--bg-elevated)',
+                borderRadius: '4px',
+                border: '1px solid var(--border-default)'
               }}>
-                {state.traceFiles.length} file(s) selected:
+                <div style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
+                  {state.traceFiles.length} file(s) loaded from live session:
+                </div>
+                {state.traceFiles.map((file, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '11px',
+                      padding: '3px 6px',
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: '3px',
+                      marginTop: idx > 0 ? '3px' : '0',
+                      fontFamily: 'monospace'
+                    }}
+                  >
+                    {file.name}
+                  </div>
+                ))}
+                {state.isLoadingMetadata && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '6px',
+                    backgroundColor: 'var(--bg-surface)',
+                    borderRadius: '3px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    color: 'var(--accent-cyan)',
+                    fontSize: '11px'
+                  }}>
+                    <div className="spinner" />
+                    Extracting trace metadata...
+                  </div>
+                )}
+                {!state.isLoadingMetadata && state.traceMetadata.size > 0 && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '6px',
+                    backgroundColor: 'var(--bg-surface)',
+                    borderRadius: '3px',
+                    color: 'var(--status-success)',
+                    fontSize: '11px'
+                  }}>
+                    ✓ {state.traceMetadata.size} trace(s) ready
+                  </div>
+                )}
               </div>
-              {state.traceFiles.map((file, idx) => (
-                <div
-                  key={idx}
-                  style={{
+            </div>
+
+            <div className="section">
+              <div className="section-title">Eval Set (Optional)</div>
+              {state.evalSetFile ? (
+                <div style={{
+                  padding: '10px',
+                  backgroundColor: 'var(--bg-elevated)',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border-default)'
+                }}>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
+                    Eval set file:
+                  </div>
+                  <div style={{
                     color: 'var(--text-secondary)',
                     fontSize: '11px',
                     padding: '3px 6px',
                     backgroundColor: 'var(--bg-surface)',
                     borderRadius: '3px',
-                    marginTop: idx > 0 ? '3px' : '0',
                     fontFamily: 'monospace'
-                  }}
-                >
-                  {file.name}
+                  }}>
+                    {state.evalSetFile.name}
+                  </div>
                 </div>
-              ))}
-              {state.isLoadingMetadata && (
-                <div style={{
-                  marginTop: '8px',
-                  padding: '6px',
-                  backgroundColor: 'var(--bg-surface)',
-                  borderRadius: '3px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: 'var(--accent-cyan)',
-                  fontSize: '11px'
-                }}>
-                  <div className="spinner" />
-                  Extracting trace metadata...
-                </div>
-              )}
-              {!state.isLoadingMetadata && state.traceMetadata.size > 0 && (
-                <div style={{
-                  marginTop: '8px',
-                  padding: '6px',
-                  backgroundColor: 'var(--bg-surface)',
-                  borderRadius: '3px',
-                  color: 'var(--status-success)',
-                  fontSize: '11px'
-                }}>
-                  ✓ {state.traceMetadata.size} trace(s) ready
+              ) : (
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', padding: '10px 0' }}>
+                  No golden eval set loaded.
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <>
+            <div className="section">
+              <div className="section-title">Trace Files</div>
+              <FileDropZone
+                title="Drop trace files here"
+                description="Upload one or more Jaeger JSON trace files"
+                multiple
+                onChange={actions.setTraceFiles}
+              />
+              {state.traceFiles.length > 0 && (
+                <div style={{
+                  marginTop: 12,
+                  padding: '10px',
+                  backgroundColor: 'var(--bg-elevated)',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border-default)'
+                }}>
+                  <div style={{
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    marginBottom: '6px'
+                  }}>
+                    {state.traceFiles.length} file(s) selected:
+                  </div>
+                  {state.traceFiles.map((file, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '11px',
+                        padding: '3px 6px',
+                        backgroundColor: 'var(--bg-surface)',
+                        borderRadius: '3px',
+                        marginTop: idx > 0 ? '3px' : '0',
+                        fontFamily: 'monospace'
+                      }}
+                    >
+                      {file.name}
+                    </div>
+                  ))}
+                  {state.isLoadingMetadata && (
+                    <div style={{
+                      marginTop: '8px',
+                      padding: '6px',
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: '3px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      color: 'var(--accent-cyan)',
+                      fontSize: '11px'
+                    }}>
+                      <div className="spinner" />
+                      Extracting trace metadata...
+                    </div>
+                  )}
+                  {!state.isLoadingMetadata && state.traceMetadata.size > 0 && (
+                    <div style={{
+                      marginTop: '8px',
+                      padding: '6px',
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: '3px',
+                      color: 'var(--status-success)',
+                      fontSize: '11px'
+                    }}>
+                      ✓ {state.traceMetadata.size} trace(s) ready
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
-        <div className="section">
-          <div className="section-title">Eval Set (Optional)</div>
-          <FileDropZone
-            title="Drop eval set file here"
-            description="Upload golden eval set JSON for comparison"
-            onChange={(files) => actions.setEvalSet(files[0] || null)}
-          />
-          {state.evalSetFile && (
-            <div style={{
-              marginTop: 12,
-              padding: '10px',
-              backgroundColor: 'var(--bg-elevated)',
-              borderRadius: '4px',
-              border: '1px solid var(--border-default)'
-            }}>
-              <div style={{
-                color: 'var(--text-primary)',
-                fontSize: '12px',
-                fontWeight: 600,
-                marginBottom: '6px'
-              }}>
-                Eval set file:
-              </div>
-              <div style={{
-                color: 'var(--text-secondary)',
-                fontSize: '11px',
-                padding: '3px 6px',
-                backgroundColor: 'var(--bg-surface)',
-                borderRadius: '3px',
-                fontFamily: 'monospace'
-              }}>
-                {state.evalSetFile.name}
-              </div>
+            <div className="section">
+              <div className="section-title">Eval Set (Optional)</div>
+              <FileDropZone
+                title="Drop eval set file here"
+                description="Upload golden eval set JSON for comparison"
+                onChange={(files) => actions.setEvalSet(files[0] || null)}
+              />
+              {state.evalSetFile && (
+                <div style={{
+                  marginTop: 12,
+                  padding: '10px',
+                  backgroundColor: 'var(--bg-elevated)',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border-default)'
+                }}>
+                  <div style={{
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    marginBottom: '6px'
+                  }}>
+                    Eval set file:
+                  </div>
+                  <div style={{
+                    color: 'var(--text-secondary)',
+                    fontSize: '11px',
+                    padding: '3px 6px',
+                    backgroundColor: 'var(--bg-surface)',
+                    borderRadius: '3px',
+                    fontFamily: 'monospace'
+                  }}>
+                    {state.evalSetFile.name}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
 
         <div className="section metrics-section">
           <div className="section-title">Metrics Configuration</div>

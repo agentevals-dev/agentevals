@@ -3,7 +3,6 @@ import { css } from '@emotion/react';
 import { CheckCircle, XCircle, AlertCircle, MinusCircle, Loader2 } from 'lucide-react';
 import type { MetricResult, Invocation } from '../../lib/types';
 import { getStatusColor } from '../../lib/utils';
-import { TrajectoryComparisonDetails } from './TrajectoryComparisonDetails';
 
 interface MetricsComparisonSectionProps {
   metricResults: MetricResult[];
@@ -12,6 +11,8 @@ interface MetricsComparisonSectionProps {
   threshold: number;
   selectedMetrics: string[];
   isEvaluating: boolean;
+  allActualInvocations?: Invocation[];
+  allExpectedInvocations?: Invocation[];
 }
 
 export const MetricsComparisonSection: React.FC<MetricsComparisonSectionProps> = ({
@@ -21,6 +22,8 @@ export const MetricsComparisonSection: React.FC<MetricsComparisonSectionProps> =
   threshold,
   selectedMetrics,
   isEvaluating,
+  allActualInvocations,
+  allExpectedInvocations,
 }) => {
   // Helper to extract text from content parts
   const getTextFromParts = (parts: any[]) => {
@@ -136,6 +139,74 @@ export const MetricsComparisonSection: React.FC<MetricsComparisonSectionProps> =
     };
   };
 
+  const getPerInvocationDetail = (result: MetricResult, idx: number): React.ReactNode => {
+    if (result.metricName === 'tool_trajectory_avg_score' && result.details?.comparisons) {
+      const comp = result.details.comparisons[idx];
+      if (!comp) return null;
+      const diffHint = comp.expected.length > 0 && comp.actual.length > 0
+        ? comp.expected[0].name !== comp.actual[0].name
+          ? 'Tool names differ'
+          : JSON.stringify(comp.expected[0].args) !== JSON.stringify(comp.actual[0].args)
+            ? 'Tool arguments differ'
+            : 'Tool sequences differ'
+        : null;
+      return (
+        <>
+          <div css={miniComparisonGridStyles}>
+            <div>
+              <div css={miniColumnLabelStyles}>Expected</div>
+              {comp.expected.length > 0 ? comp.expected.map((t, i) => (
+                <div key={i} css={miniToolItemStyles}>
+                  <div css={miniToolNameStyles}>{i + 1}. {t.name}</div>
+                  {Object.keys(t.args).length > 0 && (
+                    <pre css={miniArgsStyles}>{JSON.stringify(t.args, null, 2)}</pre>
+                  )}
+                </div>
+              )) : <span css={emptyTextStyles}>(none)</span>}
+            </div>
+            <div>
+              <div css={miniColumnLabelStyles}>Actual</div>
+              {comp.actual.length > 0 ? comp.actual.map((t, i) => (
+                <div key={i} css={miniToolItemStyles}>
+                  <div css={miniToolNameStyles}>{i + 1}. {t.name}</div>
+                  {Object.keys(t.args).length > 0 && (
+                    <pre css={miniArgsStyles}>{JSON.stringify(t.args, null, 2)}</pre>
+                  )}
+                </div>
+              )) : <span css={emptyTextStyles}>(none)</span>}
+            </div>
+          </div>
+          {diffHint && !comp.matched && (
+            <div css={diffHintStyles}>{diffHint}</div>
+          )}
+        </>
+      );
+    }
+    if (
+      (result.metricName === 'response_match_score' || result.metricName === 'final_response_match_v2')
+      && allActualInvocations && allExpectedInvocations
+    ) {
+      const actual = allActualInvocations[idx];
+      const expected = allExpectedInvocations[idx];
+      if (!actual || !expected) return null;
+      const actualText = truncateText(getTextFromParts(actual.finalResponse.parts), 120);
+      const expectedText = truncateText(getTextFromParts(expected.finalResponse.parts), 120);
+      return (
+        <div css={miniComparisonGridStyles}>
+          <div>
+            <div css={miniColumnLabelStyles}>Expected</div>
+            <div css={miniTextStyles}>{expectedText}</div>
+          </div>
+          <div>
+            <div css={miniColumnLabelStyles}>Actual</div>
+            <div css={miniTextStyles}>{actualText}</div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   const metricResultsMap = new Map(metricResults.map(mr => [mr.metricName, mr]));
   const metricsToShow = selectedMetrics.length > 0 ? selectedMetrics : metricResults.map(mr => mr.metricName);
 
@@ -226,18 +297,27 @@ export const MetricsComparisonSection: React.FC<MetricsComparisonSectionProps> =
                 <div css={perInvocationScoresStyles}>
                   <div css={perInvocationLabelStyles}>Per-invocation scores:</div>
                   <div css={scoresListStyles}>
-                    {result.perInvocationScores.map((score, idx) => (
-                      <span key={idx} css={invocationScoreStyles}>
-                        {score !== null ? score.toFixed(2) : 'N/A'}
-                      </span>
-                    ))}
+                    {result.perInvocationScores.map((score, idx) => {
+                      const failing = score !== null && score < threshold;
+                      const scoreColor = score === null
+                        ? 'var(--text-secondary)'
+                        : failing
+                          ? 'var(--status-failure)'
+                          : 'var(--status-success)';
+                      const detail = getPerInvocationDetail(result, idx);
+                      return (
+                        <div key={idx} css={invocationRowWrapperStyles(failing)}>
+                          <div css={invocationScoreRowStyles}>
+                            <span css={invocationLabelStyles}>Inv #{idx + 1}</span>
+                            <span css={invocationScoreValueStyles(scoreColor)}>
+                              {score !== null ? score.toFixed(2) : 'N/A'}
+                            </span>
+                          </div>
+                          {detail && <div css={invocationDetailStyles}>{detail}</div>}
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              )}
-
-              {result.details?.comparisons && (
-                <div css={detailsContainerStyles}>
-                  <TrajectoryComparisonDetails comparisons={result.details.comparisons} />
                 </div>
               )}
             </div>
@@ -466,22 +546,100 @@ const perInvocationLabelStyles = css`
 
 const scoresListStyles = css`
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 4px;
 `;
 
-const invocationScoreStyles = css`
+const invocationScoreRowStyles = css`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`;
+
+const invocationLabelStyles = css`
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  min-width: 48px;
+`;
+
+const invocationScoreValueStyles = (color: string) => css`
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: ${color};
+`;
+
+const invocationRowWrapperStyles = (failing: boolean) => css`
+  border-left: 3px solid ${failing ? 'var(--status-failure)' : 'var(--border-default)'};
+  padding-left: 8px;
+`;
+
+const invocationDetailStyles = css`
+  margin-top: 6px;
+  padding: 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+`;
+
+const miniComparisonGridStyles = css`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+`;
+
+const miniColumnLabelStyles = css`
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+`;
+
+const miniToolItemStyles = css`
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--text-primary);
-  background: var(--bg-primary);
-  padding: 4px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--border-default);
+  padding: 2px 6px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  margin-bottom: 2px;
 `;
 
-const detailsContainerStyles = css`
-  padding: 12px 16px;
-  border-top: 1px solid var(--border-default);
-  background: var(--bg-primary);
+const miniTextStyles = css`
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+`;
+
+const miniToolNameStyles = css`
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+`;
+
+const miniArgsStyles = css`
+  font-family: var(--font-mono);
+  font-size: 0.688rem;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+  padding: 4px 6px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  overflow-x: auto;
+  line-height: 1.4;
+`;
+
+const diffHintStyles = css`
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: rgba(255, 87, 87, 0.1);
+  border-radius: 3px;
+  font-size: 0.688rem;
+  color: var(--status-failure);
+  font-style: italic;
 `;
