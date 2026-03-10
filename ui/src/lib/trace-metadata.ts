@@ -1,6 +1,13 @@
 import { readFileAsText, safeJsonParse } from './utils';
 import type { Trace, Span, Invocation } from './types';
-import { convertTracesToInvocations } from './trace-converter';
+import {
+  ASSISTANT_ROLES,
+  USER_ROLES,
+  convertTracesToInvocations,
+  extractTextFromGenAIMessage,
+  getInputMessagesAttr,
+  getOutputMessagesAttr,
+} from './trace-converter';
 
 export interface TraceMetadata {
   traceId: string;
@@ -179,19 +186,13 @@ function extractGenAIMetadata(trace: Trace): TraceMetadata {
       metadata.sessionId = trace.traceId.substring(0, 12);
     }
 
-    const messagesAttr = firstLlm.tags?.['gen_ai.prompt'] ||
-                        firstLlm.tags?.['gen_ai.request.messages'] ||
-                        firstLlm.tags?.['gen_ai.input.messages'];
-
+    const messagesAttr = getInputMessagesAttr(firstLlm);
     if (messagesAttr) {
       metadata.userInputPreview = extractGenAIUserPreview(messagesAttr);
     }
 
     const lastLlm = llmSpans[llmSpans.length - 1];
-    const completionAttr = lastLlm.tags?.['gen_ai.completion'] ||
-                          lastLlm.tags?.['gen_ai.response.messages'] ||
-                          lastLlm.tags?.['gen_ai.output.messages'];
-
+    const completionAttr = getOutputMessagesAttr(lastLlm);
     if (completionAttr) {
       metadata.finalOutputPreview = extractGenAIOutputPreview(completionAttr);
     }
@@ -209,9 +210,9 @@ function extractGenAIUserPreview(messagesAttr: string): string {
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg.role === 'user' && msg.content) {
-      const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-      return extractTextPreview(content);
+    if (USER_ROLES.includes(msg.role)) {
+      const text = extractTextFromGenAIMessage(msg);
+      if (text) return extractTextPreview(text);
     }
   }
 
@@ -224,9 +225,9 @@ function extractGenAIOutputPreview(completionAttr: string): string {
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg.role === 'assistant' && msg.content) {
-      const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-      return extractTextPreview(content);
+    if (ASSISTANT_ROLES.includes(msg.role)) {
+      const text = extractTextFromGenAIMessage(msg);
+      if (text) return extractTextPreview(text);
     }
   }
 

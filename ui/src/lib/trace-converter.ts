@@ -3,6 +3,21 @@ import { safeJsonParse } from './utils';
 
 const ADK_SCOPE = 'gcp.vertex.agent';
 
+export const USER_ROLES = ['user', 'human'];
+export const ASSISTANT_ROLES = ['assistant', 'model', 'ai'];
+
+export function getInputMessagesAttr(span: Span): string | undefined {
+  return span.tags['gen_ai.input.messages']
+      || span.tags['gen_ai.prompt']
+      || span.tags['gen_ai.request.messages'];
+}
+
+export function getOutputMessagesAttr(span: Span): string | undefined {
+  return span.tags['gen_ai.output.messages']
+      || span.tags['gen_ai.completion']
+      || span.tags['gen_ai.response.messages'];
+}
+
 interface ConversionResult {
   invocations: Invocation[];
   warnings: string[];
@@ -252,6 +267,56 @@ function extractToolTrajectory(
   return { toolUses, toolResponses };
 }
 
+function isGenAIInvocationSpan(span: Span): boolean {
+  const opLower = span.operationName.toLowerCase();
+  return ['agent', 'chain', 'executor', 'workflow'].some(kw => opLower.includes(kw));
+}
+
+export function extractTextFromGenAIMessage(msg: any): string {
+  if (typeof msg.content === 'string' && msg.content) {
+    return msg.content;
+  }
+  if (Array.isArray(msg.content)) {
+    const parts = msg.content
+      .filter((item: any) => typeof item === 'object' && item.text)
+      .map((item: any) => item.text as string);
+    if (parts.length > 0) return parts.join(' ');
+  }
+  // Parts-based format (OTel GenAI semconv v1.36.0+)
+  if (Array.isArray(msg.parts)) {
+    const parts = msg.parts
+      .filter((p: any) => typeof p === 'object' && p.type === 'text')
+      .map((p: any) => (p.content || p.text || '') as string)
+      .filter(Boolean);
+    if (parts.length > 0) return parts.join(' ');
+  }
+  return '';
+}
+
+export function extractToolCallsFromGenAIMessage(msg: any): ToolCall[] {
+  const result: ToolCall[] = [];
+  if (Array.isArray(msg.tool_calls)) {
+    for (const tc of msg.tool_calls) {
+      if (tc.type === 'function' && tc.function) {
+        const args = safeJsonParse<Record<string, any>>(tc.function.arguments || '{}', {});
+        result.push({ name: tc.function.name, args, id: tc.id });
+      }
+    }
+  }
+  // Parts-based format (OTel GenAI semconv v1.36.0+)
+  if (result.length === 0 && Array.isArray(msg.parts)) {
+    for (const part of msg.parts) {
+      if (typeof part === 'object' && part.type === 'tool_call') {
+        const args = typeof part.arguments === 'string'
+          ? safeJsonParse<Record<string, any>>(part.arguments, {})
+          : (part.arguments || {});
+        result.push({ name: part.name, args, id: part.id });
+      }
+    }
+  }
+  return result;
+}
+
 function convertGenAITrace(trace: Trace): ConversionResult {
   const warnings: string[] = [];
   const invocations: Invocation[] = [];
@@ -267,16 +332,22 @@ function convertGenAITrace(trace: Trace): ConversionResult {
     return { invocations: [], warnings };
   }
 
-  // Multi-turn detection: if > 1 LLM span, convert as multi-turn conversation
-  if (llmSpans.length > 1) {
+  const llmRootSpans = trace.rootSpans.filter(span =>
+    span.tags['gen_ai.request.model'] || span.tags['gen_ai.system']
+  );
+
+  // Multi-turn extraction applies only to raw LLM spans whose message content accumulates
+  // across calls. Invocation spans (e.g. invoke_agent) each contain self-contained message
+  // histories and should each map to a separate invocation.
+  if (llmSpans.length > 1 && !llmRootSpans.some(isGenAIInvocationSpan)) {
     console.log(`  Multi-turn conversation detected (${llmSpans.length} LLM spans)`);
     const multiTurnInvocations = convertGenAIMultiTurn(llmSpans, trace);
     invocations.push(...multiTurnInvocations);
   } else {
-    // Single invocation
-    console.log(`  Single invocation trace`);
-    const rootSpan = trace.rootSpans[0];
-    if (rootSpan) {
+    const rootSpansToConvert = llmRootSpans.length > 0
+      ? llmRootSpans
+      : trace.rootSpans.slice(0, 1);
+    for (const rootSpan of rootSpansToConvert) {
       try {
         const invocation = convertGenAIRootSpan(rootSpan, trace);
         if (invocation) {
@@ -297,12 +368,8 @@ function convertGenAIMultiTurn(llmSpans: Span[], trace: Trace): Invocation[] {
 
   // Get messages from the first LLM span (should have full conversation history)
   const firstLlmSpan = llmSpans[0];
-  const inputMessagesAttr = firstLlmSpan.tags['gen_ai.input.messages'] ||
-                           firstLlmSpan.tags['gen_ai.prompt'] ||
-                           '[]';
-  const outputMessagesAttr = firstLlmSpan.tags['gen_ai.output.messages'] ||
-                            firstLlmSpan.tags['gen_ai.completion'] ||
-                            '[]';
+  const inputMessagesAttr = getInputMessagesAttr(firstLlmSpan) || '[]';
+  const outputMessagesAttr = getOutputMessagesAttr(firstLlmSpan) || '[]';
 
   const allInputMessages = safeJsonParse<any[]>(inputMessagesAttr, []);
   const allOutputMessages = safeJsonParse<any[]>(outputMessagesAttr, []);
@@ -314,10 +381,10 @@ function convertGenAIMultiTurn(llmSpans: Span[], trace: Trace): Invocation[] {
   }
 
   const userMessages = allInputMessages.filter(msg =>
-    msg.role === 'user' || msg.role === 'human'
+    USER_ROLES.includes(msg.role)
   );
   const assistantMessages = allOutputMessages.filter(msg =>
-    msg.role === 'assistant' || msg.role === 'model' || msg.role === 'ai'
+    ASSISTANT_ROLES.includes(msg.role)
   );
 
   console.log(`  Multi-turn: ${userMessages.length} user, ${assistantMessages.length} assistant messages`);
@@ -326,7 +393,7 @@ function convertGenAIMultiTurn(llmSpans: Span[], trace: Trace): Invocation[] {
 
   for (let userIdx = 0; userIdx < userMessages.length; userIdx++) {
     const userMsg = userMessages[userIdx];
-    const userText = userMsg.content || '';
+    const userText = extractTextFromGenAIMessage(userMsg);
 
     if (!userText) {
       continue;
@@ -340,27 +407,16 @@ function convertGenAIMultiTurn(llmSpans: Span[], trace: Trace): Invocation[] {
     const toolUses: ToolCall[] = [];
     let finalResponseText = '';
 
-    // Collect all assistant messages until we find one with content
     while (assistantIdx < assistantMessages.length) {
       const assistantMsg = assistantMessages[assistantIdx];
 
-      // Extract tool calls from this message
-      if (assistantMsg.tool_calls && Array.isArray(assistantMsg.tool_calls)) {
-        for (const tc of assistantMsg.tool_calls) {
-          if (tc.type === 'function' && tc.function) {
-            const args = safeJsonParse<Record<string, any>>(tc.function.arguments || '{}', {});
-            toolUses.push({
-              name: tc.function.name,
-              args,
-              id: tc.id
-            });
-          }
-        }
+      for (const tc of extractToolCallsFromGenAIMessage(assistantMsg)) {
+        toolUses.push(tc);
       }
 
-      // Check for final response text
-      if (assistantMsg.content) {
-        finalResponseText = assistantMsg.content;
+      const content = extractTextFromGenAIMessage(assistantMsg);
+      if (content) {
+        finalResponseText = content;
         assistantIdx++;
         break;
       }
@@ -462,10 +518,7 @@ function findDescendantToolSpans(root: Span): Span[] {
 }
 
 function extractGenAIUserContent(llmSpan: Span): Content | null {
-  const messagesAttr = llmSpan.tags['gen_ai.prompt'] ||
-                      llmSpan.tags['gen_ai.request.messages'] ||
-                      llmSpan.tags['gen_ai.input.messages'];
-
+  const messagesAttr = getInputMessagesAttr(llmSpan);
   if (!messagesAttr) return null;
 
   const messages = safeJsonParse<any[] | null>(messagesAttr, null);
@@ -473,11 +526,11 @@ function extractGenAIUserContent(llmSpan: Span): Content | null {
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg.role === 'user' && msg.content) {
-      return {
-        role: 'user',
-        parts: [{ text: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content) }],
-      };
+    if (USER_ROLES.includes(msg.role)) {
+      const text = extractTextFromGenAIMessage(msg);
+      if (text) {
+        return { role: 'user', parts: [{ text }] };
+      }
     }
   }
 
@@ -485,10 +538,7 @@ function extractGenAIUserContent(llmSpan: Span): Content | null {
 }
 
 function extractGenAIFinalResponse(llmSpan: Span): Content | null {
-  const completionAttr = llmSpan.tags['gen_ai.completion'] ||
-                        llmSpan.tags['gen_ai.response.messages'] ||
-                        llmSpan.tags['gen_ai.output.messages'];
-
+  const completionAttr = getOutputMessagesAttr(llmSpan);
   if (!completionAttr) return null;
 
   const messages = safeJsonParse<any[] | null>(completionAttr, null);
@@ -496,23 +546,9 @@ function extractGenAIFinalResponse(llmSpan: Span): Content | null {
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg.role === 'assistant' || msg.role === 'model' || msg.role === 'ai') {
-      // Handle text content
-      if (msg.content) {
-        const contentText = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-        if (contentText) {
-          return {
-            role: 'model',
-            parts: [{ text: contentText }],
-          };
-        }
-      }
-
-      // If no text content, return empty content (tool calls will be in intermediateData)
-      return {
-        role: 'model',
-        parts: [{ text: '' }],
-      };
+    if (ASSISTANT_ROLES.includes(msg.role)) {
+      const text = extractTextFromGenAIMessage(msg);
+      return { role: 'model', parts: [{ text }] };
     }
   }
 
@@ -520,7 +556,8 @@ function extractGenAIFinalResponse(llmSpan: Span): Content | null {
 }
 
 function extractGenAIToolTrajectory(toolSpans: Span[], llmSpans: Span[]): { toolUses: ToolCall[]; toolResponses: ToolResponse[] } {
-  const toolUses: ToolCall[] = [];
+  const toolCallsById = new Map<string, ToolCall>();
+  const toolCallsNoId: ToolCall[] = [];
   const toolResponses: ToolResponse[] = [];
 
   for (const toolSpan of toolSpans) {
@@ -530,12 +567,35 @@ function extractGenAIToolTrajectory(toolSpans: Span[], llmSpans: Span[]): { tool
     const resultAttr = toolSpan.tags['gen_ai.tool.call.result'] || toolSpan.tags['gen_ai.tool.result'];
 
     if (toolName) {
-      const args = safeJsonParse<Record<string, any>>(argsAttr || '{}', {});
-      toolUses.push({
-        name: toolName,
-        args,
-        id: toolCallId,
-      });
+      let args = safeJsonParse<Record<string, any>>(argsAttr || '{}', {});
+
+      // Fallback: extract args from gen_ai.input.messages when tool span
+      // doesn't have gen_ai.tool.call.arguments (e.g. Strands)
+      if (Object.keys(args).length === 0) {
+        const inputMsgsAttr = toolSpan.tags['gen_ai.input.messages'];
+        if (inputMsgsAttr) {
+          const inputMsgs = safeJsonParse<any[]>(inputMsgsAttr, []);
+          if (Array.isArray(inputMsgs)) {
+            for (const msg of inputMsgs) {
+              if (typeof msg !== 'object') continue;
+              for (const tc of extractToolCallsFromGenAIMessage(msg)) {
+                if (tc.name === toolName && Object.keys(tc.args).length > 0) {
+                  args = tc.args;
+                  break;
+                }
+              }
+              if (Object.keys(args).length > 0) break;
+            }
+          }
+        }
+      }
+
+      const tc: ToolCall = { name: toolName, args, id: toolCallId };
+      if (toolCallId) {
+        toolCallsById.set(toolCallId, tc);
+      } else {
+        toolCallsNoId.push(tc);
+      }
 
       if (resultAttr) {
         const response = safeJsonParse<Record<string, any>>(resultAttr, {});
@@ -549,31 +609,32 @@ function extractGenAIToolTrajectory(toolSpans: Span[], llmSpans: Span[]): { tool
   }
 
   for (const llmSpan of llmSpans) {
-    const completionAttr = llmSpan.tags['gen_ai.completion'] ||
-                          llmSpan.tags['gen_ai.response.messages'] ||
-                          llmSpan.tags['gen_ai.output.messages'];
-
+    const completionAttr = getOutputMessagesAttr(llmSpan);
     if (!completionAttr) continue;
 
     const messages = safeJsonParse<any[] | null>(completionAttr, null);
     if (!messages || !Array.isArray(messages)) continue;
 
     for (const msg of messages) {
-      if ((msg.role === 'assistant' || msg.role === 'model' || msg.role === 'ai') && msg.tool_calls) {
-        for (const toolCall of msg.tool_calls) {
-          if (toolCall.type === 'function' && toolCall.function) {
-            const args = safeJsonParse<Record<string, any>>(toolCall.function.arguments || '{}', {});
-            toolUses.push({
-              name: toolCall.function.name,
-              args,
-              id: toolCall.id,
-            });
+      if (ASSISTANT_ROLES.includes(msg.role)) {
+        for (const tc of extractToolCallsFromGenAIMessage(msg)) {
+          if (tc.id && toolCallsById.has(tc.id)) {
+            // Prefer LLM message version if it has richer args
+            const existing = toolCallsById.get(tc.id)!;
+            if (Object.keys(tc.args).length > 0 && Object.keys(existing.args).length === 0) {
+              toolCallsById.set(tc.id, tc);
+            }
+          } else if (tc.id) {
+            toolCallsById.set(tc.id, tc);
+          } else {
+            toolCallsNoId.push(tc);
           }
         }
       }
     }
   }
 
+  const toolUses = [...toolCallsById.values(), ...toolCallsNoId];
   return { toolUses, toolResponses };
 }
 

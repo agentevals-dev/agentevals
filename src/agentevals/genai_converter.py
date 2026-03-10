@@ -9,15 +9,22 @@ Supports traces from frameworks using OpenTelemetry GenAI semantic conventions:
 
 from __future__ import annotations
 
-import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
 
 from google.adk.evaluation.eval_case import IntermediateData, Invocation
 from google.genai import types as genai_types
 
 from .loader.base import Span, Trace
+from .utils.genai_messages import (
+    ASSISTANT_ROLES,
+    USER_ROLES,
+    extract_text_from_message,
+    extract_tool_call_args_from_messages,
+    extract_tool_calls_from_message,
+    parse_json_attr,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,22 +92,27 @@ def convert_genai_trace(trace: Trace) -> ConversionResult:
             result.warnings.append(msg)
 
     if len(llm_root_spans) > 1:
-        has_enriched = any(
-            s.get_tag(_TAG_GEN_AI_INPUT_MESSAGES) and s.get_tag(_TAG_GEN_AI_OUTPUT_MESSAGES)
-            for s in llm_root_spans
-        )
+        # Multi-turn extraction applies only to raw LLM spans whose message content accumulates
+        # across calls (e.g. a framework that re-sends full history on each LLM call).
+        # Invocation spans (e.g. invoke_agent) each contain self-contained message histories
+        # and should each map to a separate invocation via _find_genai_invocation_spans().
+        if not any(_is_genai_invocation_span(s) for s in llm_root_spans):
+            has_enriched = any(
+                s.get_tag(_TAG_GEN_AI_INPUT_MESSAGES) and s.get_tag(_TAG_GEN_AI_OUTPUT_MESSAGES)
+                for s in llm_root_spans
+            )
 
-        if has_enriched:
-            logger.debug(f"Multi-turn conversation: {len(llm_root_spans)} LLM spans")
-            try:
-                turns = _extract_multiturn_turns(llm_root_spans)
-                for turn in turns:
-                    result.invocations.append(_turn_to_invocation(turn))
-            except Exception as exc:
-                msg = f"Trace {trace.trace_id}: failed to convert multi-turn conversation: {exc}"
-                logger.warning(msg)
-                result.warnings.append(msg)
-            return result
+            if has_enriched:
+                logger.debug(f"Multi-turn conversation: {len(llm_root_spans)} LLM spans")
+                try:
+                    turns = _extract_multiturn_turns(llm_root_spans)
+                    for turn in turns:
+                        result.invocations.append(_turn_to_invocation(turn))
+                except Exception as exc:
+                    msg = f"Trace {trace.trace_id}: failed to convert multi-turn conversation: {exc}"
+                    logger.warning(msg)
+                    result.warnings.append(msg)
+                return result
 
     invocation_spans = _find_genai_invocation_spans(trace)
     logger.debug(f"Found {len(invocation_spans)} invocation spans")
@@ -192,10 +204,10 @@ def _extract_single_turn(inv_span: Span) -> _ConversationTurn:
 
 def _extract_multiturn_turns(llm_spans: list[Span]) -> list[_ConversationTurn]:
     messages_raw = llm_spans[0].get_tag(_TAG_GEN_AI_INPUT_MESSAGES, "[]")
-    all_input_messages = _parse_json(messages_raw, "gen_ai.input.messages")
+    all_input_messages = parse_json_attr(messages_raw, "gen_ai.input.messages")
 
     output_messages_raw = llm_spans[0].get_tag(_TAG_GEN_AI_OUTPUT_MESSAGES, "[]")
-    all_output_messages = _parse_json(output_messages_raw, "gen_ai.output.messages")
+    all_output_messages = parse_json_attr(output_messages_raw, "gen_ai.output.messages")
 
     if not isinstance(all_input_messages, list) or not isinstance(all_output_messages, list):
         logger.warning("Messages are not lists, falling back to single invocation")
@@ -208,8 +220,8 @@ def _extract_multiturn_turns(llm_spans: list[Span]) -> list[_ConversationTurn]:
             start_time=float(llm_spans[0].start_time),
         )]
 
-    user_messages = [msg for msg in all_input_messages if msg.get("role") in ("user", "human")]
-    assistant_messages = [msg for msg in all_output_messages if msg.get("role") in ("assistant", "model", "ai")]
+    user_messages = [msg for msg in all_input_messages if msg.get("role") in USER_ROLES]
+    assistant_messages = [msg for msg in all_output_messages if msg.get("role") in ASSISTANT_ROLES]
 
     logger.debug(f"Multi-turn: {len(user_messages)} user, {len(assistant_messages)} assistant messages")
     for i, msg in enumerate(assistant_messages):
@@ -221,7 +233,7 @@ def _extract_multiturn_turns(llm_spans: list[Span]) -> list[_ConversationTurn]:
     assistant_idx = 0
 
     for user_idx, user_msg in enumerate(user_messages):
-        user_text = user_msg.get("content", "")
+        user_text = extract_text_from_message(user_msg)
         if not user_text:
             continue
 
@@ -231,20 +243,10 @@ def _extract_multiturn_turns(llm_spans: list[Span]) -> list[_ConversationTurn]:
         while assistant_idx < len(assistant_messages):
             assistant_msg = assistant_messages[assistant_idx]
 
-            if assistant_msg.get("tool_calls"):
-                for tc in assistant_msg.get("tool_calls", []):
-                    if tc.get("type") == "function" and "function" in tc:
-                        func = tc["function"]
-                        args = _parse_json(func.get("arguments", "{}"), "tool_call.arguments")
-                        if not isinstance(args, dict):
-                            args = {}
-                        tool_calls.append(_ToolCall(
-                            name=func.get("name", ""),
-                            args=args,
-                            id=tc.get("id"),
-                        ))
+            for tc in extract_tool_calls_from_message(assistant_msg):
+                tool_calls.append(_ToolCall(name=tc["name"], args=tc["arguments"], id=tc["id"]))
 
-            content = assistant_msg.get("content", "")
+            content = extract_text_from_message(assistant_msg)
             if content:
                 assistant_text = content
                 assistant_idx += 1
@@ -291,7 +293,7 @@ def _turn_to_invocation(turn: _ConversationTurn) -> Invocation:
 
 def _extract_user_text(llm_span: Span) -> str:
     messages_raw = llm_span.get_tag(_TAG_GEN_AI_INPUT_MESSAGES, "[]")
-    messages = _parse_json(messages_raw, "gen_ai.input.messages")
+    messages = parse_json_attr(messages_raw, "gen_ai.input.messages")
 
     if not isinstance(messages, list):
         messages = []
@@ -299,15 +301,11 @@ def _extract_user_text(llm_span: Span) -> str:
     for msg in messages:
         if not isinstance(msg, dict):
             continue
-        if msg.get("role") in ("user", "human"):
-            content_text = msg.get("content", "")
-            if isinstance(content_text, str):
-                logger.debug(f"Found user message: {content_text[:100]}")
-                return content_text
-            elif isinstance(content_text, list):
-                parts = [item["text"] for item in content_text if isinstance(item, dict) and "text" in item]
-                if parts:
-                    return " ".join(parts)
+        if msg.get("role") in USER_ROLES:
+            text = extract_text_from_message(msg)
+            if text:
+                logger.debug(f"Found user message: {text[:100]}")
+                return text
 
     logger.warning(f"No user message found in {len(messages)} messages")
     raise ValueError(
@@ -317,7 +315,7 @@ def _extract_user_text(llm_span: Span) -> str:
 
 def _extract_assistant_text(llm_span: Span) -> str:
     messages_raw = llm_span.get_tag(_TAG_GEN_AI_OUTPUT_MESSAGES, "[]")
-    messages = _parse_json(messages_raw, "gen_ai.output.messages")
+    messages = parse_json_attr(messages_raw, "gen_ai.output.messages")
 
     if not isinstance(messages, list):
         messages = []
@@ -330,15 +328,11 @@ def _extract_assistant_text(llm_span: Span) -> str:
     for msg in reversed(messages):
         if not isinstance(msg, dict):
             continue
-        if msg.get("role") in ("assistant", "model", "ai"):
-            content_text = msg.get("content", "")
-            if isinstance(content_text, str) and content_text:
-                logger.debug(f"Found assistant message with text: {content_text[:100]}")
-                return content_text
-            elif isinstance(content_text, list):
-                parts = [item["text"] for item in content_text if isinstance(item, dict) and "text" in item]
-                if parts:
-                    return " ".join(parts)
+        if msg.get("role") in ASSISTANT_ROLES:
+            text = extract_text_from_message(msg)
+            if text:
+                logger.debug(f"Found assistant message with text: {text[:100]}")
+                return text
 
     logger.warning(
         f"LLM span {llm_span.span_id}: no assistant message with content in gen_ai.output.messages ({len(messages)} messages)"
@@ -350,7 +344,8 @@ def _extract_tool_calls(
     tool_spans: list[Span],
     llm_spans: list[Span] | None = None,
 ) -> tuple[list[_ToolCall], list[_ToolResponse]]:
-    tool_calls: list[_ToolCall] = []
+    tool_calls_by_id: dict[str, _ToolCall] = {}
+    tool_calls_no_id: list[_ToolCall] = []
     tool_responses: list[_ToolResponse] = []
 
     for tool_span in tool_spans:
@@ -362,15 +357,24 @@ def _extract_tool_calls(
         tool_call_id = tool_span.get_tag(_TAG_GEN_AI_TOOL_CALL_ID)
 
         args_raw = tool_span.get_tag(_TAG_GEN_AI_TOOL_CALL_ARGUMENTS, "{}")
-        args = _parse_json(args_raw, "gen_ai.tool.call.arguments")
+        args = parse_json_attr(args_raw, "gen_ai.tool.call.arguments")
         if not isinstance(args, dict):
             args = {}
 
-        tool_calls.append(_ToolCall(name=tool_name, args=args, id=tool_call_id))
+        if not args:
+            input_msgs_raw = tool_span.get_tag(_TAG_GEN_AI_INPUT_MESSAGES)
+            if input_msgs_raw:
+                args, _ = extract_tool_call_args_from_messages(input_msgs_raw, tool_name)
+
+        tc = _ToolCall(name=tool_name, args=args, id=tool_call_id)
+        if tool_call_id:
+            tool_calls_by_id[tool_call_id] = tc
+        else:
+            tool_calls_no_id.append(tc)
 
         result_raw = tool_span.get_tag(_TAG_GEN_AI_TOOL_CALL_RESULT)
         if result_raw:
-            result_data = _parse_json(result_raw, "gen_ai.tool.call.result")
+            result_data = parse_json_attr(result_raw, "gen_ai.tool.call.result")
             if result_data is None:
                 result_data = {}
 
@@ -382,10 +386,11 @@ def _extract_tool_calls(
                 id=tool_call_id,
             ))
 
+    # Extract tool calls from LLM output messages, deduplicating by tool call ID
     if llm_spans:
         for llm_span in llm_spans:
             messages_raw = llm_span.get_tag(_TAG_GEN_AI_OUTPUT_MESSAGES, "[]")
-            messages = _parse_json(messages_raw, "gen_ai.output.messages")
+            messages = parse_json_attr(messages_raw, "gen_ai.output.messages")
 
             if not isinstance(messages, list):
                 continue
@@ -393,33 +398,26 @@ def _extract_tool_calls(
             for msg in messages:
                 if not isinstance(msg, dict):
                     continue
+                if msg.get("role") not in ASSISTANT_ROLES:
+                    continue
+                for tc in extract_tool_calls_from_message(msg):
+                    tc_id = tc["id"]
+                    new_tc = _ToolCall(
+                        name=tc["name"],
+                        args=tc["arguments"],
+                        id=tc_id,
+                    )
+                    if tc_id and tc_id in tool_calls_by_id:
+                        # Prefer LLM message version if it has richer args
+                        existing = tool_calls_by_id[tc_id]
+                        if tc["arguments"] and not existing.args:
+                            tool_calls_by_id[tc_id] = new_tc
+                    elif tc_id:
+                        tool_calls_by_id[tc_id] = new_tc
+                    else:
+                        tool_calls_no_id.append(new_tc)
 
-                if msg.get("role") in ("assistant", "model", "ai") and "tool_calls" in msg:
-                    tool_call_list = msg.get("tool_calls", [])
-                    if not isinstance(tool_call_list, list):
-                        continue
-
-                    for tool_call in tool_call_list:
-                        if not isinstance(tool_call, dict):
-                            continue
-
-                        if tool_call.get("type") == "function" and "function" in tool_call:
-                            func_data = tool_call["function"]
-                            tool_name = func_data.get("name")
-                            if not tool_name:
-                                continue
-
-                            args_raw = func_data.get("arguments", "{}")
-                            args = _parse_json(args_raw, "tool_call.function.arguments")
-                            if not isinstance(args, dict):
-                                args = {}
-
-                            tool_calls.append(_ToolCall(
-                                name=tool_name,
-                                args=args,
-                                id=tool_call.get("id"),
-                            ))
-
+    tool_calls = list(tool_calls_by_id.values()) + tool_calls_no_id
     logger.debug(f"Extracted {len(tool_calls)} tool calls, {len(tool_responses)} responses")
     return tool_calls, tool_responses
 
@@ -460,20 +458,10 @@ def _find_tool_spans(root: Span) -> list[Span]:
     return results
 
 
-def _walk_spans(span: Span, predicate: Any, acc: list[Span]) -> None:
+def _walk_spans(span: Span, predicate: Callable[[Span], bool], acc: list[Span]) -> None:
     if predicate(span):
         acc.append(span)
     for child in span.children:
         _walk_spans(child, predicate, acc)
 
 
-def _parse_json(raw: str | dict | list | Any, tag_name: str) -> dict | list | Any:
-    if isinstance(raw, (dict, list)):
-        return raw
-    if isinstance(raw, str):
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            logger.warning(f"Failed to parse JSON in {tag_name}: {raw[:200]}")
-            return {}
-    return {}

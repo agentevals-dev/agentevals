@@ -39,6 +39,11 @@ packages = ["src/agentevals"]
 [tool.uv.extra-build-dependencies]
 "rouge_score-0.1.2" = ["setuptools"]
 
+[tool.uv.workspace]
+members = [
+    "examples",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
