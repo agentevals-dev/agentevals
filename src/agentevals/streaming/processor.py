@@ -173,6 +173,8 @@ class AgentEvalsStreamingProcessor:
             for key, value in span.attributes.items():
                 attributes.append(self._to_otlp_attribute(key, value))
 
+        self._promote_genai_event_attributes(span, attributes)
+
         parent_span_id = None
         if span.parent and hasattr(span.parent, "span_id"):
             parent_span_id = format(span.parent.span_id, "016x")
@@ -188,6 +190,28 @@ class AgentEvalsStreamingProcessor:
             "attributes": attributes,
             "status": {"code": span.status.status_code.value} if span.status else {},
         }
+
+    def _promote_genai_event_attributes(self, span: ReadableSpan, attributes: list[dict]) -> None:
+        """Promote OTel GenAI message attributes from span events to span attributes.
+
+        OTel GenAI semantic convention frameworks may store message content
+        (gen_ai.input.messages, gen_ai.output.messages) in span events rather
+        than span attributes. This promotes those event attributes so downstream
+        processors can access them uniformly from span attributes alone.
+        """
+        if not hasattr(span, "events") or not span.events:
+            return
+
+        _genai_event_keys = {"gen_ai.input.messages", "gen_ai.output.messages"}
+        existing_keys = {a["key"] for a in attributes}
+
+        for event in span.events:
+            if not event.attributes:
+                continue
+            for key, value in event.attributes.items():
+                if key in _genai_event_keys and key not in existing_keys:
+                    attributes.append(self._to_otlp_attribute(key, value))
+                    existing_keys.add(key)
 
     def _to_otlp_attribute(self, key: str, value: Any) -> dict:
         if isinstance(value, bool):
