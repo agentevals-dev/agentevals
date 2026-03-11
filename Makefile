@@ -15,20 +15,23 @@ build-bundle: build-ui
 	uv build
 	rm -rf src/agentevals/_static
 
+CORE_WHEEL_NAME := agentevals-$(VERSION)-core-py3-none-any.whl
+BUNDLE_WHEEL_NAME := agentevals-$(VERSION)-bundle-py3-none-any.whl
+
 release: clean build-ui
 	mkdir -p dist/core dist/bundle
 	uv build
-	mv $(WHEEL) dist/core/
+	mv $(WHEEL) dist/core/$(CORE_WHEEL_NAME)
 	mv dist/*.tar.gz dist/core/
 	rm -rf src/agentevals/_static
 	cp -r ui/dist src/agentevals/_static
 	uv build
-	mv $(WHEEL) dist/bundle/
+	mv $(WHEEL) dist/bundle/$(BUNDLE_WHEEL_NAME)
 	mv dist/*.tar.gz dist/bundle/
 	rm -rf src/agentevals/_static
 	@echo "Built:"
-	@echo "  core:   dist/core/$(notdir $(WHEEL))"
-	@echo "  bundle: dist/bundle/$(notdir $(WHEEL))"
+	@echo "  core:   dist/core/$(CORE_WHEEL_NAME)"
+	@echo "  bundle: dist/bundle/$(BUNDLE_WHEEL_NAME)"
 
 dev-backend:
 	uv run agentevals serve --dev

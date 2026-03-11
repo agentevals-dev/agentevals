@@ -46,7 +46,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: wheels
-          path: dist/*.whl
+          path: |
+            dist/core/*.whl
+            dist/bundle/*.whl
 
   github-release:
     needs: build
@@ -63,6 +65,6 @@ jobs:
       - uses: softprops/action-gh-release@v2.5.0
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: dist/*.whl
+          files: dist/**/*.whl
           generate_release_notes: true
 
