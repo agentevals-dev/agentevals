@@ -7,22 +7,14 @@ import type { TraceResult } from '../../lib/types';
 import { useTraceContext } from '../../context/TraceContext';
 import { loadJaegerTraces } from '../../lib/trace-loader';
 import { generateEvalSetFromTraces } from '../../lib/evalset-builder';
-import { ExecutionToggleButton } from './ExecutionToggleButton';
-
 interface InspectorHeaderProps {
   traceResult: TraceResult;
   onBack: () => void;
-  showExecution: boolean;
-  onToggleExecution: (show: boolean) => void;
-  spanCount?: number;
 }
 
 export const InspectorHeader: React.FC<InspectorHeaderProps> = ({
   traceResult,
   onBack,
-  showExecution,
-  onToggleExecution,
-  spanCount,
 }) => {
   const [copied, setCopied] = React.useState(false);
   const { state, actions } = useTraceContext();
@@ -134,11 +126,6 @@ export const InspectorHeader: React.FC<InspectorHeaderProps> = ({
             Annotation Queues
           </button>
         )}
-        <ExecutionToggleButton
-          showExecution={showExecution}
-          onToggle={onToggleExecution}
-          spanCount={spanCount}
-        />
         <Button
           icon={<FileJson size={16} />}
           onClick={handleCreateEvalSet}

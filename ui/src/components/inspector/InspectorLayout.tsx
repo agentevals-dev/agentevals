@@ -3,143 +3,56 @@ import { css } from '@emotion/react';
 
 interface InspectorLayoutProps {
   leftPanel: React.ReactNode;
-  centerPanel?: React.ReactNode;
   rightPanel: React.ReactNode;
-  showCenterPanel: boolean;
 }
 
 const MIN_PANEL_WIDTH = 300;
 const MAX_PANEL_WIDTH = 1000;
-const STORAGE_KEY_2_PANEL = 'inspector-panel-widths-2-panel';
-const STORAGE_KEY_3_PANEL = 'inspector-panel-widths-3-panel';
+const STORAGE_KEY = 'inspector-panel-widths-2-panel';
 
 export const InspectorLayout: React.FC<InspectorLayoutProps> = ({
   leftPanel,
-  centerPanel,
   rightPanel,
-  showCenterPanel,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [leftWidth, setLeftWidth] = useState(() => {
-    const storageKey = showCenterPanel ? STORAGE_KEY_3_PANEL : STORAGE_KEY_2_PANEL;
-    const stored = localStorage.getItem(storageKey);
+    const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const { left } = JSON.parse(stored);
-      return left || (showCenterPanel ? 300 : 400);
+      return left || 400;
     }
-    return showCenterPanel ? 300 : 400;
+    return 400;
   });
-  const [centerWidth, setCenterWidth] = useState(() => {
-    if (!showCenterPanel) return 0;
-    const stored = localStorage.getItem(STORAGE_KEY_3_PANEL);
-    if (stored) {
-      const { center } = JSON.parse(stored);
-      return center || 600;
-    }
-    return 600;
-  });
-  const [rightWidth, setRightWidth] = useState(() => {
-    const storageKey = showCenterPanel ? STORAGE_KEY_3_PANEL : STORAGE_KEY_2_PANEL;
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      const { right } = JSON.parse(stored);
-      return right || (showCenterPanel ? 500 : 600);
-    }
-    return showCenterPanel ? 500 : 600;
-  });
+  const [isDragging, setIsDragging] = useState(false);
 
-  const [isDraggingLeft, setIsDraggingLeft] = useState(false);
-  const [isDraggingCenter, setIsDraggingCenter] = useState(false);
-  const [isDraggingRight, setIsDraggingRight] = useState(false);
-
-  // Update panel widths when showCenterPanel changes
+  // Save to localStorage when width changes
   useEffect(() => {
-    if (showCenterPanel && centerWidth === 0) {
-      // Load center panel width from storage or use default
-      const stored = localStorage.getItem(STORAGE_KEY_3_PANEL);
-      if (stored) {
-        const { center, left } = JSON.parse(stored);
-        setCenterWidth(center || 600);
-        if (left) setLeftWidth(left);
-      } else {
-        setCenterWidth(600);
-        setLeftWidth(300);
-      }
-    } else if (!showCenterPanel) {
-      // Load 2-panel widths
-      const stored = localStorage.getItem(STORAGE_KEY_2_PANEL);
-      if (stored) {
-        const { left } = JSON.parse(stored);
-        if (left) setLeftWidth(left);
-      } else {
-        setLeftWidth(400);
-      }
-    }
-  }, [showCenterPanel]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ left: leftWidth }));
+  }, [leftWidth]);
 
-  // Save to localStorage when widths change
-  useEffect(() => {
-    const storageKey = showCenterPanel ? STORAGE_KEY_3_PANEL : STORAGE_KEY_2_PANEL;
-    const data = showCenterPanel
-      ? { left: leftWidth, center: centerWidth, right: rightWidth }
-      : { left: leftWidth, right: rightWidth };
-    localStorage.setItem(storageKey, JSON.stringify(data));
-  }, [leftWidth, centerWidth, rightWidth, showCenterPanel]);
-
-  // Handle left divider drag
-  const handleLeftMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
-    setIsDraggingLeft(true);
-  };
-
-  // Handle center divider drag
-  const handleCenterMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDraggingCenter(true);
+    setIsDragging(true);
   };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
+      if (!containerRef.current || !isDragging) return;
 
       const containerRect = containerRef.current.getBoundingClientRect();
-
-      if (isDraggingLeft) {
-        const newWidth = e.clientX - containerRect.left;
-        const constrainedWidth = Math.max(
-          MIN_PANEL_WIDTH,
-          Math.min(MAX_PANEL_WIDTH, newWidth)
-        );
-        setLeftWidth(constrainedWidth);
-      }
-
-      if (isDraggingCenter && showCenterPanel) {
-        // Calculate center width from left panel edge
-        const newWidth = e.clientX - containerRect.left - leftWidth - 1; // -1 for divider
-        const constrainedWidth = Math.max(
-          MIN_PANEL_WIDTH,
-          Math.min(MAX_PANEL_WIDTH, newWidth)
-        );
-        setCenterWidth(constrainedWidth);
-      }
-
-      if (isDraggingRight) {
-        const newWidth = containerRect.right - e.clientX;
-        const constrainedWidth = Math.max(
-          MIN_PANEL_WIDTH,
-          Math.min(MAX_PANEL_WIDTH, newWidth)
-        );
-        setRightWidth(constrainedWidth);
-      }
+      const newWidth = e.clientX - containerRect.left;
+      const constrainedWidth = Math.max(
+        MIN_PANEL_WIDTH,
+        Math.min(MAX_PANEL_WIDTH, newWidth)
+      );
+      setLeftWidth(constrainedWidth);
     };
 
     const handleMouseUp = () => {
-      setIsDraggingLeft(false);
-      setIsDraggingCenter(false);
-      setIsDraggingRight(false);
+      setIsDragging(false);
     };
 
-    if (isDraggingLeft || isDraggingCenter || isDraggingRight) {
+    if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -147,37 +60,23 @@ export const InspectorLayout: React.FC<InspectorLayoutProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDraggingLeft, isDraggingCenter, isDraggingRight, leftWidth, showCenterPanel]);
+  }, [isDragging]);
 
   return (
     <div
       ref={containerRef}
-      css={layoutStyles(leftWidth, centerWidth, showCenterPanel)}
-      className={isDraggingLeft || isDraggingCenter || isDraggingRight ? 'dragging' : ''}
+      css={layoutStyles(leftWidth)}
+      className={isDragging ? 'dragging' : ''}
     >
       <div css={panelStyles} className="left-panel">
         {leftPanel}
       </div>
 
-      {showCenterPanel && (
-        <>
-          <div
-            css={dividerStyles}
-            className="divider left-divider"
-            onMouseDown={handleLeftMouseDown}
-          />
-
-          <div css={panelStyles} className="center-panel">
-            {centerPanel}
-          </div>
-
-          <div
-            css={dividerStyles}
-            className="divider center-divider"
-            onMouseDown={handleCenterMouseDown}
-          />
-        </>
-      )}
+      <div
+        css={dividerStyles}
+        className="divider"
+        onMouseDown={handleMouseDown}
+      />
 
       <div css={panelStyles} className="right-panel">
         {rightPanel}
@@ -186,11 +85,9 @@ export const InspectorLayout: React.FC<InspectorLayoutProps> = ({
   );
 };
 
-const layoutStyles = (leftWidth: number, centerWidth: number, showCenterPanel: boolean) => css`
+const layoutStyles = (leftWidth: number) => css`
   display: grid;
-  grid-template-columns: ${showCenterPanel
-    ? `${leftWidth}px 1px ${centerWidth}px 1px 1fr`
-    : `${leftWidth}px 1fr`};
+  grid-template-columns: ${leftWidth}px 1px 1fr;
   height: calc(100% - 64px);
   overflow: hidden;
 

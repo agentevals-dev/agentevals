@@ -4,32 +4,17 @@ import { useTraceContext } from '../../context/TraceContext';
 import { InspectorHeader } from './InspectorHeader';
 import { InspectorLayout } from './InspectorLayout';
 import { InvocationSummaryPanel } from './InvocationSummaryPanel';
-import { SpanTreePanel } from './SpanTreePanel';
 import { ComparisonPanel } from './ComparisonPanel';
-import type { InspectorUIState, Trace, Invocation } from '../../lib/types';
+import type { Trace, Invocation } from '../../lib/types';
 import { loadJaegerTraces } from '../../lib/trace-loader';
 import { convertTracesToInvocations } from '../../lib/trace-converter';
 import { readFileAsText } from '../../lib/utils';
-
-const SHOW_EXECUTION_KEY = 'inspector-show-execution';
 
 export const InspectorView: React.FC = () => {
   const { state, actions } = useTraceContext();
 
   // Local inspector UI state
-  const [inspectorState, setInspectorState] = useState<InspectorUIState>(() => {
-    const showExecution = localStorage.getItem(SHOW_EXECUTION_KEY) === 'true';
-    return {
-      selectedInvocationId: null,
-      selectedDataPath: null,
-      highlightedSpanIds: new Set(),
-      hoveredElement: null,
-      leftPanelWidth: 400,
-      rightPanelWidth: 400,
-      jsonScrollPosition: 0,
-      showExecution,
-    };
-  });
+  const [selectedInvocationId, setSelectedInvocationId] = useState<string | null>(null);
 
   // Loaded trace data
   const [trace, setTrace] = useState<Trace | null>(null);
@@ -147,32 +132,9 @@ export const InspectorView: React.FC = () => {
     actions.setCurrentView('dashboard');
   };
 
-  // Handle execution toggle
-  const handleToggleExecution = (show: boolean) => {
-    setInspectorState(prev => ({ ...prev, showExecution: show }));
-    localStorage.setItem(SHOW_EXECUTION_KEY, String(show));
-  };
-
-  // Handle span selection
-  const handleSelectSpan = (spanId: string) => {
-    console.log('Selected span:', spanId);
-    actions.selectSpan(spanId);
-  };
-
-  // Handle span hover
-  const handleHoverSpan = (spanId: string | null) => {
-    setInspectorState(prev => ({
-      ...prev,
-      hoveredElement: spanId ? { type: 'span', id: spanId } : null,
-    }));
-  };
-
   // Handle invocation selection
   const handleSelectInvocation = (invocationId: string) => {
-    setInspectorState(prev => ({
-      ...prev,
-      selectedInvocationId: invocationId,
-    }));
+    setSelectedInvocationId(invocationId);
   };
 
   if (!traceResult) {
@@ -189,18 +151,12 @@ export const InspectorView: React.FC = () => {
     );
   }
 
-  // Calculate span count for the toggle button
-  const spanCount = trace?.allSpans?.length || 0;
-
   if (loading) {
     return (
       <div css={containerStyles}>
         <InspectorHeader
           traceResult={traceResult}
           onBack={handleBack}
-          showExecution={inspectorState.showExecution}
-          onToggleExecution={handleToggleExecution}
-          spanCount={spanCount}
         />
         <div css={loadingContainerStyles}>
           <div css={loadingSpinnerStyles} />
@@ -216,9 +172,6 @@ export const InspectorView: React.FC = () => {
         <InspectorHeader
           traceResult={traceResult}
           onBack={handleBack}
-          showExecution={inspectorState.showExecution}
-          onToggleExecution={handleToggleExecution}
-          spanCount={spanCount}
         />
         <div css={errorContainerStyles}>
           <div css={errorMessageStyles}>
@@ -237,24 +190,14 @@ export const InspectorView: React.FC = () => {
   const leftPanel = (
     <InvocationSummaryPanel
       invocations={invocations}
-      selectedInvocationId={inspectorState.selectedInvocationId}
+      selectedInvocationId={selectedInvocationId}
       onSelectInvocation={handleSelectInvocation}
     />
   );
 
-  const centerPanel = trace && inspectorState.showExecution ? (
-    <SpanTreePanel
-      trace={trace}
-      spanToDataMapping={new Map()} // Will be populated in Step 5
-      highlightedSpanIds={state.selectedSpanId ? new Set([state.selectedSpanId]) : new Set()}
-      onSelectSpan={handleSelectSpan}
-      onHoverSpan={handleHoverSpan}
-    />
-  ) : null;
-
   // Find selected or first invocation for comparison
-  const selectedInvocation = inspectorState.selectedInvocationId
-    ? invocations.find(inv => inv.invocationId === inspectorState.selectedInvocationId)
+  const selectedInvocation = selectedInvocationId
+    ? invocations.find(inv => inv.invocationId === selectedInvocationId)
     : invocations[0];
 
   // Match with expected invocation
@@ -306,15 +249,10 @@ export const InspectorView: React.FC = () => {
       <InspectorHeader
         traceResult={traceResult}
         onBack={handleBack}
-        showExecution={inspectorState.showExecution}
-        onToggleExecution={handleToggleExecution}
-        spanCount={spanCount}
       />
       <InspectorLayout
         leftPanel={leftPanel}
-        centerPanel={centerPanel}
         rightPanel={rightPanel}
-        showCenterPanel={inspectorState.showExecution}
       />
     </div>
   );
@@ -400,5 +338,3 @@ const backButtonStyles = css`
     box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
   }
 `;
-
-

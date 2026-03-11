@@ -31,7 +31,6 @@ export interface TraceState {
   currentView: ViewType;
   evaluationOrigin: ViewType | null;
   selectedTraceId: string | null;
-  selectedSpanId: string | null;
   version: string | null;
 
   // Streaming state
@@ -62,7 +61,6 @@ export interface TraceContextType {
     removeSession: (sessionId: string) => void;
     clearAllSessions: () => void;
     selectTrace: (traceId: string | null) => void;
-    selectSpan: (spanId: string | null) => void;
     clearResults: () => void;
 
     // Annotation queue actions

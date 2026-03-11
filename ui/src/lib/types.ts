@@ -350,18 +350,6 @@ export interface TraceMapping {
 
 export interface InspectorUIState {
   selectedInvocationId: string | null;
-  selectedDataPath: string | null;
-  highlightedSpanIds: Set<string>;
-  hoveredElement: ElementReference | null;
-  leftPanelWidth: number;
-  rightPanelWidth: number;
-  jsonScrollPosition: number;
-  showExecution: boolean;
-}
-
-export interface ElementReference {
-  type: 'span' | 'data' | 'json';
-  id: string;
 }
 
 // Annotation queue types
