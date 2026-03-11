@@ -229,9 +229,9 @@ export async function getConfig(): Promise<{ apiKeys: { google: boolean; anthrop
 export async function generateBugReport(diagnostics: {
   user_description: string;
   browser_info: Record<string, unknown>;
-  console_logs: Array<Record<string, unknown>>;
+  console_logs: unknown[];
   app_state: Record<string, unknown>;
-  network_errors: Array<Record<string, unknown>>;
+  network_errors: unknown[];
 }): Promise<Blob> {
   const response = await fetch(config.api.endpoints.debugBundle, {
     method: 'POST',
