@@ -123,8 +123,16 @@ function loadOtlpJsonlTraces(fileContent: string): Trace[] {
 export async function loadJaegerTraces(fileContent: string): Promise<Trace[]> {
   const trimmedContent = fileContent.trim();
 
-  if (trimmedContent.startsWith('{') && !trimmedContent.startsWith('{"data"')) {
-    return loadOtlpJsonlTraces(fileContent);
+  if (trimmedContent.includes('\n') && !trimmedContent.startsWith('[')) {
+    try {
+      const firstLine = trimmedContent.split('\n')[0].trim();
+      const parsed = JSON.parse(firstLine);
+      if (!('data' in parsed)) {
+        return loadOtlpJsonlTraces(fileContent);
+      }
+    } catch {
+      // Not valid JSONL, fall through to Jaeger parsing
+    }
   }
 
   const jaegerData: JaegerData = JSON.parse(fileContent);
