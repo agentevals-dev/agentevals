@@ -183,7 +183,7 @@ uv run agentevals serve --dev  # start backend in dev mode
 cd ui && npm run dev           # start frontend (separate terminal)
 ```
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for build tiers, Makefile targets, Nix setup, and release instructions.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for build tiers, Makefile targets, Nix setup, and release instructions. If you'd like to contribute, check out [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## FAQ
 
