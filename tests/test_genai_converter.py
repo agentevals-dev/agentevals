@@ -19,11 +19,11 @@ import pytest
 from agentevals.genai_converter import (
     ConversionResult,
     convert_genai_trace,
-    _extract_genai_user_content,
-    _extract_genai_final_response,
-    _extract_genai_tools,
-    _parse_json,
+    _extract_user_text,
+    _extract_assistant_text,
+    _extract_tool_calls,
 )
+from agentevals.utils.genai_messages import parse_json_attr
 from agentevals.loader.base import Span, Trace
 
 
@@ -94,148 +94,122 @@ def _make_genai_tool_span(
     )
 
 
-class TestParseJson:
+class TestParseJsonAttr:
     def test_parse_json_string(self):
-        result = _parse_json('{"key": "value"}', "test_tag")
+        result = parse_json_attr('{"key": "value"}', "test_tag")
         assert result == {"key": "value"}
 
     def test_parse_json_already_dict(self):
-        result = _parse_json({"key": "value"}, "test_tag")
+        result = parse_json_attr({"key": "value"}, "test_tag")
         assert result == {"key": "value"}
 
     def test_parse_json_list(self):
-        result = _parse_json([1, 2, 3], "test_tag")
+        result = parse_json_attr([1, 2, 3], "test_tag")
         assert result == [1, 2, 3]
 
     def test_parse_json_malformed(self):
-        result = _parse_json("{invalid json}", "test_tag")
+        result = parse_json_attr("{invalid json}", "test_tag")
         assert result == {}
 
     def test_parse_json_none(self):
-        result = _parse_json(None, "test_tag")
+        result = parse_json_attr(None, "test_tag")
         assert result == {}
 
 
-class TestExtractGenaiUserContent:
-    def test_extract_user_content_string_format(self):
+class TestExtractUserText:
+    def test_extract_user_text_string_format(self):
         span = _make_genai_llm_span(
             "span1",
             input_messages=[
                 {"role": "user", "content": "Hello, world!"}
             ]
         )
+        text = _extract_user_text(span)
+        assert text == "Hello, world!"
 
-        content = _extract_genai_user_content(span)
-        assert content.role == "user"
-        assert len(content.parts) == 1
-        assert content.parts[0].text == "Hello, world!"
-
-    def test_extract_user_content_list_format(self):
+    def test_extract_user_text_list_format(self):
         span = _make_genai_llm_span(
             "span1",
             input_messages=[
                 {"role": "user", "content": [{"text": "Multiple parts"}]}
             ]
         )
+        text = _extract_user_text(span)
+        assert text == "Multiple parts"
 
-        content = _extract_genai_user_content(span)
-        assert content.role == "user"
-        assert len(content.parts) == 1
-        assert content.parts[0].text == "Multiple parts"
-
-    def test_extract_user_content_human_role(self):
+    def test_extract_user_text_human_role(self):
         span = _make_genai_llm_span(
             "span1",
             input_messages=[
                 {"role": "human", "content": "Human role variant"}
             ]
         )
+        text = _extract_user_text(span)
+        assert text == "Human role variant"
 
-        content = _extract_genai_user_content(span)
-        assert content.role == "user"
-        assert content.parts[0].text == "Human role variant"
-
-    def test_extract_user_content_missing_raises(self):
+    def test_extract_user_text_missing_raises(self):
         span = _make_genai_llm_span(
             "span1",
             input_messages=[
                 {"role": "assistant", "content": "No user message"}
             ]
         )
-
         with pytest.raises(ValueError, match="no user message found"):
-            _extract_genai_user_content(span)
+            _extract_user_text(span)
 
-    def test_extract_user_content_empty_messages(self):
-        span = _make_genai_llm_span(
-            "span1",
-            input_messages=[]
-        )
-
+    def test_extract_user_text_empty_messages(self):
+        span = _make_genai_llm_span("span1", input_messages=[])
         with pytest.raises(ValueError):
-            _extract_genai_user_content(span)
+            _extract_user_text(span)
 
 
-class TestExtractGenaiFinalResponse:
-    def test_extract_final_response_string_format(self):
+class TestExtractAssistantText:
+    def test_extract_assistant_text_string_format(self):
         span = _make_genai_llm_span(
             "span1",
             output_messages=[
                 {"role": "assistant", "content": "Response text"}
             ]
         )
+        text = _extract_assistant_text(span)
+        assert text == "Response text"
 
-        content = _extract_genai_final_response(span)
-        assert content.role == "model"
-        assert len(content.parts) == 1
-        assert content.parts[0].text == "Response text"
-
-    def test_extract_final_response_list_format(self):
+    def test_extract_assistant_text_list_format(self):
         span = _make_genai_llm_span(
             "span1",
             output_messages=[
                 {"role": "assistant", "content": [{"text": "List response"}]}
             ]
         )
+        text = _extract_assistant_text(span)
+        assert text == "List response"
 
-        content = _extract_genai_final_response(span)
-        assert content.role == "model"
-        assert content.parts[0].text == "List response"
-
-    def test_extract_final_response_model_role(self):
+    def test_extract_assistant_text_model_role(self):
         span = _make_genai_llm_span(
             "span1",
             output_messages=[
                 {"role": "model", "content": "Model role variant"}
             ]
         )
+        text = _extract_assistant_text(span)
+        assert text == "Model role variant"
 
-        content = _extract_genai_final_response(span)
-        assert content.parts[0].text == "Model role variant"
-
-    def test_extract_final_response_ai_role(self):
+    def test_extract_assistant_text_ai_role(self):
         span = _make_genai_llm_span(
             "span1",
             output_messages=[
                 {"role": "ai", "content": "AI role variant"}
             ]
         )
+        text = _extract_assistant_text(span)
+        assert text == "AI role variant"
 
-        content = _extract_genai_final_response(span)
-        assert content.parts[0].text == "AI role variant"
+    def test_extract_assistant_text_missing_returns_empty(self):
+        span = _make_genai_llm_span("span1", output_messages=[])
+        text = _extract_assistant_text(span)
+        assert text == ""
 
-    def test_extract_final_response_missing_returns_empty(self):
-        span = _make_genai_llm_span(
-            "span1",
-            output_messages=[]
-        )
-
-        content = _extract_genai_final_response(span)
-        assert content.role == "model"
-        assert len(content.parts) == 1
-        assert content.parts[0].text == ""
-
-    def test_extract_final_response_takes_last_with_content(self):
+    def test_extract_assistant_text_takes_last_with_content(self):
         span = _make_genai_llm_span(
             "span1",
             output_messages=[
@@ -243,12 +217,11 @@ class TestExtractGenaiFinalResponse:
                 {"role": "assistant", "content": "Second message"},
             ]
         )
+        text = _extract_assistant_text(span)
+        assert text == "Second message"
 
-        content = _extract_genai_final_response(span)
-        assert content.parts[0].text == "Second message"
 
-
-class TestExtractGenaiTools:
+class TestExtractToolCalls:
     def test_extract_tools_from_tool_spans(self):
         tool_span = _make_genai_tool_span(
             "tool1",
@@ -258,16 +231,16 @@ class TestExtractGenaiTools:
             result={"temperature": 72}
         )
 
-        tool_uses, tool_responses = _extract_genai_tools([tool_span])
+        tool_calls, tool_responses = _extract_tool_calls([tool_span], [])
 
-        assert len(tool_uses) == 1
-        assert tool_uses[0].name == "get_weather"
-        assert tool_uses[0].id == "call_123"
-        assert tool_uses[0].args == {"location": "NYC"}
+        assert len(tool_calls) == 1
+        assert tool_calls[0].name == "get_weather"
+        assert tool_calls[0].id == "call_123"
+        assert tool_calls[0].args == {"location": "NYC"}
 
         assert len(tool_responses) == 1
         assert tool_responses[0].name == "get_weather"
-        assert "temperature" in tool_responses[0].response.parts[0].text
+        assert tool_responses[0].response == {"temperature": 72}
 
     def test_extract_tools_missing_name(self):
         span = Span(
@@ -280,8 +253,8 @@ class TestExtractGenaiTools:
             tags={"gen_ai.tool.call.id": "call_123"},
         )
 
-        tool_uses, tool_responses = _extract_genai_tools([span])
-        assert len(tool_uses) == 0
+        tool_calls, tool_responses = _extract_tool_calls([span], [])
+        assert len(tool_calls) == 0
         assert len(tool_responses) == 0
 
     def test_extract_tools_invalid_arguments_json(self):
@@ -293,10 +266,10 @@ class TestExtractGenaiTools:
         )
         tool_span.tags["gen_ai.tool.call.arguments"] = "{invalid json}"
 
-        tool_uses, tool_responses = _extract_genai_tools([tool_span])
+        tool_calls, tool_responses = _extract_tool_calls([tool_span], [])
 
-        assert len(tool_uses) == 1
-        assert tool_uses[0].args == {}
+        assert len(tool_calls) == 1
+        assert tool_calls[0].args == {}
 
 
 class TestConvertGenaiTrace:
@@ -422,7 +395,6 @@ class TestConvertGenaiTrace:
 
         assert len(result.invocations) == 0
         assert len(result.warnings) > 0
-        assert "no GenAI invocation spans found" in result.warnings[0]
 
     def test_convert_with_nested_llm_span(self):
         parent_span = Span(

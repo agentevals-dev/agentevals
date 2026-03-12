@@ -83,13 +83,15 @@ def _detect_trace_format(trace: Trace) -> str:
         "adk" or "genai"
     """
     def check_spans(spans: list[Span]) -> str | None:
+        has_genai = False
         for span in spans:
             if span.get_tag(_TAG_SCOPE) == _ADK_SCOPE:
                 return "adk"
-
-            if span.get_tag("gen_ai.request.model") or span.get_tag("gen_ai.input.messages"):
-                return "genai"
-        return None
+            if not has_genai and (
+                span.get_tag("gen_ai.request.model") or span.get_tag("gen_ai.input.messages")
+            ):
+                has_genai = True
+        return "genai" if has_genai else None
 
     initial_check = check_spans(trace.all_spans[:FORMAT_DETECTION_SPAN_LIMIT])
     if initial_check:

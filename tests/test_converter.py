@@ -354,6 +354,36 @@ class TestConverter:
         assert len(result.invocations) == 1
         assert result.invocations[0].user_content.parts[0].text == "Hello"
 
+    def test_format_detection_adk_with_mixed_genai_spans(self):
+        from agentevals.converter import _detect_trace_format
+
+        genai_span = Span(
+            trace_id="mixed",
+            span_id="openai1",
+            parent_span_id=None,
+            operation_name="openai.chat",
+            start_time=500,
+            duration=1000,
+            tags={"gen_ai.request.model": "gpt-5-mini"},
+            children=[],
+        )
+        adk_span = Span(
+            trace_id="mixed",
+            span_id="invoke1",
+            parent_span_id=None,
+            operation_name="invoke_agent test_agent",
+            start_time=1000,
+            duration=5000,
+            tags={"otel.scope.name": "gcp.vertex.agent"},
+            children=[],
+        )
+        trace = Trace(
+            trace_id="mixed",
+            root_spans=[genai_span, adk_span],
+            all_spans=[genai_span, adk_span],
+        )
+        assert _detect_trace_format(trace) == "adk"
+
     def test_format_detection_defaults_to_adk_when_no_indicators(self):
         plain_span = Span(
             trace_id="test-trace",

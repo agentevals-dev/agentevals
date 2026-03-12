@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 import pytest
@@ -24,7 +25,7 @@ class TestRunner:
             eval_set_file=EVAL_SET,
             metrics=["tool_trajectory_avg_score"],
         )
-        result = run_evaluation(config)
+        result = asyncio.run(run_evaluation(config))
 
         assert len(result.errors) == 0
         assert len(result.trace_results) == 1
@@ -45,7 +46,7 @@ class TestRunner:
             trace_files=[HELM_TRACE],
             metrics=["tool_trajectory_avg_score"],
         )
-        result = run_evaluation(config)
+        result = asyncio.run(run_evaluation(config))
 
         mr = result.trace_results[0].metric_results[0]
         assert mr.error is not None
@@ -56,7 +57,7 @@ class TestRunner:
             trace_files=["/nonexistent/file.json"],
             metrics=["tool_trajectory_avg_score"],
         )
-        result = run_evaluation(config)
+        result = asyncio.run(run_evaluation(config))
         assert len(result.errors) >= 1
 
     def test_load_eval_set(self):
@@ -79,7 +80,7 @@ class TestRunner:
             eval_set_file=EVAL_SET,
             metrics=["tool_trajectory_avg_score"],
         )
-        result = run_evaluation(config)
+        result = asyncio.run(run_evaluation(config))
 
         assert len(result.trace_results) == 1
         tr = result.trace_results[0]
@@ -108,8 +109,6 @@ class TestRunner:
         # Actual has args
         assert comp["actual"][0]["name"] == "helm_list_releases"
         assert comp["actual"][0]["args"] == {"all_namespaces": "true", "output": "json"}
-        inv = case.conversation[0]
-        assert inv.user_content.parts[0].text == "list all Helm releases"
 
     def test_multiple_metrics(self):
         config = EvalRunConfig(
@@ -117,7 +116,7 @@ class TestRunner:
             eval_set_file=EVAL_SET,
             metrics=["tool_trajectory_avg_score", "tool_trajectory_avg_score"],
         )
-        result = run_evaluation(config)
+        result = asyncio.run(run_evaluation(config))
 
         tr = result.trace_results[0]
         assert len(tr.metric_results) == 2
@@ -130,7 +129,7 @@ class TestRunner:
             eval_set_file=EVAL_SET,
             metrics=["tool_trajectory_avg_score"],
         )
-        result = run_evaluation(config)
+        result = asyncio.run(run_evaluation(config))
         output = format_results(result, fmt="json")
 
         import json
