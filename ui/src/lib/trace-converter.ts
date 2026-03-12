@@ -24,14 +24,27 @@ interface ConversionResult {
 }
 
 function detectTraceFormat(trace: Trace): 'adk' | 'genai' {
-  for (const span of trace.allSpans.slice(0, 10)) {
-    if (span.tags['otel.scope.name'] === ADK_SCOPE) {
-      return 'adk';
+  const check = (spans: Span[]): 'adk' | 'genai' | null => {
+    let hasGenai = false;
+    for (const span of spans) {
+      if (span.tags['otel.scope.name'] === ADK_SCOPE) {
+        return 'adk';
+      }
+      if (!hasGenai && (span.tags['gen_ai.request.model'] || span.tags['gen_ai.system'])) {
+        hasGenai = true;
+      }
     }
-    if (span.tags['gen_ai.request.model'] || span.tags['gen_ai.system']) {
-      return 'genai';
-    }
+    return hasGenai ? 'genai' : null;
+  };
+
+  const initial = check(trace.allSpans.slice(0, 10));
+  if (initial) return initial;
+
+  if (trace.allSpans.length > 10) {
+    const full = check(trace.allSpans);
+    if (full) return full;
   }
+
   return 'adk';
 }
 

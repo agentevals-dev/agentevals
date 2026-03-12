@@ -25,7 +25,19 @@ from google.adk.evaluation.eval_set import EvalSet
 from google.adk.evaluation.evaluator import EvaluationResult, Evaluator
 
 from .config import EvalRunConfig
-from .converter import ConversionResult, convert_traces
+from .converter import (
+    ConversionResult,
+    convert_traces,
+    _detect_trace_format,
+    _find_adk_spans,
+    _parse_json_tag,
+)
+from .utils.genai_messages import (
+    parse_json_attr,
+    extract_text_from_message,
+    USER_ROLES,
+    ASSISTANT_ROLES,
+)
 from .loader.base import TraceLoader
 from .loader.jaeger import JaegerJsonLoader
 from .loader.otlp import OtlpJsonLoader
@@ -540,3 +552,82 @@ def _extract_performance_metrics(trace) -> dict[str, Any]:
             "per_llm_call": calc_percentiles(total_tokens) if total_tokens else {"p50": 0.0, "p95": 0.0, "p99": 0.0},
         },
     }
+
+
+def _truncate(text: str, max_length: int = 200) -> str:
+    if len(text) <= max_length:
+        return text
+    return text[:max_length] + "..."
+
+
+def _extract_trace_metadata(trace) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "agent_name": None,
+        "model": None,
+        "start_time": None,
+        "user_input_preview": None,
+        "final_output_preview": None,
+    }
+
+    trace_format = _detect_trace_format(trace)
+
+    if trace_format == "adk":
+        invoke_spans = _find_adk_spans(trace, "invoke_agent")
+        if invoke_spans:
+            metadata["agent_name"] = invoke_spans[0].get_tag("gen_ai.agent.name")
+            metadata["start_time"] = invoke_spans[0].start_time
+
+        call_llm_spans = _find_adk_spans(trace, "call_llm")
+        if call_llm_spans:
+            metadata["model"] = call_llm_spans[0].get_tag("gen_ai.request.model")
+
+            llm_request_raw = call_llm_spans[0].get_tag("gcp.vertex.agent.llm_request", "{}")
+            llm_request = _parse_json_tag(llm_request_raw, "llm_request")
+            for content in reversed(llm_request.get("contents", [])):
+                if content.get("role") != "user":
+                    continue
+                text_parts = [p["text"] for p in content.get("parts", []) if "text" in p]
+                if text_parts:
+                    metadata["user_input_preview"] = _truncate(" ".join(text_parts))
+                    break
+
+            last_llm = call_llm_spans[-1]
+            llm_response_raw = last_llm.get_tag("gcp.vertex.agent.llm_response", "{}")
+            llm_response = _parse_json_tag(llm_response_raw, "llm_response")
+            response_content = llm_response.get("content", {})
+            text_parts = [p["text"] for p in response_content.get("parts", []) if "text" in p]
+            if text_parts:
+                metadata["final_output_preview"] = _truncate(" ".join(text_parts))
+    else:
+        llm_spans = [s for s in trace.all_spans if s.get_tag("gen_ai.request.model") is not None]
+        if llm_spans:
+            metadata["model"] = llm_spans[0].get_tag("gen_ai.request.model")
+            metadata["start_time"] = llm_spans[0].start_time
+
+            agent_name = llm_spans[0].get_tag("gen_ai.agent.name")
+            if agent_name:
+                metadata["agent_name"] = agent_name
+            elif trace.root_spans:
+                metadata["agent_name"] = trace.root_spans[0].operation_name
+
+            messages_raw = llm_spans[0].get_tag("gen_ai.input.messages", "[]")
+            messages = parse_json_attr(messages_raw, "gen_ai.input.messages")
+            if isinstance(messages, list):
+                for msg in reversed(messages):
+                    if isinstance(msg, dict) and msg.get("role") in USER_ROLES:
+                        text = extract_text_from_message(msg)
+                        if text:
+                            metadata["user_input_preview"] = _truncate(text)
+                            break
+
+            out_raw = llm_spans[-1].get_tag("gen_ai.output.messages", "[]")
+            out_messages = parse_json_attr(out_raw, "gen_ai.output.messages")
+            if isinstance(out_messages, list):
+                for msg in reversed(out_messages):
+                    if isinstance(msg, dict) and msg.get("role") in ASSISTANT_ROLES:
+                        text = extract_text_from_message(msg)
+                        if text:
+                            metadata["final_output_preview"] = _truncate(text)
+                            break
+
+    return metadata

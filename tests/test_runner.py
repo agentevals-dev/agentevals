@@ -4,7 +4,7 @@ import os
 import pytest
 
 from agentevals.config import EvalRunConfig
-from agentevals.runner import run_evaluation, load_eval_set
+from agentevals.runner import run_evaluation, load_eval_set, _extract_trace_metadata
 
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), "..", "samples")
@@ -138,3 +138,19 @@ class TestRunner:
         assert "traces" in data
         assert len(data["traces"]) == 1
         assert data["traces"][0]["metrics"][0]["score"] == 1.0
+
+    def test_extract_trace_metadata_adk(self):
+        from agentevals.loader.jaeger import JaegerJsonLoader
+
+        loader = JaegerJsonLoader()
+        traces = loader.load(HELM_TRACE)
+        metadata = _extract_trace_metadata(traces[0])
+
+        assert metadata["agent_name"] == "helm_agent"
+        assert metadata["model"] is not None
+        assert metadata["start_time"] is not None
+        assert metadata["start_time"] > 0
+        assert metadata["user_input_preview"] is not None
+        assert "helm" in metadata["user_input_preview"].lower()
+        assert metadata["final_output_preview"] is not None
+        assert len(metadata["final_output_preview"]) > 0

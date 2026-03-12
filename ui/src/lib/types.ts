@@ -120,6 +120,11 @@ export interface TraceResult {
   metricResults: MetricResult[];
   conversionWarnings: string[];
   performanceMetrics?: PerformanceMetrics;
+  agentName?: string;
+  model?: string;
+  startTime?: number;
+  userInputPreview?: string;
+  finalOutputPreview?: string;
 }
 
 export interface RunResultPerformanceMetrics {

@@ -136,12 +136,20 @@ export async function evaluateTracesStreaming(
           const eventData = JSON.parse(line.slice(6));
 
           if (eventType === 'performance_metrics') {
+            const tm = eventData.traceMetadata
+              ? convertSnakeToCamel(eventData.traceMetadata) as Record<string, any>
+              : {};
             const partialResult: TraceResult = {
               traceId: eventData.traceId,
               numInvocations: 0,
               metricResults: [],
               conversionWarnings: [],
               performanceMetrics: convertSnakeToCamel(eventData.performanceMetrics),
+              agentName: tm.agentName,
+              model: tm.model,
+              startTime: tm.startTime,
+              userInputPreview: tm.userInputPreview,
+              finalOutputPreview: tm.finalOutputPreview,
             };
             onTraceProgress(eventData.traceId, 'loading', partialResult);
             eventType = '';
