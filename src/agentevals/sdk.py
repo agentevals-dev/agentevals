@@ -22,6 +22,14 @@ Usage (decorator — shorthand for simple agents):
 
     app.run(["Hello!", "Tell me a joke"])
 
+Disabling streaming:
+    Pass ``streaming=False`` to skip all WebSocket/OTel setup. The context
+    managers become no-ops and your agent code runs without any agentevals
+    connection. Useful for gating on an env var so the SDK stays wired up
+    in code but only streams when the dev server is running::
+
+        app = AgentEvals(streaming=os.getenv("AGENTEVALS_STREAM", "1") == "1")
+
 Provider lifecycle:
     The SDK adds an ``AgentEvalsStreamingProcessor`` to the active
     ``TracerProvider`` for the duration of a session.  After shutdown the
@@ -76,12 +84,14 @@ class AgentEvals:
         metadata: dict[str, Any] | None = None,
         auto_instrument: bool = True,
         capture_message_content: bool = True,
+        streaming: bool = True,
     ):
         self.ws_url = ws_url
         self.eval_set_id = eval_set_id
         self.metadata = metadata or {}
         self.auto_instrument = auto_instrument
         self.capture_message_content = capture_message_content
+        self.streaming = streaming
 
         self._agent_fn: Callable | None = None
         self._is_async: bool = False
@@ -144,8 +154,14 @@ class AgentEvals:
             tracer_provider: Explicit TracerProvider to use (e.g. from StrandsTelemetry).
                 Falls back to the global provider, then creates a new one.
         """
-        eff_eval_set_id = eval_set_id or self.eval_set_id
         eff_session_name = session_name or self._generate_session_id()
+
+        if not self.streaming:
+            logger.debug("Streaming disabled, running without agentevals connection")
+            yield eff_session_name
+            return
+
+        eff_eval_set_id = eval_set_id or self.eval_set_id
         eff_metadata = {**self.metadata, **(metadata or {})}
 
         setup = self._setup_otel(eff_session_name, tracer_provider)
@@ -208,8 +224,14 @@ class AgentEvals:
             tracer_provider: Explicit TracerProvider to use. Falls back to the global
                 provider, then creates a new one.
         """
-        eff_eval_set_id = eval_set_id or self.eval_set_id
         eff_session_name = session_name or self._generate_session_id()
+
+        if not self.streaming:
+            logger.debug("Streaming disabled, running without agentevals connection")
+            yield eff_session_name
+            return
+
+        eff_eval_set_id = eval_set_id or self.eval_set_id
         eff_metadata = {**self.metadata, **(metadata or {})}
 
         setup = self._setup_otel(eff_session_name, tracer_provider)

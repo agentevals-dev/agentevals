@@ -39,6 +39,14 @@ def my_agent(prompt):
 app.run(["Hello!", "Tell me a joke"])
 ```
 
+To keep the SDK wired up in your code but skip streaming when the dev server isn't running, set `streaming=False`:
+
+```python
+app = AgentEvals(streaming=os.getenv("AGENTEVALS_STREAM", "1") == "1")
+```
+
+When disabled, `session()` and `session_async()` become no-ops — your agent code runs normally without any WebSocket connection, OTel setup, or background threads.
+
 See [sdk_example/](./sdk_example/) for complete working examples.
 
 ## Advanced: Manual OTel Setup

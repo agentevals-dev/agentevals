@@ -31,6 +31,7 @@ class TestInit:
         assert app.metadata == {}
         assert app.auto_instrument is True
         assert app.capture_message_content is True
+        assert app.streaming is True
 
     def test_custom_config(self):
         app = AgentEvals(
@@ -385,6 +386,60 @@ class TestAsyncSession:
                 assert name == "async-s1"
 
         asyncio.run(_test())
+
+
+# ---------------------------------------------------------------------------
+# streaming=False (disabled mode)
+# ---------------------------------------------------------------------------
+
+
+class TestStreamingDisabled:
+    def test_sync_session_is_noop(self):
+        app = AgentEvals(streaming=False, auto_instrument=False)
+
+        with app.session(eval_set_id="e1", session_name="s1") as name:
+            assert name == "s1"
+
+    def test_sync_session_does_not_create_processor(self):
+        app = AgentEvals(streaming=False, auto_instrument=False)
+
+        with patch(PROC_PATH) as MockProc:
+            with app.session():
+                pass
+            MockProc.assert_not_called()
+
+    def test_sync_session_generates_session_name(self):
+        app = AgentEvals(streaming=False, auto_instrument=False)
+
+        with app.session() as name:
+            assert name.startswith("session-")
+
+    def test_async_session_is_noop(self):
+        app = AgentEvals(streaming=False, auto_instrument=False)
+
+        async def _test():
+            async with app.session_async(eval_set_id="e1", session_name="s1") as name:
+                assert name == "s1"
+
+        asyncio.run(_test())
+
+    def test_async_session_does_not_create_processor(self):
+        app = AgentEvals(streaming=False, auto_instrument=False)
+
+        async def _test():
+            with patch(PROC_PATH) as MockProc:
+                async with app.session_async():
+                    pass
+                MockProc.assert_not_called()
+
+        asyncio.run(_test())
+
+    def test_no_background_thread_when_disabled(self):
+        app = AgentEvals(streaming=False, auto_instrument=False)
+        threads_before = threading.active_count()
+
+        with app.session(session_name="s1"):
+            assert threading.active_count() == threads_before
 
 
 # ---------------------------------------------------------------------------
