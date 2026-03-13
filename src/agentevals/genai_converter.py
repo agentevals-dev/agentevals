@@ -16,7 +16,7 @@ from google.adk.evaluation.eval_case import IntermediateData, Invocation
 from google.genai import types as genai_types
 
 from .converter import ConversionResult
-from .extraction import GenAIExtractor, is_invocation_span, is_llm_span, is_tool_span
+from .extraction import GenAIExtractor, is_invocation_span, is_llm_span
 from .loader.base import Span, Trace
 from .trace_attrs import (
     OTEL_GENAI_INPUT_MESSAGES,

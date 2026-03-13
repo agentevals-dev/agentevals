@@ -281,6 +281,24 @@ class TestExtractToolCall:
     def test_no_name_returns_none(self):
         assert extract_tool_call_from_attrs({}) is None
 
+    def test_span_id_fallback_when_no_tool_call_id(self):
+        attrs = {OTEL_GENAI_TOOL_NAME: "search"}
+        result = extract_tool_call_from_attrs(attrs, span_id="abc123")
+        assert result["id"] == "abc123"
+
+    def test_unknown_fallback_when_no_ids(self):
+        attrs = {OTEL_GENAI_TOOL_NAME: "search"}
+        result = extract_tool_call_from_attrs(attrs)
+        assert result["id"] == "unknown"
+
+    def test_tool_call_id_takes_priority_over_span_id(self):
+        attrs = {
+            OTEL_GENAI_TOOL_NAME: "search",
+            OTEL_GENAI_TOOL_CALL_ID: "tc1",
+        }
+        result = extract_tool_call_from_attrs(attrs, span_id="span-xyz")
+        assert result["id"] == "tc1"
+
     def test_genai_args_take_priority_over_adk(self):
         attrs = {
             OTEL_GENAI_TOOL_NAME: "tool",

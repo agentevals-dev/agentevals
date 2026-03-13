@@ -132,7 +132,8 @@ class IncrementalInvocationExtractor:
                 })
 
         elif operation_name.startswith("execute_tool") or is_genai_tool:
-            tool_call = extract_tool_call_from_attrs(attributes, operation_name)
+            span_id = span.get("spanId", "")
+            tool_call = extract_tool_call_from_attrs(attributes, operation_name, span_id=span_id)
             if tool_call:
                 call_id = tool_call["id"]
                 if invocation_id not in self.seen_tool_calls:

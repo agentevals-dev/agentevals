@@ -21,8 +21,6 @@ from .trace_attrs import (
     ADK_LLM_RESPONSE,
     ADK_SCOPE_VALUE,
     ADK_TOOL_CALL_ARGS,
-    ADK_TOOL_RESPONSE,
-    OTEL_GENAI_AGENT_NAME,
     OTEL_GENAI_INPUT_MESSAGES,
     OTEL_GENAI_OP,
     OTEL_GENAI_OUTPUT_MESSAGES,
@@ -142,7 +140,7 @@ def extract_token_usage_from_attrs(
 
 
 def extract_tool_call_from_attrs(
-    attrs: dict[str, Any], operation_name: str = ""
+    attrs: dict[str, Any], operation_name: str = "", span_id: str = ""
 ) -> dict[str, Any] | None:
     """Extract tool call info from span attributes. Returns {id, name, args} or None."""
     tool_name = attrs.get(OTEL_GENAI_TOOL_NAME)
@@ -152,7 +150,7 @@ def extract_tool_call_from_attrs(
         else:
             return None
 
-    tool_call_id = attrs.get(OTEL_GENAI_TOOL_CALL_ID, "unknown")
+    tool_call_id = attrs.get(OTEL_GENAI_TOOL_CALL_ID) or span_id or "unknown"
 
     args_raw = attrs.get(OTEL_GENAI_TOOL_CALL_ARGUMENTS)
     if not args_raw:
