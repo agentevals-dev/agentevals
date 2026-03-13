@@ -256,7 +256,10 @@ class AgentEvals:
             setup.tracer_provider.force_flush()
             if setup.logger_provider:
                 setup.logger_provider.force_flush()
-            await setup.processor.shutdown_async()
+            try:
+                await setup.processor.shutdown_async()
+            except Exception as exc:
+                logger.warning("Shutdown error: %s", exc)
 
     # --- Decorator run helpers ---
 

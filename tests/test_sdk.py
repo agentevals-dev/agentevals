@@ -387,6 +387,20 @@ class TestAsyncSession:
 
         asyncio.run(_test())
 
+    @patch(PROC_PATH)
+    def test_shutdown_error_is_logged_not_raised(self, MockProc):
+        mock_proc = _make_mock_processor()
+        mock_proc.shutdown_async = AsyncMock(side_effect=RuntimeError("ws closed"))
+        MockProc.return_value = mock_proc
+
+        app = AgentEvals(auto_instrument=False)
+
+        async def _test():
+            async with app.session_async(session_name="s1"):
+                pass
+
+        asyncio.run(_test())
+
 
 # ---------------------------------------------------------------------------
 # streaming=False (disabled mode)
