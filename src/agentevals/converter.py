@@ -11,7 +11,6 @@ Explicit format can be specified via the format parameter to convert_trace().
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -19,7 +18,7 @@ from typing import Any
 from google.adk.evaluation.eval_case import IntermediateData, Invocation
 from google.genai import types as genai_types
 
-from .extraction import get_extractor
+from .extraction import get_extractor, parse_json
 from .loader.base import Span, Trace
 from .trace_attrs import (
     ADK_INVOCATION_ID,
@@ -161,7 +160,7 @@ def _walk(span: Span, op_prefix: str, acc: list[Span]) -> None:
 def _extract_user_content(first_call_llm: Span) -> genai_types.Content:
     """Extract user input from the first call_llm span's llm_request tag."""
     llm_request_raw = first_call_llm.get_tag(ADK_LLM_REQUEST, "{}")
-    llm_request = _parse_json_tag(llm_request_raw, "llm_request")
+    llm_request = parse_json(llm_request_raw)
     contents = llm_request.get("contents", [])
 
     for content_dict in reversed(contents):
@@ -188,7 +187,7 @@ def _extract_user_content(first_call_llm: Span) -> genai_types.Content:
 def _extract_final_response(last_call_llm: Span) -> genai_types.Content:
     """Extract final text response from the last call_llm span's llm_response tag."""
     llm_response_raw = last_call_llm.get_tag(ADK_LLM_RESPONSE, "{}")
-    llm_response = _parse_json_tag(llm_response_raw, "llm_response")
+    llm_response = parse_json(llm_response_raw)
 
     content_dict = llm_response.get("content", {})
     if not content_dict:
@@ -261,7 +260,7 @@ def _extract_from_tool_span(
             return None, None
 
     args_raw = tool_span.get_tag(ADK_TOOL_CALL_ARGS, "{}")
-    args = _parse_json_tag(args_raw, "tool_call_args")
+    args = parse_json(args_raw)
 
     fc = genai_types.FunctionCall(
         name=tool_name,
@@ -272,7 +271,7 @@ def _extract_from_tool_span(
     response_raw = tool_span.get_tag(ADK_TOOL_RESPONSE)
     fr = None
     if response_raw:
-        response_data = _parse_json_tag(response_raw, "tool_response")
+        response_data = parse_json(response_raw)
         # Response format varies: MCP uses {"content": [...], "isError": false},
         # other tools return flat dicts. We pass through as-is.
         fr = genai_types.FunctionResponse(
@@ -288,7 +287,7 @@ def _extract_function_calls_from_llm_response(
     call_llm: Span,
 ) -> list[genai_types.FunctionCall]:
     llm_response_raw = call_llm.get_tag(ADK_LLM_RESPONSE, "{}")
-    llm_response = _parse_json_tag(llm_response_raw, "llm_response")
+    llm_response = parse_json(llm_response_raw)
 
     content_dict = llm_response.get("content", {})
     parts = content_dict.get("parts", [])
@@ -342,15 +341,3 @@ def _content_from_dict(content_dict: dict[str, Any]) -> genai_types.Content:
     return genai_types.Content(role=role, parts=parts)
 
 
-def _parse_json_tag(raw: str | Any, tag_name: str) -> dict[str, Any]:
-    """Parse a JSON string from a span tag. Some exporters pre-deserialize,
-    so we handle both string and dict inputs."""
-    if isinstance(raw, dict):
-        return raw
-    if isinstance(raw, str):
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse JSON in tag %s: %s", tag_name, raw[:200])
-            return {}
-    return {}

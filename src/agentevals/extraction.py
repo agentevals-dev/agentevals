@@ -53,7 +53,7 @@ def extract_user_text_from_attrs(attrs: dict[str, Any]) -> str | None:
     """Extract user input text from span attributes, ADK-first."""
     llm_request_raw = attrs.get(ADK_LLM_REQUEST)
     if llm_request_raw:
-        llm_request = _parse_json(llm_request_raw)
+        llm_request = parse_json(llm_request_raw)
         if isinstance(llm_request, dict):
             for content_dict in reversed(llm_request.get("contents", [])):
                 if content_dict.get("role") != "user":
@@ -87,7 +87,7 @@ def extract_agent_response_from_attrs(attrs: dict[str, Any]) -> str | None:
     """Extract agent response text from span attributes, ADK-first."""
     llm_response_raw = attrs.get(ADK_LLM_RESPONSE)
     if llm_response_raw:
-        llm_response = _parse_json(llm_response_raw)
+        llm_response = parse_json(llm_response_raw)
         if isinstance(llm_response, dict):
             content_dict = llm_response.get("content", {})
             if content_dict:
@@ -117,7 +117,7 @@ def extract_token_usage_from_attrs(
 
     llm_response_raw = attrs.get(ADK_LLM_RESPONSE)
     if llm_response_raw:
-        llm_response = _parse_json(llm_response_raw)
+        llm_response = parse_json(llm_response_raw)
         if isinstance(llm_response, dict):
             usage = llm_response.get("usage_metadata", {})
             input_toks = usage.get("prompt_token_count", 0)
@@ -125,7 +125,7 @@ def extract_token_usage_from_attrs(
             if input_toks or output_toks:
                 llm_request_raw = attrs.get(ADK_LLM_REQUEST)
                 if llm_request_raw:
-                    llm_request = _parse_json(llm_request_raw)
+                    llm_request = parse_json(llm_request_raw)
                     if isinstance(llm_request, dict) and "model" in llm_request:
                         model = llm_request["model"]
                 return int(input_toks), int(output_toks), model
@@ -380,7 +380,7 @@ def get_extractor(trace: Trace) -> TraceFormatExtractor:
 # ---------------------------------------------------------------------------
 
 
-def _parse_json(raw: str | dict | Any) -> dict | list | Any:
+def parse_json(raw: str | dict | Any) -> dict | list | Any:
     if isinstance(raw, (dict, list)):
         return raw
     if isinstance(raw, str):

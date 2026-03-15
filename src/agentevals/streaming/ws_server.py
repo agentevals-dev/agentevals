@@ -39,8 +39,8 @@ class StreamingTraceManager:
         self.session_ttl = timedelta(hours=session_ttl_hours)
         self.max_sessions = max_sessions
         self._cleanup_task: asyncio.Task | None = None
-        self._completion_timers: dict[str, asyncio.TimerHandle] = {}
-        self._idle_timers: dict[str, asyncio.TimerHandle] = {}
+        self._completion_timers: dict[str, asyncio.Task] = {}
+        self._idle_timers: dict[str, asyncio.Task] = {}
         self._orphan_logs: list[dict] = []
         self._orphan_log_max_age = timedelta(seconds=60)
 
@@ -259,14 +259,9 @@ class StreamingTraceManager:
         if session_id in self._completion_timers:
             self._completion_timers[session_id].cancel()
 
-        loop = asyncio.get_event_loop()
-        timer = loop.call_later(
-            3.0,
-            lambda: asyncio.ensure_future(
-                self._complete_otlp_session(session_id)
-            ),
+        self._completion_timers[session_id] = asyncio.create_task(
+            self._delayed_complete(session_id, 3.0)
         )
-        self._completion_timers[session_id] = timer
 
     def reset_idle_timer(self, session_id: str) -> None:
         """Reset the idle timeout for an OTLP session.
@@ -279,14 +274,9 @@ class StreamingTraceManager:
         if session_id in self._idle_timers:
             self._idle_timers[session_id].cancel()
 
-        loop = asyncio.get_event_loop()
-        timer = loop.call_later(
-            30.0,
-            lambda: asyncio.ensure_future(
-                self._complete_otlp_session(session_id)
-            ),
+        self._idle_timers[session_id] = asyncio.create_task(
+            self._delayed_complete(session_id, 30.0)
         )
-        self._idle_timers[session_id] = timer
 
     def schedule_log_reextraction(self, session_id: str) -> None:
         """Schedule re-extraction of invocations after late-arriving logs.
@@ -299,14 +289,28 @@ class StreamingTraceManager:
         if key in self._completion_timers:
             self._completion_timers[key].cancel()
 
-        loop = asyncio.get_event_loop()
-        timer = loop.call_later(
-            2.0,
-            lambda: asyncio.ensure_future(
-                self._reextract_with_logs(session_id)
-            ),
+        self._completion_timers[key] = asyncio.create_task(
+            self._delayed_reextract(session_id, 2.0)
         )
-        self._completion_timers[key] = timer
+
+    async def _delayed_complete(self, session_id: str, delay: float) -> None:
+        await asyncio.sleep(delay)
+        await self._complete_otlp_session(session_id)
+
+    async def _delayed_reextract(self, session_id: str, delay: float) -> None:
+        await asyncio.sleep(delay)
+        await self._reextract_with_logs(session_id)
+
+    def find_session_by_trace_id(self, trace_id: str) -> TraceSession | None:
+        """Find a session that contains the given trace_id.
+
+        Matches both active and recently-completed sessions so that
+        late-arriving logs can still be associated with their session.
+        """
+        for session in self.sessions.values():
+            if trace_id in session.trace_ids:
+                return session
+        return None
 
     async def _reextract_with_logs(self, session_id: str) -> None:
         """Re-extract invocations after late logs arrive for a completed session."""
@@ -514,10 +518,6 @@ class StreamingTraceManager:
                 else:
                     logger.info("Client disconnected after session end: %s", session_id)
 
-    def _enrich_spans_with_logs(self, spans: list[dict], logs: list[dict], session_id: str = None) -> list[dict]:
-        """Enrich spans with message content from GenAI logs."""
-        return enrich_spans_with_logs(spans, logs, session_id)
-
     async def _save_spans_to_temp_file(self, session: TraceSession) -> Path:
         """Save spans to a temporary OTLP JSONL file.
 
@@ -529,7 +529,7 @@ class StreamingTraceManager:
         """
         temp_file = Path(tempfile.gettempdir()) / f"agentevals_{session.session_id}.jsonl"
 
-        enriched_spans = self._enrich_spans_with_logs(session.spans, session.logs, session.session_id)
+        enriched_spans = enrich_spans_with_logs(session.spans, session.logs, session.session_id)
 
         with open(temp_file, "w") as f:
             for span in enriched_spans:
@@ -576,7 +576,7 @@ class StreamingTraceManager:
                     session.session_id
                 )
 
-            enriched_spans = self._enrich_spans_with_logs(session.spans, session.logs, session.session_id)
+            enriched_spans = enrich_spans_with_logs(session.spans, session.logs, session.session_id)
 
             for span in enriched_spans:
                 span_copy = span.copy()

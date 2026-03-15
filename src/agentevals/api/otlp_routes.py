@@ -70,7 +70,11 @@ async def receive_traces(request: Request) -> Response:
         body = await request.json()
 
     await _process_traces(body)
-    return Response(status_code=200, content="{}", media_type="application/json")
+    return Response(
+        status_code=200,
+        content='{"partialSuccess":{}}',
+        media_type="application/json",
+    )
 
 
 @otlp_router.post("/v1/logs")
@@ -94,7 +98,11 @@ async def receive_logs(request: Request) -> Response:
         body = await request.json()
 
     await _process_logs(body)
-    return Response(status_code=200, content="{}", media_type="application/json")
+    return Response(
+        status_code=200,
+        content='{"partialSuccess":{}}',
+        media_type="application/json",
+    )
 
 
 async def _process_traces(body: dict) -> None:
@@ -178,7 +186,7 @@ async def _process_logs(body: dict) -> None:
                 if not trace_id:
                     continue
 
-                session = _find_session_by_trace_id(trace_id)
+                session = _trace_manager.find_session_by_trace_id(trace_id)
 
                 if not session and session_name and _trace_manager:
                     candidate = _trace_manager.sessions.get(session_name)
@@ -355,21 +363,6 @@ def _parse_otlp_body(body_raw: dict) -> dict | str:
         except (json.JSONDecodeError, TypeError):
             return raw
     return _parse_otlp_any_value(body_raw)
-
-
-def _find_session_by_trace_id(trace_id: str):
-    """Find a session that contains the given trace_id.
-
-    Matches both active and recently-completed sessions so that late-arriving
-    logs (from BatchLogRecordProcessor) can still be associated with their
-    session even after span-triggered completion.
-    """
-    if not _trace_manager:
-        return None
-    for session in _trace_manager.sessions.values():
-        if trace_id in session.trace_ids:
-            return session
-    return None
 
 
 # ---------------------------------------------------------------------------

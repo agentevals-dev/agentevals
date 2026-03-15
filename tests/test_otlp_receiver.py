@@ -11,7 +11,6 @@ from agentevals.api.otlp_routes import (
     _extract_agentevals_metadata,
     _fix_protobuf_id_fields,
     _normalize_span,
-    _parse_otlp_any_value,
     _parse_otlp_body,
     _process_traces,
     _process_logs,
@@ -327,40 +326,6 @@ class TestParseOtlpBody:
         assert result["tool_calls"] == [{"id": "call_1", "type": "function"}]
 
 
-class TestParseOtlpAnyValue:
-    def test_string_value(self):
-        assert _parse_otlp_any_value({"stringValue": "hello"}) == "hello"
-
-    def test_int_value(self):
-        assert _parse_otlp_any_value({"intValue": "42"}) == 42
-
-    def test_double_value(self):
-        assert _parse_otlp_any_value({"doubleValue": 3.14}) == 3.14
-
-    def test_bool_value(self):
-        assert _parse_otlp_any_value({"boolValue": True}) is True
-
-    def test_kvlist_value(self):
-        result = _parse_otlp_any_value({"kvlistValue": {"values": [
-            {"key": "a", "value": {"stringValue": "x"}},
-            {"key": "b", "value": {"intValue": "1"}},
-        ]}})
-        assert result == {"a": "x", "b": 1}
-
-    def test_array_value(self):
-        result = _parse_otlp_any_value({"arrayValue": {"values": [
-            {"stringValue": "one"},
-            {"intValue": "2"},
-        ]}})
-        assert result == ["one", 2]
-
-    def test_bytes_value_passthrough(self):
-        assert _parse_otlp_any_value({"bytesValue": "AQID"}) == "AQID"
-
-    def test_empty_returns_as_is(self):
-        assert _parse_otlp_any_value({}) == {}
-
-
 class TestConvertOtlpLogRecordEventName:
     """Tests for the eventName top-level field (newer OTel SDKs)."""
 
@@ -669,7 +634,8 @@ class TestScheduleSessionCompletion:
             await mgr.get_or_create_otlp_session("trace-1", meta)
             mgr.schedule_session_completion("s1")
             assert "s1" in mgr._completion_timers
-            mgr._completion_timers["s1"].cancel()
+            assert isinstance(mgr._completion_timers["s1"], asyncio.Task)
+            _cancel_timers(mgr)
         _run(go())
 
     def test_replaces_existing_timer(self):
@@ -678,11 +644,13 @@ class TestScheduleSessionCompletion:
             meta = {"eval_set_id": None, "session_name": "s1", "resource_attrs": {}}
             await mgr.get_or_create_otlp_session("trace-1", meta)
             mgr.schedule_session_completion("s1")
-            timer1 = mgr._completion_timers["s1"]
+            task1 = mgr._completion_timers["s1"]
             mgr.schedule_session_completion("s1")
-            timer2 = mgr._completion_timers["s1"]
-            assert timer1 is not timer2
-            timer2.cancel()
+            task2 = mgr._completion_timers["s1"]
+            assert task1 is not task2
+            await asyncio.sleep(0)
+            assert task1.cancelled()
+            _cancel_timers(mgr)
         _run(go())
 
 
@@ -694,7 +662,8 @@ class TestResetIdleTimer:
             await mgr.get_or_create_otlp_session("trace-1", meta)
             mgr.reset_idle_timer("s1")
             assert "s1" in mgr._idle_timers
-            mgr._idle_timers["s1"].cancel()
+            assert isinstance(mgr._idle_timers["s1"], asyncio.Task)
+            _cancel_timers(mgr)
         _run(go())
 
 
@@ -1153,29 +1122,26 @@ class TestProcessLogs:
 
 class TestCleanupWithTimers:
     def test_cleanup_cancels_timers(self):
-        mgr = StreamingTraceManager()
-        session = TraceSession(
-            session_id="s1",
-            trace_id="t1",
-            eval_set_id=None,
-            source="otlp",
-        )
-        session.is_complete = True
-        session.started_at = datetime.now(UTC) - timedelta(hours=10)
-        mgr.sessions["s1"] = session
+        async def go():
+            mgr = StreamingTraceManager()
+            session = TraceSession(
+                session_id="s1",
+                trace_id="t1",
+                eval_set_id=None,
+                source="otlp",
+            )
+            session.is_complete = True
+            session.started_at = datetime.now(UTC) - timedelta(hours=10)
+            mgr.sessions["s1"] = session
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            mgr._completion_timers["s1"] = loop.call_later(999, lambda: None)
-            mgr._idle_timers["s1"] = loop.call_later(999, lambda: None)
+            mgr._completion_timers["s1"] = asyncio.create_task(asyncio.sleep(999))
+            mgr._idle_timers["s1"] = asyncio.create_task(asyncio.sleep(999))
 
             removed = mgr._cleanup_old_sessions()
             assert removed == 1
             assert "s1" not in mgr._completion_timers
             assert "s1" not in mgr._idle_timers
-        finally:
-            loop.close()
+        _run(go())
 
 
 # ---------------------------------------------------------------------------

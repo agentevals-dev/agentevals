@@ -43,7 +43,7 @@ class AgentEvalsStreamingProcessor:
     async def connect(self, eval_set_id: str | None = None, metadata: dict | None = None):
         try:
             self.websocket = await websockets.connect(self.ws_url)
-            self.loop = asyncio.get_event_loop()
+            self.loop = asyncio.get_running_loop()
 
             await self.websocket.send(
                 json.dumps(

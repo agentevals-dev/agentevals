@@ -95,6 +95,25 @@ class TestBroadcastEnrichment:
         msgs = _get_injected_attr(result[0], "gen_ai.output.messages")
         assert msgs[0]["content"] == "reply"
 
+    def test_choice_extracts_tool_calls_from_nested_message(self):
+        spans = [_make_span()]
+        logs = [_make_log("gen_ai.choice", {
+            "index": 0,
+            "finish_reason": "tool_calls",
+            "message": {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"id": "call_1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}},
+                ],
+            },
+        })]
+        result = enrich_spans_with_logs(spans, logs)
+
+        msgs = _get_injected_attr(result[0], "gen_ai.output.messages")
+        assert len(msgs) == 1
+        assert msgs[0]["tool_calls"][0]["function"]["name"] == "roll_die"
+
 
 class TestPerSpanEnrichment:
     """OTLP path: logs with span_id → matched to specific spans."""

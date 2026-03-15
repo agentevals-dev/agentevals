@@ -75,7 +75,7 @@ def _extract_messages_from_logs(
             if event_name == "gen_ai.choice":
                 nested = body.get("message", {}) if isinstance(body.get("message"), dict) else {}
                 assistant_content = body.get("content") or nested.get("content") or ""
-                tool_calls = []
+                tool_calls = nested.get("tool_calls", [])
             else:
                 assistant_content = body.get("content") or ""
                 tool_calls = body.get("tool_calls", [])
