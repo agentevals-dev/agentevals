@@ -492,7 +492,7 @@ def _text_matches(a: str, b: str) -> bool:
     return a.strip().lower() == b.strip().lower()
 
 
-def _extract_performance_metrics(trace) -> dict[str, Any]:
+def _extract_performance_metrics(trace, extractor: "TraceFormatExtractor | None" = None) -> dict[str, Any]:
     """Extract latency and token usage metrics from trace spans."""
     agent_latencies = []
     llm_latencies = []
@@ -501,7 +501,8 @@ def _extract_performance_metrics(trace) -> dict[str, Any]:
     output_tokens = []
     total_tokens = []
 
-    extractor = get_extractor(trace)
+    if extractor is None:
+        extractor = get_extractor(trace)
     invocation_spans = extractor.find_invocation_spans(trace)
 
     if not invocation_spans and trace.root_spans:
@@ -558,7 +559,7 @@ def _truncate(text: str, max_length: int = 200) -> str:
     return text[:max_length] + "..."
 
 
-def _extract_trace_metadata(trace) -> dict[str, Any]:
+def _extract_trace_metadata(trace, extractor: "TraceFormatExtractor | None" = None) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "agent_name": None,
         "model": None,
@@ -567,7 +568,8 @@ def _extract_trace_metadata(trace) -> dict[str, Any]:
         "final_output_preview": None,
     }
 
-    extractor = get_extractor(trace)
+    if extractor is None:
+        extractor = get_extractor(trace)
     invocation_spans = extractor.find_invocation_spans(trace)
 
     if invocation_spans:

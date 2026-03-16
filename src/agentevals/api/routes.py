@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 
 from agentevals import __version__
 from ..config import EvalRunConfig
+from ..extraction import get_extractor
 from ..runner import RunResult, load_eval_set, run_evaluation, _extract_performance_metrics, _extract_trace_metadata, get_loader
 
 logger = logging.getLogger(__name__)
@@ -416,8 +417,9 @@ async def evaluate_traces_stream(
                 try:
                     traces = loader.load(trace_file_path)
                     for trace in traces:
-                        perf_metrics = _extract_performance_metrics(trace)
-                        trace_metadata = _extract_trace_metadata(trace)
+                        extractor = get_extractor(trace)
+                        perf_metrics = _extract_performance_metrics(trace, extractor)
+                        trace_metadata = _extract_trace_metadata(trace, extractor)
                         event_data = {
                             "traceId": trace.trace_id,
                             "performanceMetrics": perf_metrics,
