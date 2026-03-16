@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Select, Slider } from 'antd';
 import { css } from '@emotion/react';
-import { Play } from 'lucide-react';
+import { Play, Pencil } from 'lucide-react';
 import { FileDropZone } from './FileDropZone';
 import { MetricSelector } from './MetricSelector';
+import { EvalSetEditorDrawer } from './EvalSetEditorDrawer';
+import { TraceEditorDrawer } from './TraceEditorDrawer';
 import { useTraceContext } from '../../context/TraceContext';
 
 const uploadViewStyle = css`
@@ -183,6 +185,8 @@ type JudgeModelProvider = typeof JUDGE_MODELS[number]['provider'];
 
 export const UploadView: React.FC = () => {
   const { state, actions } = useTraceContext();
+  const [evalSetDrawerOpen, setEvalSetDrawerOpen] = useState(false);
+  const [traceEditorIndex, setTraceEditorIndex] = useState<number | null>(null);
 
   const canRunEvaluation =
     state.traceFiles.length > 0 &&
@@ -228,6 +232,7 @@ export const UploadView: React.FC = () => {
                 {state.traceFiles.map((file, idx) => (
                   <div
                     key={idx}
+                    onClick={() => setTraceEditorIndex(idx)}
                     style={{
                       color: 'var(--text-secondary)',
                       fontSize: '11px',
@@ -235,10 +240,18 @@ export const UploadView: React.FC = () => {
                       backgroundColor: 'var(--bg-surface)',
                       borderRadius: '3px',
                       marginTop: idx > 0 ? '3px' : '0',
-                      fontFamily: 'monospace'
+                      fontFamily: 'monospace',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'background 0.15s ease',
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
                   >
                     {file.name}
+                    <Pencil size={10} style={{ opacity: 0.4, flexShrink: 0 }} />
                   </div>
                 ))}
                 {state.isLoadingMetadata && (
@@ -284,15 +297,26 @@ export const UploadView: React.FC = () => {
                   <div style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
                     Eval set file:
                   </div>
-                  <div style={{
-                    color: 'var(--text-secondary)',
-                    fontSize: '11px',
-                    padding: '3px 6px',
-                    backgroundColor: 'var(--bg-surface)',
-                    borderRadius: '3px',
-                    fontFamily: 'monospace'
-                  }}>
+                  <div
+                    onClick={() => setEvalSetDrawerOpen(true)}
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '11px',
+                      padding: '3px 6px',
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: '3px',
+                      fontFamily: 'monospace',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
+                  >
                     {state.evalSetFile.name}
+                    <Pencil size={10} style={{ opacity: 0.4, flexShrink: 0 }} />
                   </div>
                 </div>
               ) : (
@@ -331,6 +355,7 @@ export const UploadView: React.FC = () => {
                   {state.traceFiles.map((file, idx) => (
                     <div
                       key={idx}
+                      onClick={() => setTraceEditorIndex(idx)}
                       style={{
                         color: 'var(--text-secondary)',
                         fontSize: '11px',
@@ -338,10 +363,18 @@ export const UploadView: React.FC = () => {
                         backgroundColor: 'var(--bg-surface)',
                         borderRadius: '3px',
                         marginTop: idx > 0 ? '3px' : '0',
-                        fontFamily: 'monospace'
+                        fontFamily: 'monospace',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: 'background 0.15s ease',
                       }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
                     >
                       {file.name}
+                      <Pencil size={10} style={{ opacity: 0.4, flexShrink: 0 }} />
                     </div>
                   ))}
                   {state.isLoadingMetadata && (
@@ -399,15 +432,26 @@ export const UploadView: React.FC = () => {
                   }}>
                     Eval set file:
                   </div>
-                  <div style={{
-                    color: 'var(--text-secondary)',
-                    fontSize: '11px',
-                    padding: '3px 6px',
-                    backgroundColor: 'var(--bg-surface)',
-                    borderRadius: '3px',
-                    fontFamily: 'monospace'
-                  }}>
+                  <div
+                    onClick={() => setEvalSetDrawerOpen(true)}
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '11px',
+                      padding: '3px 6px',
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: '3px',
+                      fontFamily: 'monospace',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
+                  >
                     {state.evalSetFile.name}
+                    <Pencil size={10} style={{ opacity: 0.4, flexShrink: 0 }} />
                   </div>
                 </div>
               )}
@@ -501,6 +545,23 @@ export const UploadView: React.FC = () => {
             : 'Run Evaluation'}
         </Button>
       </div>
+
+      {state.evalSetFile && (
+        <EvalSetEditorDrawer
+          file={state.evalSetFile}
+          open={evalSetDrawerOpen}
+          onClose={() => setEvalSetDrawerOpen(false)}
+        />
+      )}
+
+      {traceEditorIndex !== null && state.traceFiles[traceEditorIndex] && (
+        <TraceEditorDrawer
+          file={state.traceFiles[traceEditorIndex]}
+          fileIndex={traceEditorIndex}
+          open={true}
+          onClose={() => setTraceEditorIndex(null)}
+        />
+      )}
     </div>
   );
 };

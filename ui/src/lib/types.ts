@@ -357,6 +357,32 @@ export interface InspectorUIState {
   selectedInvocationId: string | null;
 }
 
+// Trace editor types
+export type TraceFileFormat = 'jaeger' | 'otlp-jsonl';
+
+export interface SpanLocationRef {
+  traceIndex?: number;
+  spanIndex?: number;
+  lineIndex?: number;
+}
+
+export interface ParsedTraceFile {
+  format: TraceFileFormat;
+  fileName: string;
+  rawData: any;
+  spanIndex: Map<string, SpanLocationRef>;
+}
+
+export interface SpanEditMapping {
+  invocationId: string;
+  format: 'adk' | 'genai';
+  userInputSpanId: string;
+  finalResponseSpanId: string;
+  toolSpanIds: string[];
+  userInputAttrKey: string;
+  finalResponseAttrKey: string;
+}
+
 // Annotation queue types
 export type FirstPassLabel = 'looks_correct' | 'doesnt_look_correct';
 

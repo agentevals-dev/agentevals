@@ -170,6 +170,40 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+export function convertSnakeToCamel(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(convertSnakeToCamel);
+  }
+
+  if (obj !== null && typeof obj === 'object') {
+    const converted: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const camelKey = key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+      converted[camelKey] = convertSnakeToCamel(value);
+    }
+    return converted;
+  }
+
+  return obj;
+}
+
+export function convertCamelToSnake(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(convertCamelToSnake);
+  }
+
+  if (obj !== null && typeof obj === 'object') {
+    const converted: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+      converted[snakeKey] = convertCamelToSnake(value);
+    }
+    return converted;
+  }
+
+  return obj;
+}
+
 /**
  * Get color for extraction type
  */

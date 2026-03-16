@@ -1,7 +1,7 @@
 import type { Trace, Span, Invocation, Content, ToolCall, ToolResponse, IntermediateData } from './types';
 import { safeJsonParse } from './utils';
 
-const ADK_SCOPE = 'gcp.vertex.agent';
+export const ADK_SCOPE = 'gcp.vertex.agent';
 
 export const USER_ROLES = ['user', 'human'];
 export const ASSISTANT_ROLES = ['assistant', 'model', 'ai'];
@@ -23,7 +23,7 @@ interface ConversionResult {
   warnings: string[];
 }
 
-function detectTraceFormat(trace: Trace): 'adk' | 'genai' {
+export function detectTraceFormat(trace: Trace): 'adk' | 'genai' {
   const check = (spans: Span[]): 'adk' | 'genai' | null => {
     let hasGenai = false;
     for (const span of spans) {
@@ -106,7 +106,7 @@ function convertADKTrace(trace: Trace): ConversionResult {
  * Recursively find child spans by operation name prefix
  * (replicates Python's _find_children_by_op)
  */
-function findChildrenByOperation(root: Span, opPrefix: string): Span[] {
+export function findChildrenByOperation(root: Span, opPrefix: string): Span[] {
   const results: Span[] = [];
   walkSpanTree(root, opPrefix, results);
   results.sort((a, b) => a.startTime - b.startTime);
@@ -568,7 +568,7 @@ function convertGenAIRootSpan(rootSpan: Span, _trace: Trace): Invocation | null 
   };
 }
 
-function findDescendantLLMSpans(root: Span): Span[] {
+export function findDescendantLLMSpans(root: Span): Span[] {
   const results: Span[] = [];
   const queue = [root];
 
