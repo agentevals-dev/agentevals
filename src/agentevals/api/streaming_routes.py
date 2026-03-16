@@ -58,7 +58,7 @@ async def list_sessions():
     sessions_data = []
 
     for session_id, session in trace_manager.sessions.items():
-        sessions_data.append({
+        entry: dict = {
             "sessionId": session_id,
             "traceId": session.trace_id,
             "evalSetId": session.eval_set_id,
@@ -66,7 +66,10 @@ async def list_sessions():
             "isComplete": session.is_complete,
             "startedAt": session.started_at.isoformat(),
             "metadata": session.metadata,
-        })
+        }
+        if session.is_complete and session.invocations:
+            entry["invocations"] = session.invocations
+        sessions_data.append(entry)
 
     return sessions_data
 

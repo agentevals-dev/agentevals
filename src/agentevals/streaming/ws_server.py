@@ -43,6 +43,7 @@ class StreamingTraceManager:
         self._idle_timers: dict[str, asyncio.Task] = {}
         self._orphan_logs: list[dict] = []
         self._orphan_log_max_age = timedelta(seconds=60)
+        self._active_session_for_name: dict[str, str] = {}
 
     def register_sse_client(self) -> asyncio.Queue:
         """Register a new SSE client and return its queue."""
@@ -170,7 +171,7 @@ class StreamingTraceManager:
                 entry["trace_id"] in session.trace_ids
                 or (
                     entry["session_name"]
-                    and entry["session_name"] == session.session_id
+                    and self._active_session_for_name.get(entry["session_name"]) == session.session_id
                 )
             )
 
@@ -202,14 +203,16 @@ class StreamingTraceManager:
         independent trace.
         """
         session_name = metadata.get("session_name") or f"otlp-{trace_id[:12]}"
+
+        active_id = self._active_session_for_name.get(session_name)
+        if active_id:
+            active = self.sessions.get(active_id)
+            if active and not active.is_complete:
+                active.trace_ids.add(trace_id)
+                return active
+
         session_id = session_name
-
-        existing = self.sessions.get(session_id)
-        if existing and not existing.is_complete:
-            existing.trace_ids.add(trace_id)
-            return existing
-
-        if existing:
+        if session_id in self.sessions:
             counter = 2
             while f"{session_name}-{counter}" in self.sessions:
                 counter += 1
@@ -228,6 +231,7 @@ class StreamingTraceManager:
         )
 
         self.sessions[session_id] = session
+        self._active_session_for_name[session_name] = session_id
         self.incremental_extractors[session_id] = IncrementalInvocationExtractor()
 
         replayed = self._replay_orphan_logs(session)
@@ -331,6 +335,7 @@ class StreamingTraceManager:
         )
 
         invocations_data = await self._extract_invocations(session)
+        session.invocations = invocations_data
 
         await self.broadcast_to_ui({
             "type": "session_complete",
@@ -350,6 +355,11 @@ class StreamingTraceManager:
 
         session.is_complete = True
 
+        for name, sid in list(self._active_session_for_name.items()):
+            if sid == session_id:
+                del self._active_session_for_name[name]
+                break
+
         if session_id in self._completion_timers:
             self._completion_timers.pop(session_id).cancel()
         if session_id in self._idle_timers:
@@ -361,6 +371,7 @@ class StreamingTraceManager:
         )
 
         invocations_data = await self._extract_invocations(session)
+        session.invocations = invocations_data
 
         await self.broadcast_to_ui({
             "type": "session_complete",
@@ -498,6 +509,7 @@ class StreamingTraceManager:
                     logger.info("Session ended: %s (%d spans, %d logs)", sid, len(session.spans), len(session.logs))
 
                     invocations_data = await self._extract_invocations(session)
+                    session.invocations = invocations_data
 
                     complete_event = {
                         "type": "session_complete",

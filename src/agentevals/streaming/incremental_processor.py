@@ -34,6 +34,17 @@ from ..utils.genai_messages import parse_json_attr
 logger = logging.getLogger(__name__)
 
 
+def _normalize_ts(raw_ts) -> float:
+    """Normalize a nanosecond timestamp (string or int) to seconds."""
+    try:
+        ns = int(raw_ts)
+    except (TypeError, ValueError):
+        return 0.0
+    if ns > 1e15:
+        return ns / 1e9
+    return float(ns)
+
+
 class IncrementalInvocationExtractor:
     """Extracts conversation elements from spans and logs as they arrive."""
 
@@ -163,11 +174,11 @@ class IncrementalInvocationExtractor:
         event_name = log_event.get("event_name", "")
         body = log_event.get("body", {})
 
-        # Use current invocation ID (from most recent span)
-        if not self.current_invocation_id:
-            return updates
-
         invocation_id = self.current_invocation_id
+        if not invocation_id:
+            invocation_id = log_event.get("span_id")
+        if not invocation_id:
+            return updates
 
         # Extract user messages (gen_ai.user.message)
         if event_name == "gen_ai.user.message":
@@ -180,7 +191,7 @@ class IncrementalInvocationExtractor:
                         "type": "user_input",
                         "invocationId": invocation_id,
                         "text": user_text,
-                        "timestamp": log_event.get("timestamp", 0),
+                        "timestamp": _normalize_ts(log_event.get("timestamp", 0)),
                     })
                     self.seen_message_contents.add(message_key)
                     self.seen_user_input.add(invocation_id)
@@ -206,7 +217,7 @@ class IncrementalInvocationExtractor:
                         "type": "agent_response",
                         "invocationId": invocation_id,
                         "text": agent_text,
-                        "timestamp": log_event.get("timestamp", 0),
+                        "timestamp": _normalize_ts(log_event.get("timestamp", 0)),
                     })
                     self.seen_message_contents.add(message_key)
                     self.seen_agent_response.add(invocation_id)
@@ -242,7 +253,7 @@ class IncrementalInvocationExtractor:
                                     "type": "tool_call",
                                     "invocationId": invocation_id,
                                     "toolCall": tool_call,
-                                    "timestamp": log_event.get("timestamp", 0),
+                                    "timestamp": _normalize_ts(log_event.get("timestamp", 0)),
                                 })
                                 self.seen_message_contents.add(tool_key)
 

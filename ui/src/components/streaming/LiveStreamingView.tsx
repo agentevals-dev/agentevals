@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTraceContext } from '../../context/TraceContext';
 import { SessionCard } from './SessionCard';
 import { config } from '../../config';
@@ -30,214 +30,295 @@ export function LiveStreamingView() {
       .filter(q => q.items.some(item => item.sessionId === sessionId))
       .map(q => q.name);
 
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryDelayRef = useRef(1000);
+  const mountedRef = useRef(true);
+
   useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('[Streaming] Setting up SSE connection');
-    }
-    const eventSource = new EventSource(config.api.endpoints.uiUpdatesStream);
+    mountedRef.current = true;
 
-    eventSource.onopen = () => {
-      if (import.meta.env.DEV) {
-        console.log('[Streaming] SSE connected');
-      }
-      setConnectionStatus('connected');
-    };
+    const fetchExistingSessions = async () => {
+      try {
+        const res = await fetch(config.api.endpoints.streamingSessions);
+        if (!res.ok) return;
+        const sessions: Array<{
+          sessionId: string;
+          traceId: string;
+          evalSetId: string | null;
+          spanCount: number;
+          isComplete: boolean;
+          startedAt: string;
+          metadata: Record<string, unknown>;
+          invocations?: Array<Record<string, unknown>>;
+        }> = await res.json();
+        if (!mountedRef.current) return;
 
-    eventSource.onerror = (error) => {
-      console.error('[Streaming] SSE error:', error);
-      setConnectionStatus('disconnected');
-    };
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (import.meta.env.DEV) {
-        console.log('[Streaming] Received event:', data.type, data);
-      }
-
-      switch (data.type) {
-        case 'session_started':
-          if (import.meta.env.DEV) {
-            console.log('[Streaming] New session started:', data.session.sessionId);
-          }
-          setActiveSessions(prev => {
-            const newMap = new Map(prev);
-            newMap.set(data.session.sessionId, {
-              sessionId: data.session.sessionId,
-              traceId: data.session.traceId,
-              evalSetId: data.session.evalSetId,
+        setActiveSessions(prev => {
+          const newMap = new Map(prev);
+          for (const s of sessions) {
+            if (newMap.has(s.sessionId)) continue;
+            newMap.set(s.sessionId, {
+              sessionId: s.sessionId,
+              traceId: s.traceId,
+              evalSetId: s.evalSetId,
               spans: [],
-              status: 'active',
-              metadata: data.session.metadata || {},
+              status: s.isComplete ? 'complete' : 'active',
+              metadata: (s.metadata ?? {}) as Record<string, string>,
+              invocations: s.invocations,
               liveElements: [],
-              liveStats: {
-                totalInputTokens: 0,
-                totalOutputTokens: 0,
-              },
-              startedAt: data.session.startedAt,
+              liveStats: { totalInputTokens: 0, totalOutputTokens: 0 },
+              startedAt: s.startedAt,
             });
-            return newMap;
-          });
-          break;
-
-        case 'span_received':
-          setActiveSessions(prev => {
-            const session = prev.get(data.sessionId);
-            if (!session) return prev;
-
-            const newMap = new Map(prev);
-            newMap.set(data.sessionId, {
-              ...session,
-              spans: [...session.spans, data.span],
-            });
-            return newMap;
-          });
-          break;
-
-        case 'user_input':
-          setActiveSessions(prev => {
-            const session = prev.get(data.sessionId);
-            if (!session) return prev;
-
-            const newMap = new Map(prev);
-            newMap.set(data.sessionId, {
-              ...session,
-              liveElements: [
-                ...session.liveElements,
-                {
-                  type: 'user_input',
-                  timestamp: data.timestamp,
-                  invocationId: data.invocationId,
-                  data: { text: data.text },
-                },
-              ],
-            });
-            return newMap;
-          });
-          break;
-
-        case 'tool_call':
-          setActiveSessions(prev => {
-            const session = prev.get(data.sessionId);
-            if (!session) return prev;
-
-            const newMap = new Map(prev);
-            newMap.set(data.sessionId, {
-              ...session,
-              liveElements: [
-                ...session.liveElements,
-                {
-                  type: 'tool_call',
-                  timestamp: data.timestamp,
-                  invocationId: data.invocationId,
-                  data: { toolCall: data.toolCall },
-                },
-              ],
-            });
-            return newMap;
-          });
-          break;
-
-        case 'agent_response':
-          setActiveSessions(prev => {
-            const session = prev.get(data.sessionId);
-            if (!session) return prev;
-
-            const newMap = new Map(prev);
-            newMap.set(data.sessionId, {
-              ...session,
-              liveElements: [
-                ...session.liveElements,
-                {
-                  type: 'agent_response',
-                  timestamp: data.timestamp,
-                  invocationId: data.invocationId,
-                  data: { text: data.text },
-                },
-              ],
-            });
-            return newMap;
-          });
-          break;
-
-        case 'token_update':
-          if (import.meta.env.DEV) {
-            console.log('[Streaming] Token update:', data);
           }
-          setActiveSessions(prev => {
-            const session = prev.get(data.sessionId);
-            if (!session) {
-              console.warn('[Streaming] Token update for unknown session:', data.sessionId);
-              return prev;
-            }
+          return newMap;
+        });
+      } catch {
+        // backend not ready yet — will retry on next SSE connect
+      }
+    };
 
-            const newStats = {
-              ...session.liveStats,
-              totalInputTokens: session.liveStats.totalInputTokens + (data.inputTokens || 0),
-              totalOutputTokens: session.liveStats.totalOutputTokens + (data.outputTokens || 0),
-              ...(data.model && data.model !== 'unknown' ? { model: data.model } : {}),
-            };
+    const connectSSE = () => {
+      if (!mountedRef.current) return;
 
+      if (import.meta.env.DEV) {
+        console.log('[Streaming] Setting up SSE connection');
+      }
+      const es = new EventSource(config.api.endpoints.uiUpdatesStream);
+      eventSourceRef.current = es;
+
+      es.onopen = () => {
+        if (import.meta.env.DEV) {
+          console.log('[Streaming] SSE connected');
+        }
+        retryDelayRef.current = 1000;
+        setConnectionStatus('connected');
+        fetchExistingSessions();
+      };
+
+      es.onerror = () => {
+        if (!mountedRef.current) return;
+        setConnectionStatus('disconnected');
+
+        if (es.readyState === EventSource.CLOSED) {
+          if (import.meta.env.DEV) {
+            console.log(`[Streaming] SSE closed, reconnecting in ${retryDelayRef.current}ms`);
+          }
+          scheduleReconnect();
+        }
+      };
+
+      es.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (import.meta.env.DEV) {
+          console.log('[Streaming] Received event:', data.type, data);
+        }
+
+        switch (data.type) {
+          case 'session_started':
             if (import.meta.env.DEV) {
-              console.log('[Streaming] New stats:', newStats);
+              console.log('[Streaming] New session started:', data.session.sessionId);
             }
-
-            const newMap = new Map(prev);
-            newMap.set(data.sessionId, {
-              ...session,
-              liveStats: newStats,
-            });
-            return newMap;
-          });
-          break;
-
-        case 'session_complete':
-          if (import.meta.env.DEV) {
-            console.log('[Streaming] Session complete with invocations:', data.invocations?.length);
-          }
-          setActiveSessions(prev => {
-            const session = prev.get(data.sessionId);
-
-            const newMap = new Map(prev);
-
-            if (!session) {
-              if (import.meta.env.DEV) {
-                console.warn('[Streaming] Session not found, creating it now:', data.sessionId);
-              }
-              newMap.set(data.sessionId, {
-                sessionId: data.sessionId,
-                traceId: 'unknown',
-                evalSetId: null,
+            setActiveSessions(prev => {
+              const newMap = new Map(prev);
+              newMap.set(data.session.sessionId, {
+                sessionId: data.session.sessionId,
+                traceId: data.session.traceId,
+                evalSetId: data.session.evalSetId,
                 spans: [],
-                status: 'complete',
-                metadata: {},
-                invocations: data.invocations,
+                status: 'active',
+                metadata: data.session.metadata || {},
                 liveElements: [],
                 liveStats: {
                   totalInputTokens: 0,
                   totalOutputTokens: 0,
                 },
-                startedAt: new Date().toISOString(),
+                startedAt: data.session.startedAt,
               });
-            } else {
+              return newMap;
+            });
+            break;
+
+          case 'span_received':
+            setActiveSessions(prev => {
+              const session = prev.get(data.sessionId);
+              if (!session) return prev;
+
+              const newMap = new Map(prev);
               newMap.set(data.sessionId, {
                 ...session,
-                status: 'complete',
-                invocations: data.invocations,
+                spans: [...session.spans, data.span],
               });
+              return newMap;
+            });
+            break;
+
+          case 'user_input':
+            setActiveSessions(prev => {
+              const session = prev.get(data.sessionId);
+              if (!session) return prev;
+
+              const newMap = new Map(prev);
+              newMap.set(data.sessionId, {
+                ...session,
+                liveElements: [
+                  ...session.liveElements,
+                  {
+                    type: 'user_input',
+                    timestamp: data.timestamp,
+                    invocationId: data.invocationId,
+                    data: { text: data.text },
+                  },
+                ],
+              });
+              return newMap;
+            });
+            break;
+
+          case 'tool_call':
+            setActiveSessions(prev => {
+              const session = prev.get(data.sessionId);
+              if (!session) return prev;
+
+              const newMap = new Map(prev);
+              newMap.set(data.sessionId, {
+                ...session,
+                liveElements: [
+                  ...session.liveElements,
+                  {
+                    type: 'tool_call',
+                    timestamp: data.timestamp,
+                    invocationId: data.invocationId,
+                    data: { toolCall: data.toolCall },
+                  },
+                ],
+              });
+              return newMap;
+            });
+            break;
+
+          case 'agent_response':
+            setActiveSessions(prev => {
+              const session = prev.get(data.sessionId);
+              if (!session) return prev;
+
+              const newMap = new Map(prev);
+              newMap.set(data.sessionId, {
+                ...session,
+                liveElements: [
+                  ...session.liveElements,
+                  {
+                    type: 'agent_response',
+                    timestamp: data.timestamp,
+                    invocationId: data.invocationId,
+                    data: { text: data.text },
+                  },
+                ],
+              });
+              return newMap;
+            });
+            break;
+
+          case 'token_update':
+            if (import.meta.env.DEV) {
+              console.log('[Streaming] Token update:', data);
             }
+            setActiveSessions(prev => {
+              const session = prev.get(data.sessionId);
+              if (!session) {
+                console.warn('[Streaming] Token update for unknown session:', data.sessionId);
+                return prev;
+              }
 
-            return newMap;
-          });
-          break;
+              const newStats = {
+                ...session.liveStats,
+                totalInputTokens: session.liveStats.totalInputTokens + (data.inputTokens || 0),
+                totalOutputTokens: session.liveStats.totalOutputTokens + (data.outputTokens || 0),
+                ...(data.model && data.model !== 'unknown' ? { model: data.model } : {}),
+              };
 
-      }
+              if (import.meta.env.DEV) {
+                console.log('[Streaming] New stats:', newStats);
+              }
+
+              const newMap = new Map(prev);
+              newMap.set(data.sessionId, {
+                ...session,
+                liveStats: newStats,
+              });
+              return newMap;
+            });
+            break;
+
+          case 'session_complete':
+            if (import.meta.env.DEV) {
+              console.log('[Streaming] Session complete with invocations:', data.invocations?.length);
+            }
+            setActiveSessions(prev => {
+              const session = prev.get(data.sessionId);
+
+              const newMap = new Map(prev);
+
+              if (!session) {
+                if (import.meta.env.DEV) {
+                  console.warn('[Streaming] Session not found, creating it now:', data.sessionId);
+                }
+                newMap.set(data.sessionId, {
+                  sessionId: data.sessionId,
+                  traceId: 'unknown',
+                  evalSetId: null,
+                  spans: [],
+                  status: 'complete',
+                  metadata: {},
+                  invocations: data.invocations,
+                  liveElements: [],
+                  liveStats: {
+                    totalInputTokens: 0,
+                    totalOutputTokens: 0,
+                  },
+                  startedAt: new Date().toISOString(),
+                });
+              } else {
+                newMap.set(data.sessionId, {
+                  ...session,
+                  status: 'complete',
+                  invocations: data.invocations,
+                });
+              }
+
+              return newMap;
+            });
+            break;
+
+        }
+      };
     };
 
+    const scheduleReconnect = () => {
+      if (!mountedRef.current) return;
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+
+      retryTimeoutRef.current = setTimeout(() => {
+        retryTimeoutRef.current = null;
+        retryDelayRef.current = Math.min(retryDelayRef.current * 2, 30000);
+        connectSSE();
+      }, retryDelayRef.current);
+    };
+
+    connectSSE();
+
     return () => {
+      mountedRef.current = false;
       if (import.meta.env.DEV) {
         console.log('[Streaming] Closing SSE connection');
       }
-      eventSource.close();
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
     };
   }, []);
 

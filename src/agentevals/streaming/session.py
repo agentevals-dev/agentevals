@@ -24,6 +24,7 @@ class TraceSession:
     source: str = "websocket"
     has_root_span: bool = False
     trace_ids: set[str] = field(default_factory=set)
+    invocations: list[dict] = field(default_factory=list)
 
     def can_accept_span(self) -> bool:
         """Check if session can accept another span without exceeding limits."""

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { UserMessage, ToolCallMessage, AgentMessage } from './LiveMessage';
 import type { ConversationElement } from '../../lib/types';
 
@@ -13,15 +13,20 @@ export function LiveConversationPanel({ elements, isActive }: LiveConversationPa
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
+  const sortedElements = useMemo(
+    () => [...elements].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)),
+    [elements],
+  );
+
   useEffect(() => {
     if (autoScroll && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [elements, autoScroll]);
+  }, [sortedElements, autoScroll]);
 
   return (
     <div>
-      {elements.length > 0 && (
+      {sortedElements.length > 0 && (
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -72,7 +77,7 @@ export function LiveConversationPanel({ elements, isActive }: LiveConversationPa
           overflowY: 'auto',
         }}
       >
-        {elements.length === 0 && (
+        {sortedElements.length === 0 && (
           <div style={{
             fontSize: '13px',
             color: 'var(--text-tertiary)',
@@ -83,7 +88,7 @@ export function LiveConversationPanel({ elements, isActive }: LiveConversationPa
           </div>
         )}
 
-        {elements.map((element, idx) => {
+        {sortedElements.map((element, idx) => {
           switch (element.type) {
             case 'user_input':
               return <UserMessage key={idx} text={element.data.text} timestamp={element.timestamp} />;
