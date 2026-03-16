@@ -1,107 +1,45 @@
 <h1 align="center">agentevals</h1>
 
-`agentevals` scores agent behavior from OpenTelemetry traces without re-running the agent. It parses trace spans from `otlp` streams, or Jaeger JSON format and evaluates them against golden eval sets using ADK's evaluation framework.
+`agentevals` scores agent behavior from OpenTelemetry traces without re-running the agent. It parses OTLP streams and Jaeger JSON traces, then evaluates them against golden eval sets using ADK's evaluation framework.
 
-The tool provides a CLI for local dev work, scripting and CI pipelines, a web UI for visual inspection, EvalSet creation and interactive evaluation, and an MCP server so Claude Code can run evaluations and inspect live sessions directly from a conversation.
+Ships as a **CLI** for scripting and CI, a **web UI** for visual inspection and interactive evaluation, and an **MCP server** so Claude Code can run evaluations directly from a conversation.
 
 > [!IMPORTANT]
 > This project is under active development. Expect breaking changes.
 
-## Zero-Code Integration (Recommended)
-
-Any OTel-instrumented agent streams traces to agentevals by pointing its OTLP exporter at the receiver. No SDK needed, no custom processors, no code changes:
-
-```bash
-# Terminal 1: start agentevals
-agentevals serve --dev
-
-# Terminal 2: run your agent with OTLP export
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent"
-python your_agent.py
-```
-
-That's it. Traces and logs stream to the UI in real-time. Works with LangChain, Strands, Google ADK, LlamaIndex, or any framework that emits OTel spans. Both `http/protobuf` (default) and `http/json` wire formats are supported.
-
-The OTLP receiver runs on port 4318 (standard OTLP HTTP port). Sessions are auto-created from incoming traces and grouped by `agentevals.session_name`. Optionally set `agentevals.eval_set_id` in resource attributes to associate traces with an eval set for scoring.
-
-See [examples/zero-code-examples/](examples/zero-code-examples/) for working LangChain and Strands examples.
-
-## SDK Integration
-
-For tighter control (programmatic session lifecycle, decorator API), the `AgentEvals` SDK wraps OTel boilerplate into a context manager:
-
-```python
-from agentevals import AgentEvals
-
-app = AgentEvals()
-
-with app.session(eval_set_id="my-eval"):
-    # your agent code, any framework, unchanged
-    agent.invoke("Roll a 20-sided die for me")
-```
-
-Requires the `[streaming]` extra: `pip install "agentevals[streaming]"`. See [examples/sdk_example/](examples/sdk_example/) for framework-specific patterns.
-
 ## Installation
 
-Download a release wheel from the [releases page](../../releases). Two variants are available (both share the same filename but differ in contents):
+Download a release wheel from the [releases page](../../releases):
 
 | Variant | Description |
 |---------|-------------|
 | **core** | CLI + REST API, batch evaluation only |
-| **bundle** | CLI + REST API + WebSocket streaming + embedded web UI |
+| **bundle** | CLI + REST API + Streaming + embedded web UI |
 
 ```bash
 pip install agentevals-<version>-py3-none-any.whl
+
+# For MCP server support:
+pip install "agentevals-<version>-py3-none-any.whl[live]"
 ```
 
-The bundled wheel enables live streaming (WebSocket + SSE + session management) automatically when served.
-
-To also use the MCP server (`agentevals mcp`), install with the `[live]` extra which adds `mcp` and `httpx`:
+**From source** with `uv` or Nix:
 
 ```bash
-pip install "agentevals-<version>-py3-none-any.whl[live]"
+uv sync              
+# or: nix develop .
 ```
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions.
 
-## Getting Started
+## Quick Start
 
-Install dependencies using `uv` or Nix:
-
-```bash
-# Using uv directly
-uv sync
-
-# Using Nix (includes all dependencies)
-nix develop .
-```
-
-Run a quick evaluation:
+Run an evaluation against a sample trace:
 
 ```bash
-uv run agentevals run samples/helm.json --eval-set samples/eval_set_helm.json -m tool_trajectory_avg_score
-```
-
-## CLI Usage
-
-Score a single trace:
-
-```bash
-uv run agentevals run samples/helm.json --eval-set samples/eval_set_helm.json -m tool_trajectory_avg_score
-```
-
-Score multiple traces at once:
-
-```bash
-uv run agentevals run samples/helm.json samples/k8s.json --eval-set samples/eval_set_helm.json -m tool_trajectory_avg_score
-```
-
-Output as JSON for programmatic consumption:
-
-```bash
-uv run agentevals run samples/helm.json --eval-set samples/eval_set_helm.json --output json
+uv run agentevals run samples/helm.json \
+  --eval-set samples/eval_set_helm.json \
+  -m tool_trajectory_avg_score
 ```
 
 List available metrics:
@@ -110,11 +48,63 @@ List available metrics:
 uv run agentevals list-metrics
 ```
 
+## Integration
+
+### Zero-Code (Recommended)
+
+Point any OTel-instrumented agent at the receiver. No SDK, no code changes:
+
+```bash
+# Terminal 1
+agentevals serve --dev
+
+# Terminal 2
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent"
+python your_agent.py
+```
+
+Traces stream to the UI in real-time. Works with LangChain, Strands, Google ADK, LlamaIndex, or any framework that emits OTel spans (`http/protobuf` and `http/json` supported). Sessions are auto-created and grouped by `agentevals.session_name`. Set `agentevals.eval_set_id` to associate traces with an eval set.
+
+See [examples/zero-code-examples/](examples/zero-code-examples/) for working examples.
+
+### SDK
+
+For programmatic session lifecycle and decorator API:
+
+```python
+from agentevals import AgentEvals
+
+app = AgentEvals()
+
+with app.session(eval_set_id="my-eval"):
+    agent.invoke("Roll a 20-sided die for me")
+```
+
+Requires `pip install "agentevals[streaming]"`. See [examples/sdk_example/](examples/sdk_example/) for framework-specific patterns.
+
+## CLI
+
+```bash
+# Single trace
+uv run agentevals run samples/helm.json \
+  --eval-set samples/eval_set_helm.json \
+  -m tool_trajectory_avg_score
+
+# Multiple traces
+uv run agentevals run samples/helm.json samples/k8s.json \
+  --eval-set samples/eval_set_helm.json \
+  -m tool_trajectory_avg_score
+
+# JSON output
+uv run agentevals run samples/helm.json \
+  --eval-set samples/eval_set_helm.json \
+  --output json
+```
+
 ## Web UI
 
-The React-based UI provides visual trace inspection and interactive evaluation.
-
-**Installed bundle** (single command, UI served at port 8001):
+**Installed bundle** (port 8001):
 
 ```bash
 agentevals serve
@@ -123,101 +113,49 @@ agentevals serve
 **From source** (two terminals):
 
 ```bash
-# Terminal 1
-uv run agentevals serve --dev
-
-# Terminal 2
-cd ui && npm run dev
+uv run agentevals serve --dev    # Terminal 1
+cd ui && npm run dev             # Terminal 2 → http://localhost:5173
 ```
 
-Open http://localhost:5173 to upload traces and eval sets, select metrics, and view results with interactive span trees and actual vs expected comparisons.
-
-Push traces to the websocket endpoint and they'll appear live in the "Local Dev" tab. Select eval sets and metrics to evaluate the received traces, with results grouped by session ID for easy comparison across runs.
+Upload traces and eval sets, select metrics, and view results with interactive span trees. Live-streamed traces appear in the "Local Dev" tab, grouped by session ID.
 
 ## MCP Server
 
-agentevals exposes its evaluation capabilities as an MCP server. With it active, MCP clients can list sessions, run evaluations, and inspect traces directly from a conversation without manual HTTP calls or file management.
-
-A `.mcp.json` is included at the project root so clients, e.g. Claude Code picks it up automatically when you open this directory. Reload with `/mcp` to verify the server is active.
-
-### Available tools
+Exposes evaluation tools to MCP clients. A `.mcp.json` at the project root lets Claude Code pick it up automatically.
 
 | Tool | Requires `serve` | Description |
 |------|:---:|-------------|
-| `list_metrics` | yes | List all available metrics with descriptions and requirements |
-| `evaluate_traces` | no | Evaluate local trace files (OTLP or Jaeger) by file path |
-| `list_sessions` | yes | List active and completed streaming sessions |
-| `summarize_session` | yes | Get a structured summary of a session's invocations and tool calls |
-| `evaluate_sessions` | yes | Evaluate all completed sessions against a golden reference |
-
-`evaluate_traces` works standalone: it imports the evaluation engine directly without the server running. All other tools require `agentevals serve --dev`.
-
-### Usage
-
-```
-# In a Claude Code conversation (with agentevals serve --dev running):
-
-"List my sessions"
-→ calls list_sessions, shows session IDs and completion status
-
-"What did session langchain-session-abc123 do?"
-→ calls summarize_session, returns invocations, messages, and tool calls
-
-"Use session langchain-session-abc123 as the golden and evaluate the rest"
-→ calls evaluate_sessions, returns per-session scores with a top-level passed/failed
-
-"Evaluate /path/to/trace.otlp.jsonl using tool_trajectory_avg_score"
-→ calls evaluate_traces, no server needed
-```
-
-The React UI and Claude Code share the same in-memory session state. Running both simultaneously works fine.
-
-### Custom server URL
+| `list_metrics` | yes | List available metrics |
+| `evaluate_traces` | no | Evaluate local trace files (OTLP or Jaeger) |
+| `list_sessions` | yes | List streaming sessions |
+| `summarize_session` | yes | Structured summary of a session's tool calls |
+| `evaluate_sessions` | yes | Evaluate sessions against a golden reference |
 
 ```bash
+# Custom server URL
 AGENTEVALS_SERVER_URL=http://localhost:9000 uv run agentevals mcp
-# or
-uv run agentevals mcp --server-url http://localhost:9000
 ```
+
+The React UI and MCP server share the same in-memory session state and can run simultaneously.
 
 ## Claude Code Skills
 
-`.claude/skills/` contains two slash-command workflows that orchestrate the MCP tools into guided conversations. They're available automatically when you open this repo in Claude Code (the `.mcp.json` registers the server; the skills register from `.claude/skills/`).
+Two slash-command workflows in `.claude/skills/`, available automatically in this repo:
 
-| Skill | Trigger phrases | Requires `serve --dev` |
-|-------|----------------|:---:|
-| `/eval` | "eval this trace", "did my agent regress", "compare runs", "score session X" | for sessions |
-| `/inspect` | "show me what my agent did", "inspect session", "walk me through the last run" | yes |
+| Skill | What it does |
+|-------|-------------|
+| `/eval` | Score traces or compare sessions against a golden reference |
+| `/inspect` | Turn-by-turn narrative of a live session with anomaly detection |
 
-### `/eval`: Score agent behavior
-
-Evaluates both local trace files and live streaming sessions:
-
-- **Trace files**: detects format from extension (`.jsonl` → OTLP, `.json` → Jaeger), calls `evaluate_traces`, presents a score table with interpretation
-- **Session regression testing**: lists sessions, identifies the golden reference, calls `evaluate_sessions`, shows a comparison table with per-session deltas and explains which tool calls diverged
-
-### `/inspect`: Understand what an agent did
-
-Presents a readable turn-by-turn narrative of a live session:
-
-```
-Turn 1:
-  User: [what the user asked]
-  Tools: tool_name(arg=val, ...) → [what this achieves]
-  Response: [response text]
-```
-
-Flags anomalies (missing tool calls, repeated calls, abrupt stops) and suggests `/eval` if you want to score the session against a golden reference.
-
-## Local Development
+## Development
 
 ```bash
-uv run pytest              # run tests
-uv run agentevals serve --dev  # start backend in dev mode
-cd ui && npm run dev           # start frontend (separate terminal)
+uv run pytest                      # run tests
+uv run agentevals serve --dev      # backend
+cd ui && npm run dev               # frontend (separate terminal)
 ```
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for build tiers, Makefile targets, Nix setup, and release instructions. If you'd like to contribute, check out [CONTRIBUTING.md](CONTRIBUTING.md).
+See [DEVELOPMENT.md](DEVELOPMENT.md) for build tiers, Makefile targets, and Nix setup. To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## FAQ
 
@@ -227,6 +165,6 @@ Unlike ADK's LocalEvalService, which couples agent execution with evaluation, ag
 However, if you're iterating on your agents locally, you can point your agents to agentevals and you will see rich runtime information in your browser. For more details, use the bundled wheel and explore the Local Development option in the UI.
 
 **How does this compare to Bedrock AgentCore's evaluation?**
-AgentCore's evaluation integration (via `strands-agents-evals`) also couples agent execution with evaluation. Itre-invokes the agent for each test case, converts the resulting OTel spans to AWS's ADOT format, and scores them against 4 built-in evaluators (Helpfulness, Accuracy, Harmfulness, Relevance) via a cloud API call. This means you need an AWS account, valid credentials, and network access for every evaluation.
+AgentCore's evaluation integration (via `strands-agents-evals`) also couples agent execution with evaluation. It re-invokes the agent for each test case, converts the resulting OTel spans to AWS's ADOT format, and scores them against 4 built-in evaluators (Helpfulness, Accuracy, Harmfulness, Relevance) via a cloud API call. This means you need an AWS account, valid credentials, and network access for every evaluation.
 
 agentevals takes a different approach: it scores pre-recorded traces locally without re-running anything. It works with standard Jaeger JSON and OTLP formats from any framework, supports open-ended metrics (tool trajectory matching, LLM-based judges, custom scorers), and ships with a CLI, web UI, and MCP server. No cloud dependency required, though we do include all ADK's GCP-based evals as of now.
