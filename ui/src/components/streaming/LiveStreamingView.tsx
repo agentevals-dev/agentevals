@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTraceContext } from '../../context/TraceContext';
 import { SessionCard } from './SessionCard';
 import { config } from '../../config';
-import type { LiveSession } from '../../lib/types';
+import type { LiveSession, StreamingInvocation } from '../../lib/types';
 
 export function LiveStreamingView() {
   const { state, actions } = useTraceContext();
@@ -50,7 +50,7 @@ export function LiveStreamingView() {
           isComplete: boolean;
           startedAt: string;
           metadata: Record<string, unknown>;
-          invocations?: Array<Record<string, unknown>>;
+          invocations?: StreamingInvocation[];
         }> = await res.json();
         if (!mountedRef.current) return;
 
