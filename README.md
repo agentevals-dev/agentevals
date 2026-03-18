@@ -58,7 +58,7 @@ Point any OTel-instrumented agent at the receiver. No SDK, no code changes:
 
 ```bash
 # Terminal 1
-agentevals serve --dev
+uv run agentevals serve --dev
 
 # Terminal 2
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
@@ -116,7 +116,7 @@ agentevals serve
 
 ```bash
 uv run agentevals serve --dev    # Terminal 1
-cd ui && npm run dev             # Terminal 2 → http://localhost:5173
+cd ui && npm install && npm run dev             # Terminal 2 → http://localhost:5173
 ```
 
 Upload traces and eval sets, select metrics, and view results with interactive span trees. Live-streamed traces appear in the "Local Dev" tab, grouped by session ID.

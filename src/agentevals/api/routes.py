@@ -15,9 +15,16 @@ from fastapi.responses import StreamingResponse
 from pydantic.alias_generators import to_camel
 
 from agentevals import __version__
-from ..config import EvalRunConfig
+from ..config import (
+    EvalRunConfig,
+    BuiltinMetricDef,
+    CodeGraderDef,
+    CustomGraderDef,
+)
 from ..extraction import get_extractor
-from ..runner import RunResult, load_eval_set, run_evaluation, _extract_performance_metrics, _extract_trace_metadata, get_loader
+from ..runner import RunResult, load_eval_set, run_evaluation, get_loader
+from ..trace_metrics import extract_performance_metrics, extract_trace_metadata
+from ..builtin_metrics import METRICS_NEEDING_EXPECTED, METRICS_NEEDING_LLM
 from .models import (
     StandardResponse,
     HealthData,
@@ -46,6 +53,23 @@ def _camel_keys(obj: Any) -> Any:
 
 router = APIRouter()
 
+_TYPE_TO_MODEL = {
+    "builtin": BuiltinMetricDef,
+    "code": CodeGraderDef,
+}
+
+
+def _parse_custom_graders(raw: list[dict]) -> list[CustomGraderDef]:
+    """Parse a list of custom grader dicts from the API config JSON."""
+    defs: list[CustomGraderDef] = []
+    for entry in raw:
+        grader_type = entry.get("type", "builtin")
+        model_cls = _TYPE_TO_MODEL.get(grader_type)
+        if not model_cls:
+            raise ValueError(f"Unknown custom grader type: {grader_type}")
+        defs.append(model_cls.model_validate(entry))
+    return defs
+
 
 @router.get("/health", response_model=StandardResponse[HealthData])
 async def health_check():
@@ -65,8 +89,6 @@ async def get_config():
 
 @router.get("/metrics", response_model=StandardResponse[list[MetricInfo]])
 async def list_metrics():
-    from ..runner import _METRICS_NEEDING_EXPECTED, _METRICS_NEEDING_LLM
-
     _METRICS_NEEDING_GCP = {
         "response_evaluation_score",
         "safety_v1",
@@ -105,8 +127,8 @@ async def list_metrics():
             metrics.append(MetricInfo(
                 name=m.metric_name,
                 category=_METRIC_CATEGORIES.get(m.metric_name, "other"),
-                requires_eval_set=m.metric_name in _METRICS_NEEDING_EXPECTED,
-                requires_llm=m.metric_name in _METRICS_NEEDING_LLM,
+                requires_eval_set=m.metric_name in METRICS_NEEDING_EXPECTED,
+                requires_llm=m.metric_name in METRICS_NEEDING_LLM,
                 requires_gcp=m.metric_name in _METRICS_NEEDING_GCP,
                 requires_rubrics=m.metric_name in _METRICS_NEEDING_RUBRICS,
                 description=m.description or "No description available",
@@ -251,12 +273,21 @@ async def evaluate_traces(
                 detail="Threshold must be between 0 and 1",
             )
 
+        custom_graders: list[CustomGraderDef] = []
+        raw_custom = config_dict.get("customGraders", config_dict.get("customMetrics", []))
+        if raw_custom:
+            try:
+                custom_graders = _parse_custom_graders(raw_custom)
+            except Exception as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid customGraders: {exc}")
+
         eval_config = EvalRunConfig(
             trace_files=trace_paths,
             eval_set_file=eval_set_path,
             metrics=metrics,
+            custom_graders=custom_graders,
             trace_format=trace_format,
-            judge_model=config_dict.get("judgeModel"),  # camelCase from UI
+            judge_model=config_dict.get("judgeModel"),
             threshold=threshold,
         )
 
@@ -349,10 +380,20 @@ async def evaluate_traces_stream(
                 yield f"data: {SSEErrorEvent(error='Threshold must be between 0 and 1').model_dump_json(by_alias=True)}\n\n"
                 return
 
+            custom_graders: list[CustomGraderDef] = []
+            raw_custom = config_dict.get("customGraders", config_dict.get("customMetrics", []))
+            if raw_custom:
+                try:
+                    custom_graders = _parse_custom_graders(raw_custom)
+                except Exception as exc:
+                    yield f"data: {SSEErrorEvent(error=f'Invalid customGraders: {exc}').model_dump_json(by_alias=True)}\n\n"
+                    return
+
             eval_config = EvalRunConfig(
                 trace_files=trace_paths,
                 eval_set_file=eval_set_path,
                 metrics=metrics,
+                custom_graders=custom_graders,
                 trace_format=trace_format,
                 judge_model=config_dict.get("judgeModel"),
                 threshold=threshold,
@@ -364,8 +405,8 @@ async def evaluate_traces_stream(
                     traces = loader.load(trace_file_path)
                     for trace in traces:
                         extractor = get_extractor(trace)
-                        perf_metrics = _camel_keys(_extract_performance_metrics(trace, extractor))
-                        trace_metadata = _camel_keys(_extract_trace_metadata(trace, extractor, source_file=trace_file_path))
+                        perf_metrics = _camel_keys(extract_performance_metrics(trace, extractor))
+                        trace_metadata = _camel_keys(extract_trace_metadata(trace, extractor))
                         evt = SSEPerformanceMetricsEvent(
                             trace_id=trace.trace_id,
                             performance_metrics=perf_metrics,

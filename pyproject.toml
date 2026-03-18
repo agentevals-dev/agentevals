@@ -17,6 +17,8 @@ dependencies = [
     "python-multipart>=0.0.12",
     "python-dotenv>=1.0.0",
     "opentelemetry-proto>=1.36.0",
+    "pyyaml>=6.0",
+    "agentevals-grader-sdk>=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -38,11 +40,14 @@ artifacts = ["src/agentevals/_static/**"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentevals"]
 
-[tool.uv.extra-build-dependencies]
-"rouge_score-0.1.2" = ["setuptools"]
+[tool.uv]
+no-build-isolation-package = ["rouge_score"]
 
 [tool.uv.workspace]
-members = []
+members = ["packages/grader-sdk-py"]
+
+[tool.uv.sources]
+agentevals-grader-sdk = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

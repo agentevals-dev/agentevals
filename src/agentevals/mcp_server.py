@@ -90,6 +90,7 @@ def create_server(server_url: str | None = None) -> FastMCP:
         eval_set_file: str | None = None,
         judge_model: str | None = None,
         threshold: float | None = None,
+        eval_config_file: str | None = None,
     ) -> dict[str, Any]:
         """Evaluate one or more local agent trace files.
 
@@ -103,15 +104,30 @@ def create_server(server_url: str | None = None) -> FastMCP:
             eval_set_file: Path to a golden eval set JSON for comparison metrics.
             judge_model: LLM model for judge-based metrics (e.g. "gemini-2.5-flash").
             threshold: Score threshold for PASS/FAIL classification (0.0–1.0).
+            eval_config_file: Path to an eval config YAML file with custom graders.
         """
-        config = EvalRunConfig(
-            trace_files=trace_files,
-            metrics=metrics,
-            trace_format=trace_format,
-            eval_set_file=eval_set_file,
-            judge_model=judge_model,
-            threshold=threshold,
-        )
+        if eval_config_file:
+            from agentevals.eval_config_loader import load_eval_config, merge_configs
+
+            file_config = load_eval_config(eval_config_file)
+            cli_config = EvalRunConfig(
+                trace_files=trace_files,
+                metrics=metrics,
+                trace_format=trace_format,
+                eval_set_file=eval_set_file,
+                judge_model=judge_model,
+                threshold=threshold,
+            )
+            config = merge_configs(file_config, cli_config)
+        else:
+            config = EvalRunConfig(
+                trace_files=trace_files,
+                metrics=metrics,
+                trace_format=trace_format,
+                eval_set_file=eval_set_file,
+                judge_model=judge_model,
+                threshold=threshold,
+            )
         result = await run_evaluation(config)
         return _summarize_run_result(result)
 

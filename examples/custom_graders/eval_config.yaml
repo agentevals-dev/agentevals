@@ -1,0 +1,18 @@
+# Example eval config using a custom code-based grader alongside built-in ones.
+#
+# Run with:
+#   agentevals run samples/helm.json \
+#     --config examples/custom_graders/eval_config.yaml \
+#     --eval-set samples/eval_set_helm.json
+
+metrics:
+  # Built-in metric (unchanged)
+  - tool_trajectory_avg_score
+
+  # Python grader — checks response quality
+  - name: response_quality
+    type: code
+    path: ./examples/custom_graders/response_quality.py
+    threshold: 0.7
+    config:
+      min_response_length: 20

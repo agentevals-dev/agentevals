@@ -2,9 +2,50 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from pathlib import Path
+from typing import Any, Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
+from pydantic import field_validator
+
+
+class BuiltinMetricDef(BaseModel):
+    """A built-in ADK metric, optionally with threshold/judge overrides."""
+
+    name: str
+    type: Literal["builtin"] = "builtin"
+    threshold: Optional[float] = None
+    judge_model: Optional[str] = None
+
+
+class CodeGraderDef(BaseModel):
+    """A grader implemented as an external code file (Python, JavaScript, etc.)."""
+
+    name: str
+    type: Literal["code"] = "code"
+    path: str = Field(description="Path to the grader file (.py, .js, .ts, etc.).")
+    threshold: float = 0.5
+    timeout: int = Field(default=30, description="Subprocess timeout in seconds.")
+    config: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("path")
+    @classmethod
+    def _validate_extension(cls, v: str) -> str:
+        from .custom_evaluators import supported_extensions
+        suffix = Path(v).suffix.lower()
+        allowed = supported_extensions()
+        if suffix not in allowed:
+            raise ValueError(
+                f"Unsupported grader file extension '{suffix}'. "
+                f"Supported: {sorted(allowed)}"
+            )
+        return v
+
+
+CustomGraderDef = Annotated[
+    Union[BuiltinMetricDef, CodeGraderDef],
+    Field(discriminator="type"),
+]
 
 
 class EvalRunConfig(BaseModel):
@@ -17,7 +58,12 @@ class EvalRunConfig(BaseModel):
 
     metrics: list[str] = Field(
         default_factory=lambda: ["tool_trajectory_avg_score"],
-        description="List of metric names to evaluate.",
+        description="List of built-in metric names to evaluate.",
+    )
+
+    custom_graders: list[CustomGraderDef] = Field(
+        default_factory=list,
+        description="Custom grader definitions.",
     )
 
     trace_format: str = Field(

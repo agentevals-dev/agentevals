@@ -54,8 +54,8 @@ def main(verbose: int) -> None:
     "--metric",
     "-m",
     multiple=True,
-    default=["tool_trajectory_avg_score"],
-    help="Metric(s) to evaluate. Can be specified multiple times.",
+    default=None,
+    help="Metric(s) to evaluate. Can be specified multiple times. Default: tool_trajectory_avg_score.",
 )
 @click.option(
     "--format",
@@ -84,29 +84,57 @@ def main(verbose: int) -> None:
     default="table",
     help="Output format.",
 )
+@click.option(
+    "--config",
+    "-c",
+    "config_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to an eval config YAML file defining metrics (including custom).",
+)
 def run(
     trace_files: tuple[str, ...],
     eval_set: str | None,
-    metric: tuple[str, ...],
+    metric: tuple[str, ...] | None,
     trace_format: str,
     judge_model: str | None,
     threshold: float | None,
     output: str,
+    config_file: str | None,
 ) -> None:
     """Evaluate trace file(s) against specified metrics."""
     from .config import EvalRunConfig
     from .output import format_results
     from .runner import run_evaluation
 
-    config = EvalRunConfig(
-        trace_files=list(trace_files),
-        eval_set_file=eval_set,
-        metrics=list(metric),
-        trace_format=trace_format,
-        judge_model=judge_model,
-        threshold=threshold,
-        output_format=output,
-    )
+    explicit_metrics = list(metric) if metric else []
+
+    if config_file:
+        from .eval_config_loader import load_eval_config, merge_configs
+
+        file_config = load_eval_config(config_file)
+
+        cli_config = EvalRunConfig(
+            trace_files=list(trace_files),
+            eval_set_file=eval_set,
+            metrics=explicit_metrics,
+            trace_format=trace_format,
+            judge_model=judge_model,
+            threshold=threshold,
+            output_format=output,
+        )
+        config = merge_configs(file_config, cli_config)
+    else:
+        effective_metrics = explicit_metrics or ["tool_trajectory_avg_score"]
+        config = EvalRunConfig(
+            trace_files=list(trace_files),
+            eval_set_file=eval_set,
+            metrics=effective_metrics,
+            trace_format=trace_format,
+            judge_model=judge_model,
+            threshold=threshold,
+            output_format=output,
+        )
 
     result = asyncio.run(run_evaluation(config))
     formatted = format_results(result, fmt=output)
@@ -242,11 +270,11 @@ def serve(dev: bool, host: str, port: int, otlp_port: int, eval_sets: str | None
     os.environ["AGENTEVALS_LIVE"] = "1"
 
     if dev:
-        click.echo(f"agentevals dev server starting...")
+        click.echo("agentevals dev server starting...")
         click.echo(f"  OTLP HTTP: http://{host}:{otlp_port}  (OTEL_EXPORTER_OTLP_ENDPOINT default)")
         click.echo(f"  WebSocket: ws://{host}:{port}/ws/traces")
         click.echo(f"  API:       http://{host}:{port}/api")
-        click.echo(f"  Web UI:    http://localhost:5173")
+        click.echo("  Web UI:    http://localhost:5173")
         click.echo()
 
         if eval_sets:
