@@ -261,15 +261,6 @@ class StreamingTraceManager:
         self._active_session_for_name[session_name] = session_id
         self.incremental_extractors[session_id] = IncrementalInvocationExtractor()
 
-        replayed = self._replay_orphan_logs(session)
-        extractor = self.incremental_extractors.get(session_id)
-        if extractor and replayed:
-            for log_event in replayed:
-                updates = extractor.process_log(log_event)
-                for update in updates:
-                    update["sessionId"] = session_id
-                    await self.broadcast_to_ui(update)
-
         await self.broadcast_to_ui(WSSessionStartedEvent(
             session=SessionInfo(
                 session_id=session_id,
@@ -281,6 +272,15 @@ class StreamingTraceManager:
                 metadata=session.metadata,
             ),
         ).model_dump(by_alias=True))
+
+        replayed = self._replay_orphan_logs(session)
+        extractor = self.incremental_extractors.get(session_id)
+        if extractor and replayed:
+            for log_event in replayed:
+                updates = extractor.process_log(log_event)
+                for update in updates:
+                    update["sessionId"] = session_id
+                    await self.broadcast_to_ui(update)
 
         logger.info("Auto-created OTLP session: %s (trace: %s)", session_id, trace_id)
         return session

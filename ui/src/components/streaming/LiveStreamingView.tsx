@@ -2,7 +2,38 @@ import { useEffect, useRef, useState } from 'react';
 import { useTraceContext } from '../../context/TraceContext';
 import { SessionCard } from './SessionCard';
 import { config } from '../../config';
-import type { LiveSession, StreamingInvocation } from '../../lib/types';
+import type { ConversationElement, LiveSession, StreamingInvocation } from '../../lib/types';
+
+function invocationsToElements(invocations: StreamingInvocation[]): ConversationElement[] {
+  return invocations.flatMap((inv, idx) => {
+    const elements: ConversationElement[] = [];
+    if (inv.userText) {
+      elements.push({
+        type: 'user_input',
+        timestamp: idx * 3,
+        invocationId: inv.invocationId,
+        data: { text: inv.userText },
+      });
+    }
+    for (const tc of inv.toolCalls || []) {
+      elements.push({
+        type: 'tool_call',
+        timestamp: idx * 3 + 1,
+        invocationId: inv.invocationId,
+        data: { toolCall: tc },
+      });
+    }
+    if (inv.agentText) {
+      elements.push({
+        type: 'agent_response',
+        timestamp: idx * 3 + 2,
+        invocationId: inv.invocationId,
+        data: { text: inv.agentText },
+      });
+    }
+    return elements;
+  });
+}
 
 export function LiveStreamingView() {
   const { state, actions } = useTraceContext();
@@ -67,7 +98,9 @@ export function LiveStreamingView() {
               status: s.isComplete ? 'complete' : 'active',
               metadata: (s.metadata ?? {}) as Record<string, string>,
               invocations: s.invocations,
-              liveElements: [],
+              liveElements: s.invocations?.length
+                ? invocationsToElements(s.invocations)
+                : [],
               liveStats: { totalInputTokens: 0, totalOutputTokens: 0 },
               startedAt: s.startedAt,
             });
@@ -272,7 +305,9 @@ export function LiveStreamingView() {
                   status: 'complete',
                   metadata: {},
                   invocations: data.invocations,
-                  liveElements: [],
+                  liveElements: data.invocations?.length
+                    ? invocationsToElements(data.invocations)
+                    : [],
                   liveStats: {
                     totalInputTokens: 0,
                     totalOutputTokens: 0,
@@ -284,6 +319,9 @@ export function LiveStreamingView() {
                   ...session,
                   status: 'complete',
                   invocations: data.invocations,
+                  liveElements: data.invocations?.length
+                    ? invocationsToElements(data.invocations)
+                    : session.liveElements,
                 });
               }
 

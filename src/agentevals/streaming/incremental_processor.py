@@ -174,9 +174,9 @@ class IncrementalInvocationExtractor:
         event_name = log_event.get("event_name", "")
         body = log_event.get("body", {})
 
-        invocation_id = self.current_invocation_id
+        invocation_id = log_event.get("span_id")
         if not invocation_id:
-            invocation_id = log_event.get("span_id")
+            invocation_id = self.current_invocation_id
         if not invocation_id:
             return updates
 
