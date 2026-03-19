@@ -144,7 +144,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
 
                 newRows.set(traceId, {
                   traceId,
-                  sessionId: metadata?.sessionId,
+                  sessionId: partialResult.sessionId ?? existingRow?.sessionId ?? metadata?.sessionId,
                   status: allMetricsComplete ? 'complete' : 'loading',
                   agentName: partialResult.agentName ?? existingRow?.agentName ?? metadata?.agentName,
                   startTime: partialResult.startTime ?? existingRow?.startTime ?? metadata?.startTime,
@@ -163,7 +163,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
 
                 const resultWithSessionId = {
                   ...partialResult,
-                  sessionId: metadata?.sessionId,
+                  sessionId: partialResult.sessionId ?? metadata?.sessionId,
                 };
 
                 if (existingResultIndex >= 0) {

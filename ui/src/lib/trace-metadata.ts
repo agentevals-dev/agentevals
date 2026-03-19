@@ -131,13 +131,18 @@ function detectTraceFormat(trace: Trace): 'adk' | 'genai' {
   return 'adk';
 }
 
-export function extractTraceMetadata(trace: Trace): TraceMetadata {
+export function extractTraceMetadata(trace: Trace, sessionName?: string): TraceMetadata {
   const format = detectTraceFormat(trace);
 
   if (format === 'genai') {
-    return extractGenAIMetadata(trace);
+    return extractGenAIMetadata(trace, sessionName);
   } else {
-    return extractADKMetadata(trace);
+    const metadata = extractADKMetadata(trace);
+    if (sessionName) {
+      metadata.sessionId = sessionName;
+      if (!metadata.agentName) metadata.agentName = sessionName;
+    }
+    return metadata;
   }
 }
 
@@ -175,10 +180,14 @@ function extractADKMetadata(trace: Trace): TraceMetadata {
   return metadata;
 }
 
-function extractGenAIMetadata(trace: Trace): TraceMetadata {
+function extractGenAIMetadata(trace: Trace, sessionName?: string): TraceMetadata {
   const metadata: TraceMetadata = {
     traceId: trace.traceId,
   };
+
+  if (sessionName) {
+    metadata.sessionId = sessionName;
+  }
 
   const llmSpans = trace.allSpans.filter(span =>
     span.tags?.['gen_ai.request.model'] || span.tags?.['gen_ai.system']
@@ -192,7 +201,9 @@ function extractGenAIMetadata(trace: Trace): TraceMetadata {
     const agentName = firstLlm.tags?.['gen_ai.agent.name'];
     if (agentName) {
       metadata.agentName = agentName;
-      metadata.sessionId = agentName;
+      if (!metadata.sessionId) metadata.sessionId = agentName;
+    } else if (sessionName) {
+      metadata.agentName = sessionName;
     } else {
       const rootSpan = trace.rootSpans[0];
       metadata.agentName = rootSpan?.operationName || 'GenAI Agent';
@@ -306,8 +317,19 @@ function parseOtlpJsonl(content: string): Trace[] {
   return traces;
 }
 
+function extractSessionNameFromFilename(filename: string): string | undefined {
+  const base = filename.replace(/\.(jsonl?|json)$/i, '');
+  for (const prefix of ['trace_', 'agentevals_']) {
+    if (base.startsWith(prefix)) {
+      return base.slice(prefix.length);
+    }
+  }
+  return undefined;
+}
+
 export async function extractMetadataFromTraceFile(file: File): Promise<TraceMetadata[]> {
   const content = await readFileAsText(file);
+  const sessionName = extractSessionNameFromFilename(file.name);
 
   let traces: Trace[] = [];
 
@@ -359,7 +381,7 @@ export async function extractMetadataFromTraceFile(file: File): Promise<TraceMet
   const invocationsMap = convertTracesToInvocations(traces);
 
   return traces.map(trace => {
-    const metadata = extractTraceMetadata(trace);
+    const metadata = extractTraceMetadata(trace, sessionName);
     const conversionResult = invocationsMap.get(trace.traceId);
     if (conversionResult) {
       metadata.invocations = conversionResult.invocations;

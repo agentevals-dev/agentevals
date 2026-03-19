@@ -365,7 +365,7 @@ async def evaluate_traces_stream(
                     for trace in traces:
                         extractor = get_extractor(trace)
                         perf_metrics = _camel_keys(_extract_performance_metrics(trace, extractor))
-                        trace_metadata = _camel_keys(_extract_trace_metadata(trace, extractor))
+                        trace_metadata = _camel_keys(_extract_trace_metadata(trace, extractor, source_file=trace_file_path))
                         evt = SSEPerformanceMetricsEvent(
                             trace_id=trace.trace_id,
                             performance_metrics=perf_metrics,

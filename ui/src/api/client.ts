@@ -118,6 +118,7 @@ export async function evaluateTracesStreaming(
               conversionWarnings: [],
               performanceMetrics: eventData.performanceMetrics,
               agentName: tm.agentName,
+              sessionId: tm.sessionName,
               model: tm.model,
               startTime: tm.startTime,
               userInputPreview: tm.userInputPreview,

@@ -564,14 +564,39 @@ def _truncate(text: str, max_length: int = 200) -> str:
     return text[:max_length] + "..."
 
 
-def _extract_trace_metadata(trace, extractor: "TraceFormatExtractor | None" = None) -> dict[str, Any]:
+def _extract_session_name_from_path(source_file: str) -> str | None:
+    """Extract session name from trace file path.
+
+    Recognizes patterns like:
+    - trace_{sessionId}.jsonl (frontend-generated files)
+    - agentevals_{sessionId}.jsonl (backend-generated temp files)
+    """
+    import os
+    basename = os.path.basename(source_file)
+    name, _ = os.path.splitext(basename)
+    for prefix in ("trace_", "agentevals_"):
+        if name.startswith(prefix):
+            return name[len(prefix):]
+    return None
+
+
+def _extract_trace_metadata(
+    trace,
+    extractor: "TraceFormatExtractor | None" = None,
+    source_file: str | None = None,
+) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "agent_name": None,
         "model": None,
         "start_time": None,
         "user_input_preview": None,
         "final_output_preview": None,
+        "session_name": None,
     }
+
+    session_name = _extract_session_name_from_path(source_file) if source_file else None
+    if session_name:
+        metadata["session_name"] = session_name
 
     if extractor is None:
         extractor = get_extractor(trace)
@@ -594,8 +619,11 @@ def _extract_trace_metadata(trace, extractor: "TraceFormatExtractor | None" = No
             if agent_text:
                 metadata["final_output_preview"] = _truncate(agent_text)
 
-    if not metadata["agent_name"] and trace.root_spans:
-        metadata["agent_name"] = trace.root_spans[0].operation_name
+    if not metadata["agent_name"]:
+        if session_name:
+            metadata["agent_name"] = session_name
+        elif trace.root_spans:
+            metadata["agent_name"] = trace.root_spans[0].operation_name
 
     if not metadata["model"]:
         for span in trace.all_spans:
