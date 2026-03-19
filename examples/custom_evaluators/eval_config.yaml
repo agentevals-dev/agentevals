@@ -5,9 +5,10 @@
 #     --config examples/custom_evaluators/eval_config.yaml \
 #     --eval-set samples/eval_set_helm.json
 
-metrics:
-  # Built-in metric (unchanged)
-  - tool_trajectory_avg_score
+evaluators:
+  # Built-in metric
+  - name: tool_trajectory_avg_score
+    type: builtin
 
   # Custom code evaluators (local scripts)
   - name: tool_call_checker
@@ -24,7 +25,7 @@ metrics:
     config:
       min_response_length: 20
 
-  # reference an evaluator from Github
+  # Reference an evaluator from Github
   - name: peters_evaluator
     type: remote
     source: github

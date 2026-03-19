@@ -37,7 +37,8 @@ The `@evaluator` decorator marks your function as a runnable evaluator. Call `.r
 
 - **`EvalInput`** -- input payload with `metric_name`, `threshold`, `config`, `invocations`, and optional `expected_invocations`
 - **`EvalResult`** -- output payload with `score` (0.0-1.0), optional `status`, `per_invocation_scores`, and `details` (dict)
-- **`InvocationData`** -- a single agent turn with `user_content`, `final_response`, `tool_calls`, and `tool_responses`
+- **`InvocationData`** -- a single agent turn with `user_content`, `final_response`, and `intermediate_steps`
+- **`IntermediateStepData`** -- the steps between user input and final response: `tool_calls` and `tool_responses`
 
 ## Documentation
 

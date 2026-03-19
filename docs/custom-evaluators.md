@@ -63,10 +63,11 @@ The `@evaluator` decorator marks your function as an evaluator. Call `.run()` to
 
 ```yaml
 # eval_config.yaml
-metrics:
-  - tool_trajectory_avg_score   # built-in metric
+evaluators:
+  - name: tool_trajectory_avg_score   # built-in metric
+    type: builtin
 
-  - name: response_quality      # your custom evaluator
+  - name: response_quality            # your custom evaluator
     type: code
     path: ./evaluators/response_quality.py
     threshold: 0.7
@@ -84,7 +85,7 @@ agentevals run traces/my_trace.json \
 
 ## Eval Config Reference
 
-Each custom evaluator entry in the `metrics` list uses the following fields:
+Each evaluator entry in the `evaluators` list uses the following fields:
 
 | Field | Required | Default | Description |
 |---|---|---|---|
@@ -103,6 +104,7 @@ Every evaluator — regardless of language — communicates via the same JSON pr
 
 ```json
 {
+  "protocol_version": "1.0",
   "metric_name": "response_quality",
   "threshold": 0.7,
   "config": { "min_length": 20 },
@@ -111,12 +113,14 @@ Every evaluator — regardless of language — communicates via the same JSON pr
       "invocation_id": "inv-001",
       "user_content": "What is 2+2?",
       "final_response": "The answer is 4.",
-      "tool_calls": [
-        { "name": "calculator", "args": { "expression": "2+2" } }
-      ],
-      "tool_responses": [
-        { "name": "calculator", "output": "4" }
-      ]
+      "intermediate_steps": {
+        "tool_calls": [
+          { "name": "calculator", "args": { "expression": "2+2" } }
+        ],
+        "tool_responses": [
+          { "name": "calculator", "output": "4" }
+        ]
+      }
     }
   ],
   "expected_invocations": null
@@ -125,6 +129,7 @@ Every evaluator — regardless of language — communicates via the same JSON pr
 
 | Field | Type | Description |
 |---|---|---|
+| `protocol_version` | string | Wire-format version (`"MAJOR.MINOR"`). Current: `"1.0"` |
 | `metric_name` | string | Name of this evaluator |
 | `threshold` | float | Pass/fail threshold |
 | `config` | object | User-provided config from the YAML |
@@ -138,6 +143,12 @@ Each invocation contains:
 | `invocation_id` | string | Unique turn identifier |
 | `user_content` | string | What the user said |
 | `final_response` | string or null | The agent's final response |
+| `intermediate_steps` | object | Steps between user input and final response |
+
+The `intermediate_steps` object contains:
+
+| Field | Type | Description |
+|---|---|---|
 | `tool_calls` | array | Tools the agent called |
 | `tool_responses` | array | Responses the agent received from tools |
 
@@ -159,6 +170,24 @@ Each invocation contains:
 | `per_invocation_scores` | no | Per-turn scores (same order as input invocations) |
 | `details` | no | Arbitrary metadata for debugging |
 
+### Protocol Versioning
+
+The `protocol_version` field uses `"MAJOR.MINOR"` format (currently `"1.0"`). This allows the CLI and SDK to evolve independently while maintaining compatibility:
+
+- **Additive only** -- new fields may be added to `EvalInput` or `EvalResult`; existing fields are never removed or renamed within the same major version.
+- **Defaults required** -- every new field must have a default value. Older deserializers silently ignore unknown fields (Pydantic's default behavior), so an evaluator built against an older SDK will still work with a newer CLI.
+- **MINOR bumps** -- additive changes (new optional fields). No action required by evaluator authors.
+- **MAJOR bumps** -- breaking changes (removed fields, type changes). The SDK's `@evaluator` decorator will log a warning if it sees a major version it does not recognize.
+
+The CLI and SDK are **independent packages**. Install them at whatever versions you need:
+
+```bash
+pip install agentevals            # CLI -- may speak protocol 1.1
+pip install agentevals-evaluator-sdk   # SDK -- may speak protocol 1.0
+```
+
+As long as the major version matches, they are compatible.
+
 ## Writing Evaluators in Other Languages
 
 You don't need the Python SDK. Any program that reads JSON from stdin and writes JSON to stdout works.
@@ -171,7 +200,7 @@ const input = JSON.parse(require("fs").readFileSync("/dev/stdin", "utf8"));
 
 let score = 1.0;
 for (const inv of input.invocations) {
-  if (inv.tool_calls.length === 0) {
+  if (inv.intermediate_steps.tool_calls.length === 0) {
     score -= 0.5;
   }
 }
@@ -183,9 +212,10 @@ console.log(JSON.stringify({
 ```
 
 ```yaml
-- name: tool_check
-  type: code
-  path: ./evaluators/tool_check.js
+evaluators:
+  - name: tool_check
+    type: code
+    path: ./evaluators/tool_check.js
 ```
 
 ### Any language
@@ -221,8 +251,9 @@ This shows evaluators from all registered sources: ADK built-in metrics and the 
 You can reference evaluators from the community repository directly in your eval config. They are downloaded and cached automatically on first use.
 
 ```yaml
-metrics:
-  - tool_trajectory_avg_score
+evaluators:
+  - name: tool_trajectory_avg_score
+    type: builtin
 
   - name: response_quality
     type: remote
@@ -372,7 +403,7 @@ register_executor("docker", lambda path, timeout: DockerBackend(path, timeout))
 Users then set `executor: docker` in their config:
 
 ```yaml
-metrics:
+evaluators:
   - name: untrusted_evaluator
     type: code
     path: ./evaluators/untrusted.py
@@ -400,7 +431,7 @@ register_source(MyRegistrySource())
 Users can then reference evaluators from the new source:
 
 ```yaml
-metrics:
+evaluators:
   - name: my_evaluator
     type: remote
     source: my-registry

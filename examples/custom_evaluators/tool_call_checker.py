@@ -2,7 +2,7 @@
 
 Usage in eval_config.yaml:
 
-    metrics:
+    evaluators:
       - name: tool_call_checker
         type: code
         path: ./examples/custom_evaluators/tool_call_checker.py
@@ -20,7 +20,7 @@ def tool_call_checker(input: EvalInput) -> EvalResult:
     scores: list[float] = []
 
     for inv in input.invocations:
-        if len(inv.tool_calls) >= min_calls:
+        if len(inv.intermediate_steps.tool_calls) >= min_calls:
             scores.append(1.0)
         else:
             scores.append(0.0)

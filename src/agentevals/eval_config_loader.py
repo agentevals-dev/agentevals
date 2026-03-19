@@ -25,25 +25,24 @@ _TYPE_TO_MODEL = {
 }
 
 
-def _parse_evaluator_entry(entry: str | dict[str, Any]) -> tuple[str | None, CustomEvaluatorDef | None]:
+def _parse_evaluator_entry(entry: dict[str, Any]) -> tuple[str | None, CustomEvaluatorDef | None]:
     """Parse a single evaluator entry from the YAML config.
 
+    Every entry must be a dict with ``name`` and ``type`` fields.
     Returns (builtin_name, custom_evaluator_def).  Exactly one will be non-None.
-    Plain strings and dicts without a ``type`` key (or type=builtin) that have
-    no extra fields beyond name/threshold/judge_model are treated as built-in
-    metric name references so they flow through the existing ``metrics`` list.
     """
-    if isinstance(entry, str):
-        return entry, None
-
     if not isinstance(entry, dict):
-        raise ValueError(f"Evaluator entry must be a string or dict, got {type(entry).__name__}")
+        raise ValueError(
+            f"Each evaluator entry must be a mapping with 'name' and 'type' fields, got {type(entry).__name__}: {entry!r}"
+        )
 
     name = entry.get("name")
     if not name:
-        raise ValueError(f"Evaluator entry dict must have a 'name' field: {entry}")
+        raise ValueError(f"Evaluator entry must have a 'name' field: {entry}")
 
-    evaluator_type = entry.get("type", "builtin")
+    evaluator_type = entry.get("type")
+    if not evaluator_type:
+        raise ValueError(f"Evaluator entry '{name}' must have a 'type' field (builtin, code, or remote)")
 
     if evaluator_type not in _TYPE_TO_MODEL:
         raise ValueError(
@@ -62,9 +61,9 @@ def _parse_evaluator_entry(entry: str | dict[str, Any]) -> tuple[str | None, Cus
 def load_eval_config(path: str | Path) -> EvalRunConfig:
     """Load an eval config YAML file and return a partially-filled EvalRunConfig.
 
-    The returned config will have ``metrics`` (built-in names) and
-    ``custom_evaluators`` populated.  Callers should merge these with any
-    CLI/API overrides and fill in ``trace_files`` etc.
+    The YAML file uses an ``evaluators`` list where each entry is a dict with
+    ``name`` and ``type`` fields.  Built-in entries populate ``metrics``;
+    code/remote entries populate ``custom_evaluators``.
     """
     path = Path(path)
     if not path.exists():
@@ -76,15 +75,15 @@ def load_eval_config(path: str | Path) -> EvalRunConfig:
     if not isinstance(data, dict):
         raise ValueError(f"Eval config must be a YAML mapping, got {type(data).__name__}")
 
-    raw_metrics = data.get("metrics", [])
-    if not isinstance(raw_metrics, list):
-        raise ValueError("'metrics' must be a list")
+    raw_evaluators = data.get("evaluators", [])
+    if not isinstance(raw_evaluators, list):
+        raise ValueError("'evaluators' must be a list")
 
     builtin_names: list[str] = []
     custom_defs: list[CustomEvaluatorDef] = []
     builtin_overrides: dict[str, BuiltinMetricDef] = {}
 
-    for entry in raw_metrics:
+    for entry in raw_evaluators:
         builtin_name, custom_def = _parse_evaluator_entry(entry)
         if builtin_name:
             builtin_names.append(builtin_name)

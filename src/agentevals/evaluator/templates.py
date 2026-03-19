@@ -12,7 +12,7 @@ PYTHON_TEMPLATE = Template('''\
 
 Usage in eval_config.yaml:
 
-    metrics:
+    evaluators:
       - name: ${name}
         type: code
         path: ./${name}/${name}.py
@@ -56,7 +56,7 @@ JAVASCRIPT_TEMPLATE = Template("""\
  *
  * Usage in eval_config.yaml:
  *
- *     metrics:
+ *     evaluators:
  *       - name: ${name}
  *         type: code
  *         path: ./${name}/${name}.js
@@ -97,7 +97,7 @@ TYPESCRIPT_TEMPLATE = Template("""\
  *
  * Usage in eval_config.yaml:
  *
- *     metrics:
+ *     evaluators:
  *       - name: ${name}
  *         type: code
  *         path: ./${name}/${name}.ts
@@ -106,15 +106,20 @@ TYPESCRIPT_TEMPLATE = Template("""\
 
 import * as fs from "fs";
 
-interface Invocation {
-  invocation_id: string;
-  user_content: string;
-  final_response: string | null;
+interface IntermediateSteps {
   tool_calls: { name: string; args: Record<string, unknown> }[];
   tool_responses: { name: string; output: string }[];
 }
 
+interface Invocation {
+  invocation_id: string;
+  user_content: string;
+  final_response: string | null;
+  intermediate_steps: IntermediateSteps;
+}
+
 interface EvalInput {
+  protocol_version: string;
   metric_name: string;
   threshold: number;
   config: Record<string, unknown>;

@@ -4,7 +4,8 @@ Every backend implements the same protocol: accept :class:`EvalInput` (JSON)
 and return :class:`EvalResult` (JSON).  The transport varies — local
 subprocess, HTTP, Docker container, etc.
 
-The protocol types live in :mod:`agentevals_evaluator_sdk.types`.
+The protocol types live in :mod:`agentevals._protocol` (CLI-internal) and are
+JSON-wire-compatible with the types in the ``agentevals-evaluator-sdk`` package.
 """
 
 from __future__ import annotations
@@ -18,15 +19,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from agentevals_evaluator_sdk import (
+from google.adk.evaluation.eval_case import Invocation, get_all_tool_calls
+from google.adk.evaluation.evaluator import EvalStatus, EvaluationResult, Evaluator, PerInvocationResult
+
+from agentevals._protocol import (
     EvalInput,
     EvalResult,
     InvocationData,
     ToolCallData,
     ToolResponseData,
 )
-from google.adk.evaluation.eval_case import Invocation, get_all_tool_calls
-from google.adk.evaluation.evaluator import EvalStatus, EvaluationResult, Evaluator, PerInvocationResult
 
 logger = logging.getLogger(__name__)
 
@@ -383,6 +385,8 @@ class CustomEvaluatorRunner(Evaluator):
         expected_invocations: list[Invocation] | None = None,
         conversation_scenario=None,
     ) -> EvaluationResult:
+
+    
         eval_input = EvalInput(
             metric_name=self._metric_name,
             threshold=self._threshold,

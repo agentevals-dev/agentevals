@@ -240,17 +240,18 @@ def evaluator_init(name: str, output_dir: str, runtime: str | None) -> None:
     click.echo()
     click.echo("Next steps:")
     click.echo("  1. Implement your scoring logic in the generated code file")
-    click.echo("  2. Add it to your eval_config.yaml:")
+    click.echo("  2. Add it to your eval_config.yaml under 'evaluators':")
     click.echo()
 
     code_files = [f for f in evaluator_dir.iterdir() if f.suffix in (".py", ".js", ".ts")]
     evaluator_name = evaluator_dir.name
     if code_files:
         rel = code_files[0].relative_to(evaluator_dir.parent)
-        click.echo(f"     - name: {evaluator_name}")
-        click.echo("       type: code")
-        click.echo(f"       path: ./{rel}")
-        click.echo("       threshold: 0.5")
+        click.echo("     evaluators:")
+        click.echo(f"       - name: {evaluator_name}")
+        click.echo("         type: code")
+        click.echo(f"         path: ./{rel}")
+        click.echo("         threshold: 0.5")
     click.echo()
     click.echo("  3. Run: agentevals run <trace_file> --config eval_config.yaml")
 
@@ -389,7 +390,7 @@ def evaluator_config(name: str, evaluator_path: str | None, threshold: float | N
         if needs_llm:
             entry["judge_model"] = "gemini-2.5-flash"
 
-        snippet: dict = {"metrics": [entry]}
+        snippet: dict = {"evaluators": [entry]}
 
         notes: list[str] = []
         if needs_eval_set:
@@ -399,7 +400,7 @@ def evaluator_config(name: str, evaluator_path: str | None, threshold: float | N
         if needs_gcp:
             notes.append("Requires GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION (Vertex AI)")
 
-        comment = "# Add to your eval_config.yaml under 'metrics':"
+        comment = "# Add to your eval_config.yaml under 'evaluators':"
         if notes:
             comment += "\n#\n# Notes:\n" + "\n".join(f"#   - {n}" for n in notes)
     elif match and match.source != "builtin":
@@ -414,8 +415,8 @@ def evaluator_config(name: str, evaluator_path: str | None, threshold: float | N
         else:
             entry["threshold"] = 0.5
         entry["executor"] = "local"
-        snippet = {"custom_evaluators": [entry]}
-        comment = "# Add to your eval_config.yaml under 'custom_evaluators':"
+        snippet = {"evaluators": [entry]}
+        comment = "# Add to your eval_config.yaml under 'evaluators':"
     else:
         path_val = evaluator_path or f"./{name}/{name}.py"
         entry = {
@@ -428,8 +429,8 @@ def evaluator_config(name: str, evaluator_path: str | None, threshold: float | N
         else:
             entry["threshold"] = 0.5
         entry["executor"] = "local"
-        snippet = {"custom_evaluators": [entry]}
-        comment = "# Add to your eval_config.yaml under 'custom_evaluators':"
+        snippet = {"evaluators": [entry]}
+        comment = "# Add to your eval_config.yaml under 'evaluators':"
 
     rendered = _yaml.dump(snippet, default_flow_style=False, sort_keys=False)
     click.echo(f"\n{comment}\n")

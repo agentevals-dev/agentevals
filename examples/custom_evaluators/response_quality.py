@@ -5,7 +5,7 @@ Install the SDK standalone:  pip install agentevals-evaluator-sdk
 
 Usage in eval_config.yaml:
 
-    metrics:
+    evaluators:
       - name: response_quality
         type: code
         path: ./examples/custom_evaluators/response_quality.py

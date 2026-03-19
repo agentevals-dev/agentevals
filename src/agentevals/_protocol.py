@@ -1,8 +1,15 @@
-"""Subprocess protocol types for custom evaluator evaluation.
+"""CLI-internal protocol types for the custom evaluator JSON wire format.
 
-These types define the JSON stdin/stdout contract between agentevals and
-external evaluator scripts/containers.  They are intentionally simple and
-free of ADK-specific types so they can be used from any language.
+These mirror the types in ``agentevals_evaluator_sdk.types`` but are owned by
+the CLI so that the CLI and SDK packages can be versioned independently.  The
+JSON schema produced/consumed by these models is the contract — not the Python
+types themselves.
+
+Protocol versioning rules:
+- ``protocol_version`` uses ``"MAJOR.MINOR"`` format.
+- MINOR bumps are additive-only (new fields with defaults).  Old deserializers
+  silently ignore unknown fields.
+- MAJOR bumps signal breaking changes (removed/renamed fields, type changes).
 """
 
 from __future__ import annotations
@@ -10,6 +17,8 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+
+PROTOCOL_VERSION = "1.0"
 
 
 class ToolCallData(BaseModel):
@@ -27,34 +36,25 @@ class ToolResponseData(BaseModel):
 
 
 class IntermediateStepData(BaseModel):
-    """The intermediate steps an agent took between receiving user input and
-    producing a final response — tool calls, tool responses, and (in the
-    future) reasoning traces, memory lookups, sub-agent calls, etc.
-
-    Mirrors the semantic role of ADK's ``IntermediateData`` without depending
-    on ADK types.
-    """
+    """Intermediate steps between user input and final response."""
 
     tool_calls: list[ToolCallData] = Field(default_factory=list)
     tool_responses: list[ToolResponseData] = Field(default_factory=list)
 
 
 class InvocationData(BaseModel):
-    """Simplified representation of a single agent invocation (turn).
-
-    This is a language-agnostic view of ADK's ``Invocation`` so that
-    script/container authors don't need ADK.
-    """
+    """Simplified, language-agnostic representation of a single agent turn."""
 
     invocation_id: str = ""
     user_content: str = ""
     final_response: Optional[str] = None
     intermediate_steps: IntermediateStepData = Field(default_factory=IntermediateStepData)
 
-class EvalInput(BaseModel):
-    """Input payload sent to a custom evaluator script/container on stdin."""
 
-    protocol_version: str = "1.0"
+class EvalInput(BaseModel):
+    """Input payload sent to a custom evaluator on stdin."""
+
+    protocol_version: str = PROTOCOL_VERSION
     metric_name: str
     threshold: float = 0.5
     config: dict[str, Any] = Field(default_factory=dict)
@@ -63,7 +63,7 @@ class EvalInput(BaseModel):
 
 
 class EvalResult(BaseModel):
-    """Output payload expected from a custom evaluator script/container on stdout."""
+    """Output payload expected from a custom evaluator on stdout."""
 
     score: float = Field(ge=0.0, le=1.0)
     status: Optional[str] = Field(

@@ -22,6 +22,7 @@ from .decorator import evaluator
 from .types import (
     EvalInput,
     EvalResult,
+    IntermediateStepData,
     InvocationData,
     ToolCallData,
     ToolResponseData,
@@ -31,6 +32,7 @@ __all__ = [
     "evaluator",
     "EvalInput",
     "EvalResult",
+    "IntermediateStepData",
     "InvocationData",
     "ToolCallData",
     "ToolResponseData",
