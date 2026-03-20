@@ -17,7 +17,7 @@ Thank you for your interest in contributing to agentevals! This document covers 
 
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
-- Node.js 18+ and npm (for the UI)
+- Node.js 20+ and npm (for the UI)
 - Optionally, [Nix](https://nixos.org/) — the project includes a `flake.nix` devshell
 
 ### Getting Started
@@ -143,6 +143,7 @@ test: add coverage for OTLP trace parsing
 src/agentevals/       # Python backend (FastAPI, CLI, evaluation engine)
 ui/src/               # React frontend (Vite, Ant Design, TypeScript)
 tests/                # Python tests (pytest)
+examples/             # Agent examples (zero-code, SDK, custom evaluators)
 samples/              # Example traces and eval sets
 docs/                 # Documentation
 ```

@@ -2,21 +2,35 @@
   <img src="docs/assets/logo-color.png" alt="agentevals" width="420" />
 </p>
 
-`agentevals` scores agent behavior from OpenTelemetry traces without re-running the agent. It parses OTLP streams and Jaeger JSON traces, then evaluates them against golden eval sets using ADK's evaluation framework.
+`agentevals` evaluates AI agent behavior from OpenTelemetry traces, without re-running the agent. Record once, score as many times as you want.
 
-Ships as a **CLI** for scripting and CI, a **web UI** for visual inspection and interactive evaluation, and an **MCP server** so Claude Code can run evaluations directly from a conversation.
+Works with any OTel-instrumented framework (LangChain, Strands, Google ADK, and others). Supports Jaeger JSON and OTLP trace formats, built-in and custom evaluators, and LLM-based judges.
+
+- **CLI** for scripting and CI pipelines
+- **Web UI** for visual inspection and local developer experience
+- **MCP server** so MCP clients can run evaluations from a conversation
 
 > [!IMPORTANT]
 > This project is under active development. Expect breaking changes.
 
+## Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Integration](#integration)
+- [CLI](#cli)
+- [Custom Evaluators](#custom-evaluators)
+- [Web UI](#web-ui)
+- [REST API Reference](#rest-api-reference)
+- [MCP Server](#mcp-server)
+- [Claude Code Skills](#claude-code-skills)
+- [Docs](#docs)
+- [Development](#development)
+- [FAQ](#faq)
+
 ## Installation
 
-Download a release wheel from the [releases page](../../releases):
-
-| Variant | Description |
-|---------|-------------|
-| **core** | CLI + REST API, batch evaluation only |
-| **bundle** | CLI + REST API + Streaming + embedded web UI |
+Grab a wheel from the [releases page](../../releases). The **core** wheel has the CLI and REST API. The **bundle** wheel adds streaming and the embedded web UI.
 
 ```bash
 pip install agentevals-<version>-py3-none-any.whl
@@ -28,7 +42,7 @@ pip install "agentevals-<version>-py3-none-any.whl[live]"
 **From source** with `uv` or Nix:
 
 ```bash
-uv sync              
+uv sync
 # or: nix develop .
 ```
 
@@ -44,10 +58,10 @@ uv run agentevals run samples/helm.json \
   -m tool_trajectory_avg_score
 ```
 
-List available metrics:
+List available evaluators:
 
 ```bash
-uv run agentevals list-metrics
+uv run agentevals evaluator list
 ```
 
 ## Integration
@@ -102,6 +116,12 @@ uv run agentevals run samples/helm.json samples/k8s.json \
 uv run agentevals run samples/helm.json \
   --eval-set samples/eval_set_helm.json \
   --output json
+
+# List available evaluators (builtin + community)
+uv run agentevals evaluator list
+
+# List only builtin evaluators
+uv run agentevals evaluator list --source builtin
 ```
 
 ## Custom Evaluators
@@ -112,7 +132,14 @@ Beyond the built-in metrics, you can write your own evaluators in Python, JavaSc
 agentevals evaluator init my_evaluator
 ```
 
-This scaffolds a directory with boilerplate and a manifest. Implement your scoring logic, then reference it in an eval config:
+This scaffolds a directory with boilerplate and a manifest. You can also list supported runtimes and generate config snippets:
+
+```bash
+agentevals evaluator runtimes           # show supported languages
+agentevals evaluator config my_evaluator --path ./evaluators/my_evaluator.py
+```
+
+Implement your scoring logic, then reference it in an eval config:
 
 ```yaml
 # eval_config.yaml
@@ -195,6 +222,7 @@ Two slash-command workflows in `.claude/skills/`, available automatically in thi
 |-------|-------------|
 | [Eval Set Format](docs/eval-set-format.md) | Schema, field reference, and examples for golden eval set JSON files |
 | [Custom Evaluators](docs/custom-evaluators.md) | Write your own scoring logic in Python, JavaScript, or any language |
+| [Live Streaming](docs/streaming.md) | Real-time trace streaming, dev server setup, and session management |
 | [OpenTelemetry Compatibility](docs/otel-compatibility.md) | Supported OTel conventions, message delivery mechanisms, and OTLP receiver |
 
 ## Development

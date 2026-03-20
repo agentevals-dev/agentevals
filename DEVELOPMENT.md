@@ -2,14 +2,14 @@
 
 ## Distribution tiers
 
-agentevals ships as three distinct configurations from a single codebase:
+agentevals ships as two distribution variants from a single codebase:
 
-| Tier | Install | Serve behavior |
-|------|---------|----------------|
-| **Core** | `pip install agentevals` | REST API only — stateless batch evaluation endpoints |
-| **Bundle** | `pip install agentevals` (bundled wheel) | REST API + WebSocket streaming + session management + embedded React UI |
+| Tier | Install | What you get |
+|------|---------|--------------|
+| **Core** | `pip install agentevals` | CLI + REST API + live mode (WebSocket streaming, sessions, SSE) |
+| **Bundle** | `pip install agentevals` (bundled wheel) | Everything in Core + embedded React UI |
 
-Live mode (WebSocket streaming, session management, SSE) is enabled automatically when `--dev` is passed or when the bundled UI is detected — no extra dependencies required.
+Live mode (WebSocket streaming, session management, SSE) is always enabled when running `agentevals serve`. The `--dev` flag adds hot reload and dev-friendly console output but does not change what features are active.
 
 The optional `[live]` extra (`pip install "agentevals[live]"`) adds `mcp` and `httpx`, which are only needed for the MCP server (`agentevals mcp`). The bundled wheel is built with `make build-bundle` and includes compiled UI assets baked into the package.
 
@@ -43,7 +43,7 @@ Both `build` and `build-bundle` produce `dist/agentevals-*.whl` with the same pa
 make test              # run all tests (unit + integration, excludes e2e)
 make test-unit         # unit tests only (fast, no server startup)
 make test-integration  # integration tests — OTLP pipeline, session grouping, timing (no API keys)
-make test-e2e          # E2E tests — real agents as subprocesses (requires OPENAI_API_KEY)
+make test-e2e          # E2E tests — real agents as subprocesses (requires OPENAI_API_KEY and/or GOOGLE_API_KEY)
 ```
 
 ### Cleanup
@@ -62,7 +62,7 @@ Tests are organized into three tiers with different trade-offs:
 |------|----------|-----------|----------|------------------|
 | **Unit** | `tests/` (excl. integration) | `TestClient` / mocks | None | Business logic, route handlers, converters |
 | **Integration** | `tests/integration/` | ASGI in-process | None | OTLP session grouping, timing, concurrent batches, eval pipeline |
-| **E2E** | `tests/integration/test_live_agents.py` | Real uvicorn servers | `OPENAI_API_KEY` | Full pipeline — real agent → OTLP export → session creation → invocation extraction → API visibility |
+| **E2E** | `tests/integration/test_live_agents.py` | Real uvicorn servers | `OPENAI_API_KEY`, `GOOGLE_API_KEY` | Full pipeline — real agent → OTLP export → session creation → invocation extraction → API visibility |
 
 Integration tests use `httpx.ASGITransport` to hit the OTLP and streaming API routes in-process (no ports, no real HTTP). Timers are configured fast (0.1s grace, 0.5s idle) for quick deterministic tests.
 
@@ -70,7 +70,7 @@ E2E tests start real uvicorn servers on ephemeral ports in a background thread, 
 
 ### Running E2E tests
 
-E2E tests require `OPENAI_API_KEY` (used by LangChain and Strands agents). They are skipped automatically when the key is not set.
+E2E tests require `OPENAI_API_KEY` (LangChain and Strands agents) and/or `GOOGLE_API_KEY` (ADK agents). Each test class is skipped automatically when its required key is not set.
 
 ```bash
 # Source your .env and run
@@ -81,7 +81,7 @@ set -a && source .env && set +a && make test-e2e
 
 When adding a new example agent to `examples/`, add corresponding E2E tests to ensure the full OTLP pipeline works:
 
-1. Add a test class in `tests/integration/test_live_agents.py` following the existing pattern (`TestLangchainZeroCode`, `TestStrandsZeroCode`)
+1. Add a test class in `tests/integration/test_live_agents.py` following the existing pattern (`TestLangchainZeroCode`, `TestStrandsZeroCode`, `TestAdkZeroCode`)
 2. Each agent should have at minimum three tests:
    - **Session creation** — agent runs successfully, session is created with spans (and logs if applicable)
    - **Invocation extraction** — invocations are extracted with user/agent content
@@ -93,13 +93,13 @@ When adding a new example agent to `examples/`, add corresponding E2E tests to e
 
 ## Runtime behavior
 
-The serve command auto-detects the active mode:
+The serve command always enables live mode (WebSocket, streaming, sessions). The flags control UI serving and reload behavior:
 
-- `agentevals serve` — REST-only if no bundled UI present; full experience if bundled wheel
-- `agentevals serve --dev` — always enables live mode (WebSocket + streaming + sessions)
-- `agentevals serve --headless` — disables UI serving even in bundled builds (API-only)
+- `agentevals serve` — live mode + REST API; UI served if bundled `_static/` is present
+- `agentevals serve --dev` — same as above + hot reload on source changes + dev console output
+- `agentevals serve --headless` — live mode + REST API, UI suppressed even if bundled
 
-Controlled by environment variables `AGENTEVALS_LIVE=1` and `AGENTEVALS_HEADLESS=1`, which the CLI sets automatically based on flags and detected `_static/` presence.
+Controlled by environment variables `AGENTEVALS_LIVE=1` (always set by the CLI) and `AGENTEVALS_HEADLESS=1` (set when `--headless` is passed).
 
 ## NixOS / Nix devshell
 
