@@ -22,7 +22,7 @@ class EvaluatorResolver:
     def register_source(self, source: EvaluatorSource) -> None:
         self._sources[source.source_name] = source
 
-    async def resolve(self, evaluator_def) -> "CodeEvaluatorDef":
+    async def resolve(self, evaluator_def) -> "CodeEvaluatorDef":  # noqa: F821
         """Download a remote evaluator and return a CodeEvaluatorDef pointing to the cached file."""
         from ..config import CodeEvaluatorDef, RemoteEvaluatorDef
 
@@ -31,7 +31,9 @@ class EvaluatorResolver:
 
         source = self._sources.get(evaluator_def.source)
         if source is None:
-            raise ValueError(f"Unknown evaluator source '{evaluator_def.source}'. Available: {sorted(self._sources.keys())}")
+            raise ValueError(
+                f"Unknown evaluator source '{evaluator_def.source}'. Available: {sorted(self._sources.keys())}"
+            )
 
         dest = self._cache_dir / evaluator_def.source / evaluator_def.ref
         if not dest.exists():

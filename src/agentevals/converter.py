@@ -111,8 +111,6 @@ def _find_adk_spans(trace: Trace, operation: str) -> list[Span]:
 
 
 def _convert_invoke_span(invoke_span: Span) -> Invocation:
-    agent_name = invoke_span.get_tag(OTEL_GENAI_AGENT_NAME, "unknown")
-
     call_llm_spans = _find_children_by_op(invoke_span, "call_llm")
     if not call_llm_spans:
         raise ValueError(f"invoke_agent span {invoke_span.span_id} has no child call_llm spans")

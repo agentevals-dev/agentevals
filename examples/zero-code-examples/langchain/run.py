@@ -50,22 +50,17 @@ def main():
 
     os.environ.setdefault(
         "OTEL_RESOURCE_ATTRIBUTES",
-        "agentevals.eval_set_id=langchain_agent_eval,"
-        "agentevals.session_name=langchain-zero-code",
+        "agentevals.eval_set_id=langchain_agent_eval,agentevals.session_name=langchain-zero-code",
     )
 
     resource = Resource.create()
 
     tracer_provider = TracerProvider(resource=resource)
-    tracer_provider.add_span_processor(
-        BatchSpanProcessor(OTLPSpanExporter(), schedule_delay_millis=1000)
-    )
+    tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(), schedule_delay_millis=1000))
     trace.set_tracer_provider(tracer_provider)
 
     logger_provider = LoggerProvider(resource=resource)
-    logger_provider.add_log_record_processor(
-        BatchLogRecordProcessor(OTLPLogExporter(), schedule_delay_millis=1000)
-    )
+    logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter(), schedule_delay_millis=1000))
     set_logger_provider(logger_provider)
 
     OpenAIInstrumentor().instrument()
@@ -101,11 +96,7 @@ def main():
                 selected_tool = {t.name: t for t in tools}.get(tool_name)
                 if selected_tool:
                     tool_result = selected_tool.invoke(tool_args)
-                    messages.append(
-                        ToolMessage(
-                            content=str(tool_result), tool_call_id=tool_call["id"]
-                        )
-                    )
+                    messages.append(ToolMessage(content=str(tool_result), tool_call_id=tool_call["id"]))
         else:
             print("     Agent: [Max iterations reached]")
 

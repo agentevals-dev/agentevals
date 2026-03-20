@@ -277,7 +277,7 @@ class AgentEvals:
         elif interactive:
             while True:
                 try:
-                    prompt = input("> ")
+                    prompt = input("> ")  # noqa: ASYNC250
                 except (EOFError, KeyboardInterrupt):
                     break
                 result = await self._agent_fn(prompt)

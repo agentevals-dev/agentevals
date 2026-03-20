@@ -35,14 +35,10 @@ def response_quality(input: EvalInput) -> EvalResult:
         if len(inv.final_response.strip()) < min_len:
             score -= 0.3
             issues.append(
-                f"{inv.invocation_id}: response too short "
-                f"({len(inv.final_response.strip())} < {min_len} chars)"
+                f"{inv.invocation_id}: response too short ({len(inv.final_response.strip())} < {min_len} chars)"
             )
 
-        if (
-            inv.user_content
-            and inv.final_response.strip().lower() == inv.user_content.strip().lower()
-        ):
+        if inv.user_content and inv.final_response.strip().lower() == inv.user_content.strip().lower():
             score -= 0.5
             issues.append(f"{inv.invocation_id}: response is just the user input echoed back")
 

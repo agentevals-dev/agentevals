@@ -20,6 +20,7 @@ def evaluator(fn: Callable[[EvalInput], EvalResult]) -> Callable[[EvalInput], Ev
 
         from agentevals_evaluator_sdk import evaluator, EvalInput, EvalResult
 
+
         @evaluator
         def format_check(input: EvalInput) -> EvalResult:
             score = 1.0
@@ -27,6 +28,7 @@ def evaluator(fn: Callable[[EvalInput], EvalResult]) -> Callable[[EvalInput], Ev
                 if not inv.final_response:
                     score -= 0.5
             return EvalResult(score=max(0.0, score))
+
 
         if __name__ == "__main__":
             format_check.run()
@@ -59,9 +61,7 @@ def evaluator(fn: Callable[[EvalInput], EvalResult]) -> Callable[[EvalInput], Ev
             sys.exit(1)
 
         if not isinstance(result, EvalResult):
-            _write_error(
-                f"Evaluator function must return EvalResult, got {type(result).__name__}"
-            )
+            _write_error(f"Evaluator function must return EvalResult, got {type(result).__name__}")
             sys.exit(1)
 
         sys.stdout.write(result.model_dump_json())

@@ -81,11 +81,7 @@ def test_otlp_loader_full_export():
     otlp_export = {
         "resourceSpans": [
             {
-                "resource": {
-                    "attributes": [
-                        {"key": "service.name", "value": {"stringValue": "my-agent"}}
-                    ]
-                },
+                "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "my-agent"}}]},
                 "scopeSpans": [
                     {
                         "scope": {
@@ -113,9 +109,7 @@ def test_otlp_loader_full_export():
         ]
     }
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(otlp_export, f)
         temp_path = f.name
 

@@ -206,9 +206,7 @@ class TestSyncSession:
         app = AgentEvals(auto_instrument=False)
 
         with app.session(eval_set_id="e1", session_name="s1", metadata={"k": "v"}):
-            mock_proc.connect.assert_called_once_with(
-                eval_set_id="e1", metadata={"k": "v"}
-            )
+            mock_proc.connect.assert_called_once_with(eval_set_id="e1", metadata={"k": "v"})
 
         mock_proc.shutdown_async.assert_called_once()
 
@@ -288,6 +286,7 @@ class TestSyncSession:
 
         # Give the thread a moment to fully terminate after join
         import time
+
         time.sleep(0.1)
         assert threading.active_count() <= threads_before + 1
 
@@ -305,6 +304,7 @@ class TestSyncSession:
                 pass
 
         import time
+
         time.sleep(0.1)
         assert threading.active_count() <= threads_before + 1
 
@@ -340,9 +340,7 @@ class TestAsyncSession:
 
         async def _test():
             async with app.session_async(eval_set_id="e1", session_name="s1", metadata={"k": "v"}):
-                mock_proc.connect.assert_called_once_with(
-                    eval_set_id="e1", metadata={"k": "v"}
-                )
+                mock_proc.connect.assert_called_once_with(eval_set_id="e1", metadata={"k": "v"})
             mock_proc.shutdown_async.assert_called_once()
 
         asyncio.run(_test())
@@ -464,9 +462,11 @@ class TestStreamingDisabled:
 class TestLazyImport:
     def test_import_agent_evals(self):
         from agentevals import AgentEvals as Imported
+
         assert Imported is AgentEvals
 
     def test_invalid_attribute(self):
         import agentevals
+
         with pytest.raises(AttributeError, match="has no attribute"):
-            getattr(agentevals, "DoesNotExist")
+            agentevals.DoesNotExist  # noqa: B018

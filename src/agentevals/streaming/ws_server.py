@@ -478,7 +478,6 @@ class StreamingTraceManager:
 
                 elif event["type"] == "span":
                     sid = event["session_id"]
-                    span_name = event["span"].get("name", "unknown")
 
                     if sid not in self.sessions:
                         logger.warning("Span for unknown session: %s", sid)
@@ -591,7 +590,7 @@ class StreamingTraceManager:
 
         enriched_spans = enrich_spans_with_logs(session.spans, session.logs, session.session_id)
 
-        with open(temp_file, "w") as f:
+        with open(temp_file, "w") as f:  # noqa: ASYNC230
             for span in enriched_spans:
                 span_copy = span.copy()
                 span_copy["traceId"] = session.trace_id
@@ -756,17 +755,12 @@ class StreamingTraceManager:
         return model_info
 
     @staticmethod
-    def _augment_tool_responses_from_logs(
-        invocations_data: list[dict], session: TraceSession
-    ) -> None:
+    def _augment_tool_responses_from_logs(invocations_data: list[dict], session: TraceSession) -> None:
         """Fill in missing tool responses from session logs (e.g. LangChain gen_ai.tool.message)."""
         if not session.logs:
             return
 
-        needs_responses = any(
-            inv.get("toolCalls") and not inv.get("toolResponses")
-            for inv in invocations_data
-        )
+        needs_responses = any(inv.get("toolCalls") and not inv.get("toolResponses") for inv in invocations_data)
         if not needs_responses:
             return
 
@@ -791,11 +785,13 @@ class StreamingTraceManager:
                 continue
 
             response = parse_tool_response_content(content)
-            tool_results_by_span.setdefault(span_id, []).append({
-                "name": body.get("name") or tool_names.get(tool_id, "unknown"),
-                "response": response,
-                "id": tool_id,
-            })
+            tool_results_by_span.setdefault(span_id, []).append(
+                {
+                    "name": body.get("name") or tool_names.get(tool_id, "unknown"),
+                    "response": response,
+                    "id": tool_id,
+                }
+            )
 
         if not tool_results_by_span:
             return

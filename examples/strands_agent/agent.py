@@ -34,6 +34,7 @@ def check_prime(nums: list[int]) -> dict:
     Returns:
         Dictionary with primality results and list of prime numbers
     """
+
     def is_prime(n: int) -> bool:
         if n < 2:
             return False

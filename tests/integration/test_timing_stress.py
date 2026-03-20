@@ -31,37 +31,57 @@ class TestInterleavedBatches:
         session_name = "interleaved"
 
         # Batch 1: spans from first LLM call
-        await send_traces(otlp_client, make_trace_request(
-            trace_id="t1", session_name=session_name,
-            spans=[make_genai_span(trace_id="t1", span_id="s1")],
-        ))
+        await send_traces(
+            otlp_client,
+            make_trace_request(
+                trace_id="t1",
+                session_name=session_name,
+                spans=[make_genai_span(trace_id="t1", span_id="s1")],
+            ),
+        )
         await asyncio.sleep(0.02)
 
         # Batch 2: logs from first LLM call (arrive after spans)
-        await send_logs(otlp_client, make_log_request(
-            trace_id="t1", session_name=session_name,
-            log_records=[make_genai_log("gen_ai.user.message", "Hello", trace_id="t1")],
-        ))
+        await send_logs(
+            otlp_client,
+            make_log_request(
+                trace_id="t1",
+                session_name=session_name,
+                log_records=[make_genai_log("gen_ai.user.message", "Hello", trace_id="t1")],
+            ),
+        )
         await asyncio.sleep(0.02)
 
         # Batch 3: spans from second LLM call (different trace_id, same session)
-        await send_traces(otlp_client, make_trace_request(
-            trace_id="t2", session_name=session_name,
-            spans=[make_genai_span(trace_id="t2", span_id="s2")],
-        ))
+        await send_traces(
+            otlp_client,
+            make_trace_request(
+                trace_id="t2",
+                session_name=session_name,
+                spans=[make_genai_span(trace_id="t2", span_id="s2")],
+            ),
+        )
         await asyncio.sleep(0.02)
 
         # Batch 4: logs from second LLM call
-        await send_logs(otlp_client, make_log_request(
-            trace_id="t2", session_name=session_name,
-            log_records=[make_genai_log("gen_ai.user.message", "World", trace_id="t2")],
-        ))
+        await send_logs(
+            otlp_client,
+            make_log_request(
+                trace_id="t2",
+                session_name=session_name,
+                log_records=[make_genai_log("gen_ai.user.message", "World", trace_id="t2")],
+            ),
+        )
 
         # Complete with root span
-        await send_traces(otlp_client, make_trace_request(
-            trace_id="t3", session_name=session_name,
-            spans=[make_genai_span(trace_id="t3", parent_span_id=None)],
-        ))
+        await send_traces(
+            otlp_client,
+            make_trace_request(
+                trace_id="t3",
+                session_name=session_name,
+                spans=[make_genai_span(trace_id="t3", parent_span_id=None)],
+            ),
+        )
 
         await wait_for_session_complete(trace_manager, session_name)
 
@@ -77,18 +97,26 @@ class TestConcurrentRequests:
         session_name = "concurrent"
 
         async def send_trace(idx: int):
-            await send_traces(otlp_client, make_trace_request(
-                trace_id=f"ct-{idx}", session_name=session_name,
-                spans=[make_genai_span(trace_id=f"ct-{idx}")],
-            ))
+            await send_traces(
+                otlp_client,
+                make_trace_request(
+                    trace_id=f"ct-{idx}",
+                    session_name=session_name,
+                    spans=[make_genai_span(trace_id=f"ct-{idx}")],
+                ),
+            )
 
         await asyncio.gather(*[send_trace(i) for i in range(5)])
 
         # Complete
-        await send_traces(otlp_client, make_trace_request(
-            trace_id="ct-root", session_name=session_name,
-            spans=[make_genai_span(trace_id="ct-root", parent_span_id=None)],
-        ))
+        await send_traces(
+            otlp_client,
+            make_trace_request(
+                trace_id="ct-root",
+                session_name=session_name,
+                spans=[make_genai_span(trace_id="ct-root", parent_span_id=None)],
+            ),
+        )
         await wait_for_session_complete(trace_manager, session_name)
 
         session = trace_manager.sessions[session_name]
@@ -99,10 +127,14 @@ class TestConcurrentRequests:
         """Interleaved spans from session A and B in concurrent requests."""
 
         async def send_for_session(name: str, idx: int):
-            await send_traces(otlp_client, make_trace_request(
-                trace_id=f"{name}-{idx}", session_name=name,
-                spans=[make_genai_span(trace_id=f"{name}-{idx}")],
-            ))
+            await send_traces(
+                otlp_client,
+                make_trace_request(
+                    trace_id=f"{name}-{idx}",
+                    session_name=name,
+                    spans=[make_genai_span(trace_id=f"{name}-{idx}")],
+                ),
+            )
 
         tasks = []
         for i in range(3):
@@ -112,10 +144,14 @@ class TestConcurrentRequests:
 
         # Complete both
         for name in ["sess-a", "sess-b"]:
-            await send_traces(otlp_client, make_trace_request(
-                trace_id=f"{name}-root", session_name=name,
-                spans=[make_genai_span(trace_id=f"{name}-root", parent_span_id=None)],
-            ))
+            await send_traces(
+                otlp_client,
+                make_trace_request(
+                    trace_id=f"{name}-root",
+                    session_name=name,
+                    spans=[make_genai_span(trace_id=f"{name}-root", parent_span_id=None)],
+                ),
+            )
 
         await wait_for_session_complete(trace_manager, "sess-a")
         await wait_for_session_complete(trace_manager, "sess-b")
@@ -133,24 +169,32 @@ class TestGracePeriodInteractions:
         session_name = "grace-logs"
 
         # Send spans including root
-        await send_traces(otlp_client, make_trace_request(
-            trace_id="gl-t1", session_name=session_name,
-            spans=[
-                make_genai_span(trace_id="gl-t1", span_id="child", parent_span_id="root"),
-                make_genai_span(trace_id="gl-t1", span_id="root", parent_span_id=None),
-            ],
-        ))
+        await send_traces(
+            otlp_client,
+            make_trace_request(
+                trace_id="gl-t1",
+                session_name=session_name,
+                spans=[
+                    make_genai_span(trace_id="gl-t1", span_id="child", parent_span_id="root"),
+                    make_genai_span(trace_id="gl-t1", span_id="root", parent_span_id=None),
+                ],
+            ),
+        )
 
         # Immediately send logs (before grace period expires)
         session = trace_manager.sessions[session_name]
         assert not session.is_complete
 
-        await send_logs(otlp_client, make_log_request(
-            trace_id="gl-t1", session_name=session_name,
-            log_records=[
-                make_genai_log("gen_ai.user.message", "Grace test", trace_id="gl-t1"),
-            ],
-        ))
+        await send_logs(
+            otlp_client,
+            make_log_request(
+                trace_id="gl-t1",
+                session_name=session_name,
+                log_records=[
+                    make_genai_log("gen_ai.user.message", "Grace test", trace_id="gl-t1"),
+                ],
+            ),
+        )
 
         await wait_for_session_complete(trace_manager, session_name)
 
@@ -164,16 +208,24 @@ class TestRapidSequentialSessions:
         but new trace_id. Since trace_id is unknown, a new session is created."""
         session_name = "rapid"
 
-        await send_traces(otlp_client, make_trace_request(
-            trace_id="rapid-a", session_name=session_name,
-            spans=[make_genai_span(trace_id="rapid-a", parent_span_id=None)],
-        ))
+        await send_traces(
+            otlp_client,
+            make_trace_request(
+                trace_id="rapid-a",
+                session_name=session_name,
+                spans=[make_genai_span(trace_id="rapid-a", parent_span_id=None)],
+            ),
+        )
         await wait_for_session_complete(trace_manager, session_name)
 
-        await send_traces(otlp_client, make_trace_request(
-            trace_id="rapid-b", session_name=session_name,
-            spans=[make_genai_span(trace_id="rapid-b", parent_span_id=None)],
-        ))
+        await send_traces(
+            otlp_client,
+            make_trace_request(
+                trace_id="rapid-b",
+                session_name=session_name,
+                spans=[make_genai_span(trace_id="rapid-b", parent_span_id=None)],
+            ),
+        )
         await wait_for_session_complete(trace_manager, f"{session_name}-2")
 
         a = trace_manager.sessions[session_name]
@@ -183,30 +235,35 @@ class TestRapidSequentialSessions:
         assert len(a.spans) == 1
         assert len(b.spans) == 1
 
-    async def test_split_batch_reopens_despite_rapid_timing(
-        self, trace_manager, otlp_client
-    ):
+    async def test_split_batch_reopens_despite_rapid_timing(self, trace_manager, otlp_client):
         """Even with rapid timing, a known trace_id reopens the session."""
         session_name = "rapid-split"
 
         # Batch 1: root span + child from next trace
-        await send_traces(otlp_client, make_trace_request(
-            trace_id="rs-t1", session_name=session_name,
-            spans=[
-                make_genai_span(trace_id="rs-t1", parent_span_id=None),
-                make_genai_span(trace_id="rs-t2", span_id="t2-child",
-                                parent_span_id="t2-root"),
-            ],
-        ))
+        await send_traces(
+            otlp_client,
+            make_trace_request(
+                trace_id="rs-t1",
+                session_name=session_name,
+                spans=[
+                    make_genai_span(trace_id="rs-t1", parent_span_id=None),
+                    make_genai_span(trace_id="rs-t2", span_id="t2-child", parent_span_id="t2-root"),
+                ],
+            ),
+        )
         await wait_for_session_complete(trace_manager, session_name)
 
         # Batch 2: rest of the split trace
-        await send_traces(otlp_client, make_trace_request(
-            trace_id="rs-t2", session_name=session_name,
-            spans=[
-                make_genai_span(trace_id="rs-t2", span_id="t2-root", parent_span_id=None),
-            ],
-        ))
+        await send_traces(
+            otlp_client,
+            make_trace_request(
+                trace_id="rs-t2",
+                session_name=session_name,
+                spans=[
+                    make_genai_span(trace_id="rs-t2", span_id="t2-root", parent_span_id=None),
+                ],
+            ),
+        )
         await wait_for_session_complete(trace_manager, session_name)
 
         assert len(trace_manager.sessions) == 1
@@ -241,10 +298,14 @@ class TestLargeBatches:
         """Logs with different trace_ids that map to different sessions."""
         # Create two sessions
         for name in ["log-batch-a", "log-batch-b"]:
-            await send_traces(otlp_client, make_trace_request(
-                trace_id=f"t-{name}", session_name=name,
-                spans=[make_genai_span(trace_id=f"t-{name}")],
-            ))
+            await send_traces(
+                otlp_client,
+                make_trace_request(
+                    trace_id=f"t-{name}",
+                    session_name=name,
+                    spans=[make_genai_span(trace_id=f"t-{name}")],
+                ),
+            )
 
         # Single log batch with entries for both sessions
         log_body = make_log_request(
@@ -267,10 +328,14 @@ class TestLargeBatches:
 
         # Complete both with root spans
         for name in ["log-batch-a", "log-batch-b"]:
-            await send_traces(otlp_client, make_trace_request(
-                trace_id=f"t-{name}-root", session_name=name,
-                spans=[make_genai_span(trace_id=f"t-{name}-root", parent_span_id=None)],
-            ))
+            await send_traces(
+                otlp_client,
+                make_trace_request(
+                    trace_id=f"t-{name}-root",
+                    session_name=name,
+                    spans=[make_genai_span(trace_id=f"t-{name}-root", parent_span_id=None)],
+                ),
+            )
 
         await wait_for_session_complete(trace_manager, "log-batch-a")
         await wait_for_session_complete(trace_manager, "log-batch-b")

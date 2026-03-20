@@ -217,7 +217,7 @@ class GitHubEvaluatorSource(EvaluatorSource):
             resp.raise_for_status()
 
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(resp.text, encoding="utf-8")
+        dest.write_text(resp.text, encoding="utf-8")  # noqa: ASYNC240
         return dest
 
 

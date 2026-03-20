@@ -90,9 +90,7 @@ def setup_otel_streaming(ws_url: str, session_id: str, eval_set_id: str | None =
     thread = threading.Thread(target=run_loop_in_background, daemon=True)
     thread.start()
 
-    future = asyncio.run_coroutine_threadsafe(
-        processor.connect(eval_set_id=eval_set_id), loop
-    )
+    future = asyncio.run_coroutine_threadsafe(processor.connect(eval_set_id=eval_set_id), loop)
     future.result()
 
     tracer_provider.add_span_processor(processor)
@@ -161,11 +159,7 @@ def main():
                 selected_tool = {t.name: t for t in tools}.get(tool_name)
                 if selected_tool:
                     tool_result = selected_tool.invoke(tool_args)
-                    messages.append(
-                        ToolMessage(
-                            content=str(tool_result), tool_call_id=tool_call["id"]
-                        )
-                    )
+                    messages.append(ToolMessage(content=str(tool_result), tool_call_id=tool_call["id"]))
         else:
             print("     Agent: [Max iterations reached]")
 

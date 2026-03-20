@@ -3,9 +3,8 @@ import os
 
 import pytest
 
-from agentevals.loader.jaeger import JaegerJsonLoader
 from agentevals.loader.base import Span, Trace
-
+from agentevals.loader.jaeger import JaegerJsonLoader
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), "..", "samples")
 

@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 from agentevals.api.otlp_routes import (
     _convert_otlp_log_record,
-    _decode_protobuf_traces,
     _decode_protobuf_logs,
+    _decode_protobuf_traces,
     _extract_agentevals_metadata,
     _fix_protobuf_id_fields,
     _normalize_span,
     _parse_otlp_body,
-    _process_traces,
     _process_logs,
+    _process_traces,
     set_trace_manager,
 )
 from agentevals.streaming.session import TraceSession
@@ -117,9 +117,11 @@ class TestNormalizeSpan:
         assert "otel.scope.version" in attr_keys
 
     def test_does_not_duplicate_existing_scope(self):
-        span = _make_span(attributes=[
-            _make_otlp_attr("otel.scope.name", "existing-scope"),
-        ])
+        span = _make_span(
+            attributes=[
+                _make_otlp_attr("otel.scope.name", "existing-scope"),
+            ]
+        )
         result = _normalize_span(span, "gcp.vertex.agent", "1.0.0")
         scope_attrs = [a for a in result["attributes"] if a["key"] == "otel.scope.name"]
         assert len(scope_attrs) == 1
@@ -161,9 +163,11 @@ class TestNormalizeSpan:
         assert "gen_ai.output.messages" in attr_keys
 
     def test_event_promotion_does_not_overwrite_existing(self):
-        span = _make_span(attributes=[
-            _make_otlp_attr("gen_ai.input.messages", '[{"existing": true}]'),
-        ])
+        span = _make_span(
+            attributes=[
+                _make_otlp_attr("gen_ai.input.messages", '[{"existing": true}]'),
+            ]
+        )
         span["events"] = [
             {
                 "name": "gen_ai.client.inference.operation.details",
@@ -292,10 +296,17 @@ class TestParseOtlpBody:
                 "values": [
                     {"key": "index", "value": {"intValue": "0"}},
                     {"key": "finish_reason", "value": {"stringValue": "stop"}},
-                    {"key": "message", "value": {"kvlistValue": {"values": [
-                        {"key": "role", "value": {"stringValue": "assistant"}},
-                        {"key": "content", "value": {"stringValue": "Hello!"}},
-                    ]}}},
+                    {
+                        "key": "message",
+                        "value": {
+                            "kvlistValue": {
+                                "values": [
+                                    {"key": "role", "value": {"stringValue": "assistant"}},
+                                    {"key": "content", "value": {"stringValue": "Hello!"}},
+                                ]
+                            }
+                        },
+                    },
                 ]
             }
         }
@@ -312,12 +323,23 @@ class TestParseOtlpBody:
             "kvlistValue": {
                 "values": [
                     {"key": "role", "value": {"stringValue": "assistant"}},
-                    {"key": "tool_calls", "value": {"arrayValue": {"values": [
-                        {"kvlistValue": {"values": [
-                            {"key": "id", "value": {"stringValue": "call_1"}},
-                            {"key": "type", "value": {"stringValue": "function"}},
-                        ]}},
-                    ]}}},
+                    {
+                        "key": "tool_calls",
+                        "value": {
+                            "arrayValue": {
+                                "values": [
+                                    {
+                                        "kvlistValue": {
+                                            "values": [
+                                                {"key": "id", "value": {"stringValue": "call_1"}},
+                                                {"key": "type", "value": {"stringValue": "function"}},
+                                            ]
+                                        }
+                                    },
+                                ]
+                            }
+                        },
+                    },
                 ]
             }
         }
@@ -334,9 +356,13 @@ class TestConvertOtlpLogRecordEventName:
         record = {
             "eventName": "gen_ai.user.message",
             "observedTimeUnixNano": "1773581221981770020",
-            "body": {"kvlistValue": {"values": [
-                {"key": "content", "value": {"stringValue": "Hello!"}},
-            ]}},
+            "body": {
+                "kvlistValue": {
+                    "values": [
+                        {"key": "content", "value": {"stringValue": "Hello!"}},
+                    ]
+                }
+            },
             "attributes": [
                 _make_otlp_attr("gen_ai.system", "openai"),
             ],
@@ -410,14 +436,25 @@ class TestConvertOtlpLogRecordEventName:
         record = {
             "eventName": "gen_ai.choice",
             "observedTimeUnixNano": "1773581222000000000",
-            "body": {"kvlistValue": {"values": [
-                {"key": "index", "value": {"intValue": "0"}},
-                {"key": "finish_reason", "value": {"stringValue": "stop"}},
-                {"key": "message", "value": {"kvlistValue": {"values": [
-                    {"key": "role", "value": {"stringValue": "assistant"}},
-                    {"key": "content", "value": {"stringValue": "I can help!"}},
-                ]}}},
-            ]}},
+            "body": {
+                "kvlistValue": {
+                    "values": [
+                        {"key": "index", "value": {"intValue": "0"}},
+                        {"key": "finish_reason", "value": {"stringValue": "stop"}},
+                        {
+                            "key": "message",
+                            "value": {
+                                "kvlistValue": {
+                                    "values": [
+                                        {"key": "role", "value": {"stringValue": "assistant"}},
+                                        {"key": "content", "value": {"stringValue": "I can help!"}},
+                                    ]
+                                }
+                            },
+                        },
+                    ]
+                }
+            },
             "attributes": [
                 _make_otlp_attr("gen_ai.system", "openai"),
             ],
@@ -445,28 +482,42 @@ class TestLateLogReextraction:
             mgr.schedule_log_reextraction = MagicMock()
 
             body = {
-                "resourceLogs": [{
-                    "resource": {"attributes": []},
-                    "scopeLogs": [{"logRecords": [{
-                        "eventName": "gen_ai.user.message",
-                        "observedTimeUnixNano": "1000000000",
-                        "body": {"kvlistValue": {"values": [
-                            {"key": "content", "value": {"stringValue": "hello"}},
-                        ]}},
-                        "attributes": [],
-                        "traceId": "trace-abc",
-                    }]}],
-                }]
+                "resourceLogs": [
+                    {
+                        "resource": {"attributes": []},
+                        "scopeLogs": [
+                            {
+                                "logRecords": [
+                                    {
+                                        "eventName": "gen_ai.user.message",
+                                        "observedTimeUnixNano": "1000000000",
+                                        "body": {
+                                            "kvlistValue": {
+                                                "values": [
+                                                    {"key": "content", "value": {"stringValue": "hello"}},
+                                                ]
+                                            }
+                                        },
+                                        "attributes": [],
+                                        "traceId": "trace-abc",
+                                    }
+                                ]
+                            }
+                        ],
+                    }
+                ]
             }
             await _process_logs(body)
 
             assert len(session.logs) == 1
             mgr.schedule_log_reextraction.assert_called_once_with("s1")
+
         _run(go())
 
     def test_late_logs_not_matched_to_completed_session_by_name(self):
         """Logs with a new trace_id should not attach to a completed session
         even if the session_name matches (the next run may reuse the name)."""
+
         async def go():
             mgr = _make_mgr()
             set_trace_manager(mgr)
@@ -476,24 +527,35 @@ class TestLateLogReextraction:
             mgr.buffer_orphan_log = MagicMock()
 
             body = {
-                "resourceLogs": [{
-                    "resource": {"attributes": [
-                        _make_otlp_attr("agentevals.session_name", "named-session"),
-                    ]},
-                    "scopeLogs": [{"logRecords": [{
-                        "eventName": "gen_ai.user.message",
-                        "observedTimeUnixNano": "1000000000",
-                        "body": {"stringValue": '{"content": "hi"}'},
-                        "attributes": [],
-                        "traceId": "new-trace-id",
-                    }]}],
-                }]
+                "resourceLogs": [
+                    {
+                        "resource": {
+                            "attributes": [
+                                _make_otlp_attr("agentevals.session_name", "named-session"),
+                            ]
+                        },
+                        "scopeLogs": [
+                            {
+                                "logRecords": [
+                                    {
+                                        "eventName": "gen_ai.user.message",
+                                        "observedTimeUnixNano": "1000000000",
+                                        "body": {"stringValue": '{"content": "hi"}'},
+                                        "attributes": [],
+                                        "traceId": "new-trace-id",
+                                    }
+                                ]
+                            }
+                        ],
+                    }
+                ]
             }
             await _process_logs(body)
 
             assert len(session.logs) == 0
             assert "new-trace-id" not in session.trace_ids
             mgr.buffer_orphan_log.assert_called_once()
+
         _run(go())
 
 
@@ -521,6 +583,7 @@ class TestGetOrCreateOtlpSession:
             s1 = await mgr.get_or_create_otlp_session("trace-abc", meta)
             s2 = await mgr.get_or_create_otlp_session("trace-abc", meta)
             assert s1 is s2
+
         _run(go())
 
     def test_new_trace_id_does_not_return_complete_session(self):
@@ -532,6 +595,7 @@ class TestGetOrCreateOtlpSession:
             s2 = await mgr.get_or_create_otlp_session("trace-new", meta)
             assert s2 is not s1
             assert s2.session_id == "s1-2"
+
         _run(go())
 
     def test_same_trace_id_reopens_complete_session(self):
@@ -543,10 +607,12 @@ class TestGetOrCreateOtlpSession:
             s2 = await mgr.get_or_create_otlp_session("trace-abc", meta)
             assert s2 is s1
             assert not s2.is_complete
+
         _run(go())
 
     def test_unique_session_ids_across_runs(self):
         """Repeated runs with the same session_name get unique IDs."""
+
         async def go():
             mgr = _make_mgr()
             meta = {"eval_set_id": None, "session_name": "my-agent", "resource_attrs": {}}
@@ -560,6 +626,7 @@ class TestGetOrCreateOtlpSession:
             assert s2.session_id == "my-agent-2"
             assert s3.session_id == "my-agent-3"
             assert len(mgr.sessions) == 3
+
         _run(go())
 
     def test_auto_generates_session_name(self):
@@ -606,6 +673,7 @@ class TestCompleteOtlpSession:
             await mgr._complete_otlp_session("s1")
             assert session.is_complete is True
             assert "s1" not in mgr.incremental_extractors
+
         _run(go())
 
     def test_broadcasts_session_complete(self):
@@ -617,6 +685,7 @@ class TestCompleteOtlpSession:
             await mgr._complete_otlp_session("s1")
             calls = mgr.broadcast_to_ui.call_args_list
             assert any(c[0][0]["type"] == "session_complete" for c in calls)
+
         _run(go())
 
     def test_idempotent(self):
@@ -627,11 +696,9 @@ class TestCompleteOtlpSession:
             mgr.broadcast_to_ui = AsyncMock()
             await mgr._complete_otlp_session("s1")
             await mgr._complete_otlp_session("s1")
-            complete_events = [
-                c for c in mgr.broadcast_to_ui.call_args_list
-                if c[0][0]["type"] == "session_complete"
-            ]
+            complete_events = [c for c in mgr.broadcast_to_ui.call_args_list if c[0][0]["type"] == "session_complete"]
             assert len(complete_events) == 1
+
         _run(go())
 
     def test_missing_session_no_error(self):
@@ -649,6 +716,7 @@ class TestScheduleSessionCompletion:
             assert "s1" in mgr._completion_timers
             assert isinstance(mgr._completion_timers["s1"], asyncio.Task)
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_replaces_existing_timer(self):
@@ -664,6 +732,7 @@ class TestScheduleSessionCompletion:
             await asyncio.sleep(0)
             assert task1.cancelled()
             _cancel_timers(mgr)
+
         _run(go())
 
 
@@ -677,6 +746,7 @@ class TestResetIdleTimer:
             assert "s1" in mgr._idle_timers
             assert isinstance(mgr._idle_timers["s1"], asyncio.Task)
             _cancel_timers(mgr)
+
         _run(go())
 
 
@@ -702,6 +772,7 @@ class TestProcessTraces:
             assert len(session.spans) == 1
             assert session.trace_id == "t1"
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_multiple_spans_same_trace(self):
@@ -719,6 +790,7 @@ class TestProcessTraces:
             assert len(sessions) == 1
             assert len(sessions[0].spans) == 2
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_different_traces_create_different_sessions(self):
@@ -729,15 +801,25 @@ class TestProcessTraces:
                 "resourceSpans": [
                     {
                         "resource": {"attributes": []},
-                        "scopeSpans": [{"scope": {}, "spans": [
-                            _make_span(trace_id="t1", span_id="s1"),
-                        ]}],
+                        "scopeSpans": [
+                            {
+                                "scope": {},
+                                "spans": [
+                                    _make_span(trace_id="t1", span_id="s1"),
+                                ],
+                            }
+                        ],
                     },
                     {
                         "resource": {"attributes": []},
-                        "scopeSpans": [{"scope": {}, "spans": [
-                            _make_span(trace_id="t2", span_id="s2"),
-                        ]}],
+                        "scopeSpans": [
+                            {
+                                "scope": {},
+                                "spans": [
+                                    _make_span(trace_id="t2", span_id="s2"),
+                                ],
+                            }
+                        ],
                     },
                 ]
             }
@@ -746,6 +828,7 @@ class TestProcessTraces:
             assert "t1" in trace_ids
             assert "t2" in trace_ids
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_scope_injected_into_spans(self):
@@ -764,10 +847,12 @@ class TestProcessTraces:
             assert attr_map["otel.scope.name"]["stringValue"] == "gcp.vertex.agent"
             assert attr_map["otel.scope.version"]["stringValue"] == "1.2.3"
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_root_span_schedules_completion(self):
         """Root spans trigger a 3-second grace period for session completion."""
+
         async def go():
             mgr = _make_mgr()
             mgr.schedule_session_completion = MagicMock()
@@ -780,6 +865,7 @@ class TestProcessTraces:
             assert session.has_root_span is True
             mgr.schedule_session_completion.assert_called_once_with(session.session_id)
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_idle_timer_reset_on_each_span(self):
@@ -796,10 +882,12 @@ class TestProcessTraces:
             await _process_traces(body)
             assert mgr.reset_idle_timer.call_count == 2
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_multi_trace_same_session(self):
         """Spans from different traces with the same session_name group into one session."""
+
         async def go():
             mgr = _make_mgr()
             set_trace_manager(mgr)
@@ -821,10 +909,12 @@ class TestProcessTraces:
             assert len(session.spans) == 2
             assert session.trace_ids == {"trace-a", "trace-b"}
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_logs_route_to_multi_trace_session(self):
         """Logs with any of the session's trace_ids are routed correctly."""
+
         async def go():
             mgr = _make_mgr()
             set_trace_manager(mgr)
@@ -842,30 +932,40 @@ class TestProcessTraces:
             await _process_traces(body2)
 
             log_body = {
-                "resourceLogs": [{
-                    "resource": {"attributes": []},
-                    "scopeLogs": [{"logRecords": [{
-                        "timeUnixNano": "1000000000",
-                        "body": {"stringValue": '{"content": "hello"}'},
-                        "attributes": [
-                            _make_otlp_attr("event.name", "gen_ai.user.message"),
+                "resourceLogs": [
+                    {
+                        "resource": {"attributes": []},
+                        "scopeLogs": [
+                            {
+                                "logRecords": [
+                                    {
+                                        "timeUnixNano": "1000000000",
+                                        "body": {"stringValue": '{"content": "hello"}'},
+                                        "attributes": [
+                                            _make_otlp_attr("event.name", "gen_ai.user.message"),
+                                        ],
+                                        "traceId": "trace-a",
+                                    },
+                                    {
+                                        "timeUnixNano": "2000000000",
+                                        "body": {"stringValue": '{"content": "world"}'},
+                                        "attributes": [
+                                            _make_otlp_attr("event.name", "gen_ai.user.message"),
+                                        ],
+                                        "traceId": "trace-b",
+                                    },
+                                ]
+                            }
                         ],
-                        "traceId": "trace-a",
-                    }, {
-                        "timeUnixNano": "2000000000",
-                        "body": {"stringValue": '{"content": "world"}'},
-                        "attributes": [
-                            _make_otlp_attr("event.name", "gen_ai.user.message"),
-                        ],
-                        "traceId": "trace-b",
-                    }]}],
-                }]
+                    }
+                ]
             }
             await _process_logs(log_body)
 
             session = mgr.sessions["my-session"]
             assert len(session.logs) == 2
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_empty_request(self):
@@ -874,6 +974,7 @@ class TestProcessTraces:
             set_trace_manager(mgr)
             await _process_traces({"resourceSpans": []})
             assert len(mgr.sessions) == 0
+
         _run(go())
 
     def test_broadcasts_span_received(self):
@@ -884,12 +985,10 @@ class TestProcessTraces:
                 spans=[_make_span(trace_id="t1")],
             )
             await _process_traces(body)
-            span_received_calls = [
-                c for c in mgr.broadcast_to_ui.call_args_list
-                if c[0][0]["type"] == "span_received"
-            ]
+            span_received_calls = [c for c in mgr.broadcast_to_ui.call_args_list if c[0][0]["type"] == "span_received"]
             assert len(span_received_calls) == 1
             _cancel_timers(mgr)
+
         _run(go())
 
 
@@ -903,54 +1002,85 @@ class TestOrphanLogBuffer:
 
     def test_logs_buffered_when_no_session_exists(self):
         """Logs arriving before any session should be buffered, not dropped."""
+
         async def go():
             mgr = _make_mgr()
             set_trace_manager(mgr)
             body = {
-                "resourceLogs": [{
-                    "resource": {"attributes": [
-                        _make_otlp_attr("agentevals.session_name", "my-agent"),
-                    ]},
-                    "scopeLogs": [{"logRecords": [{
-                        "eventName": "gen_ai.user.message",
-                        "observedTimeUnixNano": "1000000000",
-                        "body": {"kvlistValue": {"values": [
-                            {"key": "content", "value": {"stringValue": "Hello!"}},
-                        ]}},
-                        "attributes": [],
-                        "traceId": "trace-1",
-                        "spanId": "span-1",
-                    }]}],
-                }]
+                "resourceLogs": [
+                    {
+                        "resource": {
+                            "attributes": [
+                                _make_otlp_attr("agentevals.session_name", "my-agent"),
+                            ]
+                        },
+                        "scopeLogs": [
+                            {
+                                "logRecords": [
+                                    {
+                                        "eventName": "gen_ai.user.message",
+                                        "observedTimeUnixNano": "1000000000",
+                                        "body": {
+                                            "kvlistValue": {
+                                                "values": [
+                                                    {"key": "content", "value": {"stringValue": "Hello!"}},
+                                                ]
+                                            }
+                                        },
+                                        "attributes": [],
+                                        "traceId": "trace-1",
+                                        "spanId": "span-1",
+                                    }
+                                ]
+                            }
+                        ],
+                    }
+                ]
             }
             await _process_logs(body)
             assert len(mgr._orphan_logs) == 1
             assert mgr._orphan_logs[0]["trace_id"] == "trace-1"
             assert mgr._orphan_logs[0]["session_name"] == "my-agent"
+
         _run(go())
 
     def test_orphan_logs_replayed_on_session_creation(self):
         """Buffered logs are injected when a matching session is created."""
+
         async def go():
             mgr = _make_mgr()
             set_trace_manager(mgr)
 
             log_body = {
-                "resourceLogs": [{
-                    "resource": {"attributes": [
-                        _make_otlp_attr("agentevals.session_name", "my-agent"),
-                    ]},
-                    "scopeLogs": [{"logRecords": [{
-                        "eventName": "gen_ai.user.message",
-                        "observedTimeUnixNano": "1000000000",
-                        "body": {"kvlistValue": {"values": [
-                            {"key": "content", "value": {"stringValue": "Hello!"}},
-                        ]}},
-                        "attributes": [],
-                        "traceId": "trace-1",
-                        "spanId": "span-1",
-                    }]}],
-                }]
+                "resourceLogs": [
+                    {
+                        "resource": {
+                            "attributes": [
+                                _make_otlp_attr("agentevals.session_name", "my-agent"),
+                            ]
+                        },
+                        "scopeLogs": [
+                            {
+                                "logRecords": [
+                                    {
+                                        "eventName": "gen_ai.user.message",
+                                        "observedTimeUnixNano": "1000000000",
+                                        "body": {
+                                            "kvlistValue": {
+                                                "values": [
+                                                    {"key": "content", "value": {"stringValue": "Hello!"}},
+                                                ]
+                                            }
+                                        },
+                                        "attributes": [],
+                                        "traceId": "trace-1",
+                                        "spanId": "span-1",
+                                    }
+                                ]
+                            }
+                        ],
+                    }
+                ]
             }
             await _process_logs(log_body)
             assert len(mgr._orphan_logs) == 1
@@ -961,30 +1091,46 @@ class TestOrphanLogBuffer:
             assert len(session.logs) == 1
             assert session.logs[0]["event_name"] == "gen_ai.user.message"
             assert len(mgr._orphan_logs) == 0
+
         _run(go())
 
     def test_orphan_logs_matched_by_session_name(self):
         """Orphan logs with different trace_id but same session_name are replayed."""
+
         async def go():
             mgr = _make_mgr()
             set_trace_manager(mgr)
 
             log_body = {
-                "resourceLogs": [{
-                    "resource": {"attributes": [
-                        _make_otlp_attr("agentevals.session_name", "my-agent"),
-                    ]},
-                    "scopeLogs": [{"logRecords": [{
-                        "eventName": "gen_ai.user.message",
-                        "observedTimeUnixNano": "1000000000",
-                        "body": {"kvlistValue": {"values": [
-                            {"key": "content", "value": {"stringValue": "Hello!"}},
-                        ]}},
-                        "attributes": [],
-                        "traceId": "different-trace",
-                        "spanId": "span-1",
-                    }]}],
-                }]
+                "resourceLogs": [
+                    {
+                        "resource": {
+                            "attributes": [
+                                _make_otlp_attr("agentevals.session_name", "my-agent"),
+                            ]
+                        },
+                        "scopeLogs": [
+                            {
+                                "logRecords": [
+                                    {
+                                        "eventName": "gen_ai.user.message",
+                                        "observedTimeUnixNano": "1000000000",
+                                        "body": {
+                                            "kvlistValue": {
+                                                "values": [
+                                                    {"key": "content", "value": {"stringValue": "Hello!"}},
+                                                ]
+                                            }
+                                        },
+                                        "attributes": [],
+                                        "traceId": "different-trace",
+                                        "spanId": "span-1",
+                                    }
+                                ]
+                            }
+                        ],
+                    }
+                ]
             }
             await _process_logs(log_body)
 
@@ -993,55 +1139,75 @@ class TestOrphanLogBuffer:
 
             assert len(session.logs) == 1
             assert "different-trace" in session.trace_ids
+
         _run(go())
 
     def test_expired_orphan_logs_not_replayed(self):
         """Orphan logs older than max_age are discarded."""
+
         async def go():
             mgr = _make_mgr()
             set_trace_manager(mgr)
 
-            mgr._orphan_logs.append({
-                "trace_id": "trace-old",
-                "session_name": "my-agent",
-                "log_event": {
-                    "event_name": "gen_ai.user.message",
-                    "timestamp": "1000",
-                    "body": {"content": "old"},
-                    "attributes": {},
-                },
-                "buffered_at": datetime.now(UTC) - timedelta(seconds=120),
-            })
+            mgr._orphan_logs.append(
+                {
+                    "trace_id": "trace-old",
+                    "session_name": "my-agent",
+                    "log_event": {
+                        "event_name": "gen_ai.user.message",
+                        "timestamp": "1000",
+                        "body": {"content": "old"},
+                        "attributes": {},
+                    },
+                    "buffered_at": datetime.now(UTC) - timedelta(seconds=120),
+                }
+            )
 
             meta = {"eval_set_id": None, "session_name": "my-agent", "resource_attrs": {}}
             session = await mgr.get_or_create_otlp_session("trace-1", meta)
 
             assert len(session.logs) == 0
+
         _run(go())
 
     def test_multiple_orphan_logs_for_same_session(self):
         """Multiple orphan logs are all replayed into the session."""
+
         async def go():
             mgr = _make_mgr()
             set_trace_manager(mgr)
 
             for i in range(3):
                 log_body = {
-                    "resourceLogs": [{
-                        "resource": {"attributes": [
-                            _make_otlp_attr("agentevals.session_name", "my-agent"),
-                        ]},
-                        "scopeLogs": [{"logRecords": [{
-                            "eventName": "gen_ai.user.message",
-                            "observedTimeUnixNano": str(1000 + i),
-                            "body": {"kvlistValue": {"values": [
-                                {"key": "content", "value": {"stringValue": f"msg {i}"}},
-                            ]}},
-                            "attributes": [],
-                            "traceId": "trace-1",
-                            "spanId": f"span-{i}",
-                        }]}],
-                    }]
+                    "resourceLogs": [
+                        {
+                            "resource": {
+                                "attributes": [
+                                    _make_otlp_attr("agentevals.session_name", "my-agent"),
+                                ]
+                            },
+                            "scopeLogs": [
+                                {
+                                    "logRecords": [
+                                        {
+                                            "eventName": "gen_ai.user.message",
+                                            "observedTimeUnixNano": str(1000 + i),
+                                            "body": {
+                                                "kvlistValue": {
+                                                    "values": [
+                                                        {"key": "content", "value": {"stringValue": f"msg {i}"}},
+                                                    ]
+                                                }
+                                            },
+                                            "attributes": [],
+                                            "traceId": "trace-1",
+                                            "spanId": f"span-{i}",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
                 }
                 await _process_logs(log_body)
 
@@ -1052,6 +1218,7 @@ class TestOrphanLogBuffer:
 
             assert len(session.logs) == 3
             assert len(mgr._orphan_logs) == 0
+
         _run(go())
 
 
@@ -1063,22 +1230,31 @@ class TestProcessLogs:
             meta = {"eval_set_id": None, "session_name": "s1", "resource_attrs": {}}
             await mgr.get_or_create_otlp_session("trace-abc", meta)
             body = {
-                "resourceLogs": [{
-                    "resource": {"attributes": []},
-                    "scopeLogs": [{"logRecords": [{
-                        "timeUnixNano": "1000000000",
-                        "body": {"stringValue": '{"content": "hello"}'},
-                        "attributes": [
-                            _make_otlp_attr("event.name", "gen_ai.user.message"),
+                "resourceLogs": [
+                    {
+                        "resource": {"attributes": []},
+                        "scopeLogs": [
+                            {
+                                "logRecords": [
+                                    {
+                                        "timeUnixNano": "1000000000",
+                                        "body": {"stringValue": '{"content": "hello"}'},
+                                        "attributes": [
+                                            _make_otlp_attr("event.name", "gen_ai.user.message"),
+                                        ],
+                                        "traceId": "trace-abc",
+                                    }
+                                ]
+                            }
                         ],
-                        "traceId": "trace-abc",
-                    }]}],
-                }]
+                    }
+                ]
             }
             await _process_logs(body)
             session = mgr.sessions["s1"]
             assert len(session.logs) == 1
             assert session.logs[0]["event_name"] == "gen_ai.user.message"
+
         _run(go())
 
     def test_buffers_log_with_unknown_trace_id(self):
@@ -1086,21 +1262,30 @@ class TestProcessLogs:
             mgr = _make_mgr()
             set_trace_manager(mgr)
             body = {
-                "resourceLogs": [{
-                    "resource": {"attributes": []},
-                    "scopeLogs": [{"logRecords": [{
-                        "timeUnixNano": "1000000000",
-                        "body": {"stringValue": '{"content": "hi"}'},
-                        "attributes": [
-                            _make_otlp_attr("event.name", "gen_ai.user.message"),
+                "resourceLogs": [
+                    {
+                        "resource": {"attributes": []},
+                        "scopeLogs": [
+                            {
+                                "logRecords": [
+                                    {
+                                        "timeUnixNano": "1000000000",
+                                        "body": {"stringValue": '{"content": "hi"}'},
+                                        "attributes": [
+                                            _make_otlp_attr("event.name", "gen_ai.user.message"),
+                                        ],
+                                        "traceId": "unknown-trace",
+                                    }
+                                ]
+                            }
                         ],
-                        "traceId": "unknown-trace",
-                    }]}],
-                }]
+                    }
+                ]
             }
             await _process_logs(body)
             assert len(mgr.sessions) == 0
             assert len(mgr._orphan_logs) == 1
+
         _run(go())
 
     def test_ignores_non_genai_logs(self):
@@ -1110,21 +1295,30 @@ class TestProcessLogs:
             meta = {"eval_set_id": None, "session_name": "s1", "resource_attrs": {}}
             await mgr.get_or_create_otlp_session("trace-1", meta)
             body = {
-                "resourceLogs": [{
-                    "resource": {"attributes": []},
-                    "scopeLogs": [{"logRecords": [{
-                        "timeUnixNano": "1000000000",
-                        "body": {"stringValue": "just a log"},
-                        "attributes": [
-                            _make_otlp_attr("event.name", "http.request"),
+                "resourceLogs": [
+                    {
+                        "resource": {"attributes": []},
+                        "scopeLogs": [
+                            {
+                                "logRecords": [
+                                    {
+                                        "timeUnixNano": "1000000000",
+                                        "body": {"stringValue": "just a log"},
+                                        "attributes": [
+                                            _make_otlp_attr("event.name", "http.request"),
+                                        ],
+                                        "traceId": "trace-1",
+                                    }
+                                ]
+                            }
                         ],
-                        "traceId": "trace-1",
-                    }]}],
-                }]
+                    }
+                ]
             }
             await _process_logs(body)
             session = mgr.sessions["s1"]
             assert len(session.logs) == 0
+
         _run(go())
 
 
@@ -1154,6 +1348,7 @@ class TestCleanupWithTimers:
             assert removed == 1
             assert "s1" not in mgr._completion_timers
             assert "s1" not in mgr._idle_timers
+
         _run(go())
 
 
@@ -1163,28 +1358,32 @@ class TestCleanupWithTimers:
 
 import base64
 
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest as TraceServiceRequestPB,
-)
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest as LogsServiceRequestPB,
 )
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest as TraceServiceRequestPB,
+)
 from opentelemetry.proto.common.v1.common_pb2 import (
     AnyValue,
+    InstrumentationScope,
     KeyValue,
     KeyValueList,
 )
-from opentelemetry.proto.trace.v1.trace_pb2 import (
-    ResourceSpans,
-    ScopeSpans,
-    Span as SpanPB,
+from opentelemetry.proto.logs.v1.logs_pb2 import (
+    LogRecord as LogRecordPB,
 )
-from opentelemetry.proto.resource.v1.resource_pb2 import Resource as ResourcePB
-from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
 from opentelemetry.proto.logs.v1.logs_pb2 import (
     ResourceLogs,
     ScopeLogs,
-    LogRecord as LogRecordPB,
+)
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource as ResourcePB
+from opentelemetry.proto.trace.v1.trace_pb2 import (
+    ResourceSpans,
+    ScopeSpans,
+)
+from opentelemetry.proto.trace.v1.trace_pb2 import (
+    Span as SpanPB,
 )
 
 
@@ -1255,13 +1454,7 @@ class TestFixProtobufIdFields:
         raw_bytes = _hex_to_bytes(TRACE_ID_HEX)
         b64_trace = base64.b64encode(raw_bytes).decode()
         b64_span = base64.b64encode(_hex_to_bytes(SPAN_ID_HEX)).decode()
-        data = {
-            "resourceSpans": [{
-                "scopeSpans": [{
-                    "spans": [{"traceId": b64_trace, "spanId": b64_span}]
-                }]
-            }]
-        }
+        data = {"resourceSpans": [{"scopeSpans": [{"spans": [{"traceId": b64_trace, "spanId": b64_span}]}]}]}
         _fix_protobuf_id_fields(data)
         span = data["resourceSpans"][0]["scopeSpans"][0]["spans"][0]
         assert span["traceId"] == TRACE_ID_HEX
@@ -1338,9 +1531,7 @@ class TestDecodeProtobufTraces:
 
     def test_preserves_scope(self):
         span = _make_pb_span()
-        request = _make_pb_export_request(
-            [span], scope_name="gcp.vertex.agent", scope_version="1.2.3"
-        )
+        request = _make_pb_export_request([span], scope_name="gcp.vertex.agent", scope_version="1.2.3")
         raw = request.SerializeToString()
 
         body = _decode_protobuf_traces(raw)
@@ -1375,9 +1566,7 @@ class TestDecodeProtobufLogs:
             span_id=_hex_to_bytes(SPAN_ID_HEX),
             body=AnyValue(string_value='{"content": "hello"}'),
         )
-        log_record.attributes.append(
-            KeyValue(key="event.name", value=AnyValue(string_value="gen_ai.user.message"))
-        )
+        log_record.attributes.append(KeyValue(key="event.name", value=AnyValue(string_value="gen_ai.user.message")))
 
         scope_logs = ScopeLogs(log_records=[log_record])
         resource_logs = ResourceLogs(scope_logs=[scope_logs])
@@ -1425,6 +1614,7 @@ class TestProtobufJsonParity:
             assert session.trace_id == TRACE_ID_HEX
             assert len(session.spans) == 1
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_protobuf_root_span_schedules_completion(self):
@@ -1444,6 +1634,7 @@ class TestProtobufJsonParity:
             assert session.has_root_span is True
             mgr.schedule_session_completion.assert_called_once()
             _cancel_timers(mgr)
+
         _run(go())
 
     def test_protobuf_scope_injection(self):
@@ -1452,9 +1643,7 @@ class TestProtobufJsonParity:
             set_trace_manager(mgr)
 
             span = _make_pb_span()
-            request = _make_pb_export_request(
-                [span], scope_name="strands.agent", scope_version="2.0.0"
-            )
+            request = _make_pb_export_request([span], scope_name="strands.agent", scope_version="2.0.0")
             raw = request.SerializeToString()
 
             body = _decode_protobuf_traces(raw)
@@ -1466,4 +1655,5 @@ class TestProtobufJsonParity:
             assert attr_map["otel.scope.name"]["stringValue"] == "strands.agent"
             assert attr_map["otel.scope.version"]["stringValue"] == "2.0.0"
             _cancel_timers(mgr)
+
         _run(go())

@@ -82,9 +82,7 @@ async def main():
         user_id = "demo_user"
 
         runner = InMemoryRunner(agent=dice_agent, app_name=app_name)
-        session = await runner.session_service.create_session(
-            app_name=app_name, user_id=user_id
-        )
+        session = await runner.session_service.create_session(app_name=app_name, user_id=user_id)
 
         test_queries = [
             "Hi! Can you help me?",
@@ -95,14 +93,10 @@ async def main():
         for i, query in enumerate(test_queries, 1):
             print(f"\n[{i}/{len(test_queries)}] User: {query}")
 
-            content = types.Content(
-                role="user", parts=[types.Part.from_text(text=query)]
-            )
+            content = types.Content(role="user", parts=[types.Part.from_text(text=query)])
 
             agent_response = ""
-            async for event in runner.run_async(
-                user_id=user_id, session_id=session.id, new_message=content
-            ):
+            async for event in runner.run_async(user_id=user_id, session_id=session.id, new_message=content):
                 if event.content.parts and event.content.parts[0].text:
                     agent_response = event.content.parts[0].text
 
@@ -125,17 +119,11 @@ async def main():
         app_name = "dice_agent_app"
         user_id = "demo_user"
         runner = InMemoryRunner(agent=dice_agent, app_name=app_name)
-        session = await runner.session_service.create_session(
-            app_name=app_name, user_id=user_id
-        )
+        session = await runner.session_service.create_session(app_name=app_name, user_id=user_id)
 
-        content = types.Content(
-            role="user", parts=[types.Part.from_text(text="Roll a 6-sided die")]
-        )
+        content = types.Content(role="user", parts=[types.Part.from_text(text="Roll a 6-sided die")])
 
-        async for event in runner.run_async(
-            user_id=user_id, session_id=session.id, new_message=content
-        ):
+        async for event in runner.run_async(user_id=user_id, session_id=session.id, new_message=content):
             if event.content.parts and event.content.parts[0].text:
                 print(f"Agent: {event.content.parts[0].text}")
 

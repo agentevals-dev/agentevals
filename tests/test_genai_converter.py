@@ -14,19 +14,20 @@ Tests cover:
 """
 
 import json
+
 import pytest
 
 from agentevals.genai_converter import (
     ConversionResult,
-    convert_genai_trace,
     _deduplicate_invocations,
-    _extract_user_text,
     _extract_assistant_text,
     _extract_tool_calls,
+    _extract_user_text,
     _trim_cumulative_output,
+    convert_genai_trace,
 )
-from agentevals.utils.genai_messages import parse_json_attr
 from agentevals.loader.base import Span, Trace
+from agentevals.utils.genai_messages import parse_json_attr
 
 
 def _make_genai_llm_span(
@@ -120,42 +121,22 @@ class TestParseJsonAttr:
 
 class TestExtractUserText:
     def test_extract_user_text_string_format(self):
-        span = _make_genai_llm_span(
-            "span1",
-            input_messages=[
-                {"role": "user", "content": "Hello, world!"}
-            ]
-        )
+        span = _make_genai_llm_span("span1", input_messages=[{"role": "user", "content": "Hello, world!"}])
         text = _extract_user_text(span)
         assert text == "Hello, world!"
 
     def test_extract_user_text_list_format(self):
-        span = _make_genai_llm_span(
-            "span1",
-            input_messages=[
-                {"role": "user", "content": [{"text": "Multiple parts"}]}
-            ]
-        )
+        span = _make_genai_llm_span("span1", input_messages=[{"role": "user", "content": [{"text": "Multiple parts"}]}])
         text = _extract_user_text(span)
         assert text == "Multiple parts"
 
     def test_extract_user_text_human_role(self):
-        span = _make_genai_llm_span(
-            "span1",
-            input_messages=[
-                {"role": "human", "content": "Human role variant"}
-            ]
-        )
+        span = _make_genai_llm_span("span1", input_messages=[{"role": "human", "content": "Human role variant"}])
         text = _extract_user_text(span)
         assert text == "Human role variant"
 
     def test_extract_user_text_missing_raises(self):
-        span = _make_genai_llm_span(
-            "span1",
-            input_messages=[
-                {"role": "assistant", "content": "No user message"}
-            ]
-        )
+        span = _make_genai_llm_span("span1", input_messages=[{"role": "assistant", "content": "No user message"}])
         with pytest.raises(ValueError, match="no user message found"):
             _extract_user_text(span)
 
@@ -167,42 +148,24 @@ class TestExtractUserText:
 
 class TestExtractAssistantText:
     def test_extract_assistant_text_string_format(self):
-        span = _make_genai_llm_span(
-            "span1",
-            output_messages=[
-                {"role": "assistant", "content": "Response text"}
-            ]
-        )
+        span = _make_genai_llm_span("span1", output_messages=[{"role": "assistant", "content": "Response text"}])
         text = _extract_assistant_text(span)
         assert text == "Response text"
 
     def test_extract_assistant_text_list_format(self):
         span = _make_genai_llm_span(
-            "span1",
-            output_messages=[
-                {"role": "assistant", "content": [{"text": "List response"}]}
-            ]
+            "span1", output_messages=[{"role": "assistant", "content": [{"text": "List response"}]}]
         )
         text = _extract_assistant_text(span)
         assert text == "List response"
 
     def test_extract_assistant_text_model_role(self):
-        span = _make_genai_llm_span(
-            "span1",
-            output_messages=[
-                {"role": "model", "content": "Model role variant"}
-            ]
-        )
+        span = _make_genai_llm_span("span1", output_messages=[{"role": "model", "content": "Model role variant"}])
         text = _extract_assistant_text(span)
         assert text == "Model role variant"
 
     def test_extract_assistant_text_ai_role(self):
-        span = _make_genai_llm_span(
-            "span1",
-            output_messages=[
-                {"role": "ai", "content": "AI role variant"}
-            ]
-        )
+        span = _make_genai_llm_span("span1", output_messages=[{"role": "ai", "content": "AI role variant"}])
         text = _extract_assistant_text(span)
         assert text == "AI role variant"
 
@@ -217,7 +180,7 @@ class TestExtractAssistantText:
             output_messages=[
                 {"role": "assistant", "content": ""},
                 {"role": "assistant", "content": "Second message"},
-            ]
+            ],
         )
         text = _extract_assistant_text(span)
         assert text == "Second message"
@@ -230,7 +193,7 @@ class TestExtractToolCalls:
             tool_name="get_weather",
             tool_call_id="call_123",
             arguments={"location": "NYC"},
-            result={"temperature": 72}
+            result={"temperature": 72},
         )
 
         tool_calls, tool_responses = _extract_tool_calls([tool_span], [])
@@ -340,12 +303,8 @@ class TestConvertGenaiTrace:
     def test_convert_with_tool_spans(self):
         llm_span = _make_genai_llm_span(
             "llm1",
-            input_messages=[
-                {"role": "user", "content": "What's the weather?"}
-            ],
-            output_messages=[
-                {"role": "assistant", "content": "It's 72 degrees"}
-            ],
+            input_messages=[{"role": "user", "content": "What's the weather?"}],
+            output_messages=[{"role": "assistant", "content": "It's 72 degrees"}],
         )
 
         tool_span = _make_genai_tool_span(
@@ -353,7 +312,7 @@ class TestConvertGenaiTrace:
             tool_name="get_weather",
             tool_call_id="call_123",
             arguments={"location": "NYC"},
-            result={"temperature": 72}
+            result={"temperature": 72},
         )
         tool_span.parent_span_id = "llm1"
 
@@ -574,9 +533,11 @@ class TestConvertGenaiTrace:
                 {"role": "user", "content": "Roll a die"},
             ],
             output_messages=[
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "call_1", "function": {"name": "roll_die", "arguments": "{}"}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{"id": "call_1", "function": {"name": "roll_die", "arguments": "{}"}}],
+                },
             ],
         )
         span2 = _make_genai_llm_span(
@@ -633,9 +594,10 @@ class TestExtractUserTextReversed:
 class TestDeduplicateInvocations:
     """Tests for _deduplicate_invocations."""
 
-    def _make_invocation(self, user_text: str, response_text: str) -> "Invocation":
-        from google.genai import types as genai_types
+    def _make_invocation(self, user_text: str, response_text: str):
         from google.adk.evaluation.eval_case import Invocation
+        from google.genai import types as genai_types
+
         return Invocation(
             invocation_id=f"inv-{user_text[:10]}",
             user_content=genai_types.Content(
@@ -696,16 +658,20 @@ class TestTrimCumulativeOutput:
             "span1",
             input_messages=[{"role": "user", "content": "Hello"}],
             output_messages=[
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c1", "type": "function", "function": {"name": "greet", "arguments": "{}"}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "greet", "arguments": "{}"}}],
+                },
                 {"role": "assistant", "content": "Hi!"},
             ],
         )
         output = [
-            {"role": "assistant", "content": "", "tool_calls": [
-                {"id": "c1", "type": "function", "function": {"name": "greet", "arguments": "{}"}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "greet", "arguments": "{}"}}],
+            },
             {"role": "assistant", "content": "Hi!"},
         ]
         result = _trim_cumulative_output(span, output)
@@ -720,17 +686,23 @@ class TestTrimCumulativeOutput:
             ],
             output_messages=[
                 {"role": "assistant", "content": "Hello!"},
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}}
+                    ],
+                },
                 {"role": "assistant", "content": "I rolled a 3!"},
             ],
         )
         output = [
             {"role": "assistant", "content": "Hello!"},
-            {"role": "assistant", "content": "", "tool_calls": [
-                {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}}],
+            },
             {"role": "assistant", "content": "I rolled a 3!"},
         ]
         result = _trim_cumulative_output(span, output)
@@ -750,25 +722,45 @@ class TestTrimCumulativeOutput:
             ],
             output_messages=[
                 {"role": "assistant", "content": "Hello!"},
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
+                    ],
+                },
                 {"role": "assistant", "content": "I rolled a 3!"},
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c2", "type": "function", "function": {"name": "check_prime", "arguments": '{"nums": [3]}'}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "c2",
+                            "type": "function",
+                            "function": {"name": "check_prime", "arguments": '{"nums": [3]}'},
+                        }
+                    ],
+                },
                 {"role": "assistant", "content": "Yes, 3 is prime!"},
             ],
         )
         output = [
             {"role": "assistant", "content": "Hello!"},
-            {"role": "assistant", "content": "", "tool_calls": [
-                {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
+                ],
+            },
             {"role": "assistant", "content": "I rolled a 3!"},
-            {"role": "assistant", "content": "", "tool_calls": [
-                {"id": "c2", "type": "function", "function": {"name": "check_prime", "arguments": '{"nums": [3]}'}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"id": "c2", "type": "function", "function": {"name": "check_prime", "arguments": '{"nums": [3]}'}}
+                ],
+            },
             {"role": "assistant", "content": "Yes, 3 is prime!"},
         ]
         result = _trim_cumulative_output(span, output)
@@ -813,17 +805,23 @@ class TestTrimCumulativeOutput:
             ],
             output_messages=[
                 {"role": "assistant", "content": "Hello!"},
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}}
+                    ],
+                },
                 {"role": "assistant", "content": "I rolled a 3!"},
             ],
         )
         output = [
             {"role": "assistant", "content": "Hello!"},
-            {"role": "assistant", "content": "", "tool_calls": [
-                {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}}],
+            },
             {"role": "assistant", "content": "I rolled a 3!"},
         ]
         result = _trim_cumulative_output(span, output)
@@ -869,9 +867,13 @@ class TestCumulativeHistoryToolCalls:
             ],
             output_messages=[
                 {"role": "assistant", "content": "Hello!"},
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
+                    ],
+                },
                 {"role": "assistant", "content": "I rolled a 3!"},
             ],
         )
@@ -886,9 +888,13 @@ class TestCumulativeHistoryToolCalls:
             ],
             output_messages=[
                 {"role": "assistant", "content": "Hello!"},
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
+                    ],
+                },
                 {"role": "assistant", "content": "I rolled a 3!"},
             ],
         )
@@ -903,13 +909,25 @@ class TestCumulativeHistoryToolCalls:
             ],
             output_messages=[
                 {"role": "assistant", "content": "Hello!"},
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {"id": "c1", "type": "function", "function": {"name": "roll_die", "arguments": '{"sides": 20}'}}
+                    ],
+                },
                 {"role": "assistant", "content": "I rolled a 3!"},
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c2", "type": "function", "function": {"name": "check_prime", "arguments": '{"nums": [3]}'}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "c2",
+                            "type": "function",
+                            "function": {"name": "check_prime", "arguments": '{"nums": [3]}'},
+                        }
+                    ],
+                },
                 {"role": "assistant", "content": "Yes, 3 is prime!"},
             ],
         )
@@ -938,9 +956,7 @@ class TestCumulativeHistoryToolCalls:
         inv3 = result.invocations[2]
         assert inv3.user_content.parts[0].text == "Is it prime?"
         tool_names_3 = [t.name for t in inv3.intermediate_data.tool_uses]
-        assert tool_names_3 == ["check_prime"], (
-            f"Expected only check_prime for turn 3, got {tool_names_3}"
-        )
+        assert tool_names_3 == ["check_prime"], f"Expected only check_prime for turn 3, got {tool_names_3}"
 
     def test_single_turn_with_tool_unaffected(self):
         """Single-turn tool use should not be affected by cumulative trimming."""
@@ -948,9 +964,17 @@ class TestCumulativeHistoryToolCalls:
             "span1",
             input_messages=[{"role": "user", "content": "What's the weather?"}],
             output_messages=[
-                {"role": "assistant", "content": "", "tool_calls": [
-                    {"id": "c1", "type": "function", "function": {"name": "get_weather", "arguments": '{"city": "NYC"}'}}
-                ]},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "c1",
+                            "type": "function",
+                            "function": {"name": "get_weather", "arguments": '{"city": "NYC"}'},
+                        }
+                    ],
+                },
                 {"role": "assistant", "content": "It's 72F in NYC"},
             ],
         )

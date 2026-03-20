@@ -61,7 +61,7 @@ class OtlpJsonLoader(TraceLoader):
         all_spans = []
 
         for resource_span in data.get("resourceSpans", []):
-            resource_attrs = se
+            resource_attrs = self._extract_attributes(resource_span.get("resource", {}).get("attributes", []))
             for scope_span in resource_span.get("scopeSpans", []):
                 scope = scope_span.get("scope", {})
                 scope_name = scope.get("name", "")

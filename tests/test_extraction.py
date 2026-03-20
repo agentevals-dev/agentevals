@@ -65,53 +65,62 @@ def _trace(spans, root_spans=None):
 # extract_user_text_from_attrs
 # ---------------------------------------------------------------------------
 
+
 class TestExtractUserText:
     def test_adk_llm_request(self):
         attrs = {
-            ADK_LLM_REQUEST: json.dumps({
-                "contents": [
-                    {"role": "user", "parts": [{"text": "Hello from ADK"}]},
-                ]
-            })
+            ADK_LLM_REQUEST: json.dumps(
+                {
+                    "contents": [
+                        {"role": "user", "parts": [{"text": "Hello from ADK"}]},
+                    ]
+                }
+            )
         }
         assert extract_user_text_from_attrs(attrs) == "Hello from ADK"
 
     def test_adk_llm_request_prefers_last_user(self):
         attrs = {
-            ADK_LLM_REQUEST: json.dumps({
-                "contents": [
-                    {"role": "user", "parts": [{"text": "First"}]},
-                    {"role": "model", "parts": [{"text": "Response"}]},
-                    {"role": "user", "parts": [{"text": "Second"}]},
-                ]
-            })
+            ADK_LLM_REQUEST: json.dumps(
+                {
+                    "contents": [
+                        {"role": "user", "parts": [{"text": "First"}]},
+                        {"role": "model", "parts": [{"text": "Response"}]},
+                        {"role": "user", "parts": [{"text": "Second"}]},
+                    ]
+                }
+            )
         }
         assert extract_user_text_from_attrs(attrs) == "Second"
 
     def test_genai_content_based(self):
         attrs = {
-            OTEL_GENAI_INPUT_MESSAGES: json.dumps([
-                {"role": "user", "content": "Hello from GenAI"},
-            ])
+            OTEL_GENAI_INPUT_MESSAGES: json.dumps(
+                [
+                    {"role": "user", "content": "Hello from GenAI"},
+                ]
+            )
         }
         assert extract_user_text_from_attrs(attrs) == "Hello from GenAI"
 
     def test_genai_parts_based(self):
         attrs = {
-            OTEL_GENAI_INPUT_MESSAGES: json.dumps([
-                {"role": "user", "parts": [{"type": "text", "content": "Parts hello"}]},
-            ])
+            OTEL_GENAI_INPUT_MESSAGES: json.dumps(
+                [
+                    {"role": "user", "parts": [{"type": "text", "content": "Parts hello"}]},
+                ]
+            )
         }
         assert extract_user_text_from_attrs(attrs) == "Parts hello"
 
     def test_adk_takes_priority_over_genai(self):
         attrs = {
-            ADK_LLM_REQUEST: json.dumps({
-                "contents": [{"role": "user", "parts": [{"text": "ADK wins"}]}]
-            }),
-            OTEL_GENAI_INPUT_MESSAGES: json.dumps([
-                {"role": "user", "content": "GenAI loses"},
-            ]),
+            ADK_LLM_REQUEST: json.dumps({"contents": [{"role": "user", "parts": [{"text": "ADK wins"}]}]}),
+            OTEL_GENAI_INPUT_MESSAGES: json.dumps(
+                [
+                    {"role": "user", "content": "GenAI loses"},
+                ]
+            ),
         }
         assert extract_user_text_from_attrs(attrs) == "ADK wins"
 
@@ -120,9 +129,11 @@ class TestExtractUserText:
 
     def test_no_user_role(self):
         attrs = {
-            OTEL_GENAI_INPUT_MESSAGES: json.dumps([
-                {"role": "system", "content": "You are helpful"},
-            ])
+            OTEL_GENAI_INPUT_MESSAGES: json.dumps(
+                [
+                    {"role": "system", "content": "You are helpful"},
+                ]
+            )
         }
         assert extract_user_text_from_attrs(attrs) is None
 
@@ -139,39 +150,40 @@ class TestExtractUserText:
 # extract_agent_response_from_attrs
 # ---------------------------------------------------------------------------
 
+
 class TestExtractAgentResponse:
     def test_adk_llm_response(self):
-        attrs = {
-            ADK_LLM_RESPONSE: json.dumps({
-                "content": {"parts": [{"text": "ADK response"}]}
-            })
-        }
+        attrs = {ADK_LLM_RESPONSE: json.dumps({"content": {"parts": [{"text": "ADK response"}]}})}
         assert extract_agent_response_from_attrs(attrs) == "ADK response"
 
     def test_genai_content_based(self):
         attrs = {
-            OTEL_GENAI_OUTPUT_MESSAGES: json.dumps([
-                {"role": "assistant", "content": "GenAI response"},
-            ])
+            OTEL_GENAI_OUTPUT_MESSAGES: json.dumps(
+                [
+                    {"role": "assistant", "content": "GenAI response"},
+                ]
+            )
         }
         assert extract_agent_response_from_attrs(attrs) == "GenAI response"
 
     def test_genai_model_role(self):
         attrs = {
-            OTEL_GENAI_OUTPUT_MESSAGES: json.dumps([
-                {"role": "model", "content": "Model response"},
-            ])
+            OTEL_GENAI_OUTPUT_MESSAGES: json.dumps(
+                [
+                    {"role": "model", "content": "Model response"},
+                ]
+            )
         }
         assert extract_agent_response_from_attrs(attrs) == "Model response"
 
     def test_adk_takes_priority(self):
         attrs = {
-            ADK_LLM_RESPONSE: json.dumps({
-                "content": {"parts": [{"text": "ADK wins"}]}
-            }),
-            OTEL_GENAI_OUTPUT_MESSAGES: json.dumps([
-                {"role": "assistant", "content": "GenAI loses"},
-            ]),
+            ADK_LLM_RESPONSE: json.dumps({"content": {"parts": [{"text": "ADK wins"}]}}),
+            OTEL_GENAI_OUTPUT_MESSAGES: json.dumps(
+                [
+                    {"role": "assistant", "content": "GenAI loses"},
+                ]
+            ),
         }
         assert extract_agent_response_from_attrs(attrs) == "ADK wins"
 
@@ -179,11 +191,7 @@ class TestExtractAgentResponse:
         assert extract_agent_response_from_attrs({}) is None
 
     def test_adk_no_text_parts(self):
-        attrs = {
-            ADK_LLM_RESPONSE: json.dumps({
-                "content": {"parts": [{"function_call": {"name": "tool"}}]}
-            })
-        }
+        attrs = {ADK_LLM_RESPONSE: json.dumps({"content": {"parts": [{"function_call": {"name": "tool"}}]}})}
         assert extract_agent_response_from_attrs(attrs) is None
 
 
@@ -191,15 +199,18 @@ class TestExtractAgentResponse:
 # extract_token_usage_from_attrs
 # ---------------------------------------------------------------------------
 
+
 class TestExtractTokenUsage:
     def test_adk_usage_metadata(self):
         attrs = {
-            ADK_LLM_RESPONSE: json.dumps({
-                "usage_metadata": {
-                    "prompt_token_count": 100,
-                    "candidates_token_count": 50,
+            ADK_LLM_RESPONSE: json.dumps(
+                {
+                    "usage_metadata": {
+                        "prompt_token_count": 100,
+                        "candidates_token_count": 50,
+                    }
                 }
-            }),
+            ),
             ADK_LLM_REQUEST: json.dumps({"model": "gemini-pro"}),
         }
         in_toks, out_toks, model = extract_token_usage_from_attrs(attrs)
@@ -220,12 +231,14 @@ class TestExtractTokenUsage:
 
     def test_adk_takes_priority(self):
         attrs = {
-            ADK_LLM_RESPONSE: json.dumps({
-                "usage_metadata": {
-                    "prompt_token_count": 100,
-                    "candidates_token_count": 50,
+            ADK_LLM_RESPONSE: json.dumps(
+                {
+                    "usage_metadata": {
+                        "prompt_token_count": 100,
+                        "candidates_token_count": 50,
+                    }
                 }
-            }),
+            ),
             OTEL_GENAI_USAGE_INPUT_TOKENS: 999,
             OTEL_GENAI_USAGE_OUTPUT_TOKENS: 999,
         }
@@ -252,6 +265,7 @@ class TestExtractTokenUsage:
 # ---------------------------------------------------------------------------
 # extract_tool_call_from_attrs
 # ---------------------------------------------------------------------------
+
 
 class TestExtractToolCall:
     def test_genai_tool_attrs(self):
@@ -313,25 +327,32 @@ class TestExtractToolCall:
 # flatten_otlp_attributes
 # ---------------------------------------------------------------------------
 
+
 class TestFlattenOtlpAttributes:
     def test_string_value(self):
-        result = flatten_otlp_attributes([
-            {"key": "k1", "value": {"stringValue": "v1"}},
-        ])
+        result = flatten_otlp_attributes(
+            [
+                {"key": "k1", "value": {"stringValue": "v1"}},
+            ]
+        )
         assert result == {"k1": "v1"}
 
     def test_int_value(self):
-        result = flatten_otlp_attributes([
-            {"key": "k1", "value": {"intValue": "42"}},
-        ])
+        result = flatten_otlp_attributes(
+            [
+                {"key": "k1", "value": {"intValue": "42"}},
+            ]
+        )
         assert result == {"k1": 42}
 
     def test_mixed_types(self):
-        result = flatten_otlp_attributes([
-            {"key": "str", "value": {"stringValue": "hello"}},
-            {"key": "num", "value": {"doubleValue": 3.14}},
-            {"key": "flag", "value": {"boolValue": True}},
-        ])
+        result = flatten_otlp_attributes(
+            [
+                {"key": "str", "value": {"stringValue": "hello"}},
+                {"key": "num", "value": {"doubleValue": 3.14}},
+                {"key": "flag", "value": {"boolValue": True}},
+            ]
+        )
         assert result == {"str": "hello", "num": 3.14, "flag": True}
 
     def test_empty(self):
@@ -341,6 +362,7 @@ class TestFlattenOtlpAttributes:
 # ---------------------------------------------------------------------------
 # Span classification helpers
 # ---------------------------------------------------------------------------
+
 
 class TestSpanClassifiers:
     def test_is_adk_scope(self):
@@ -376,6 +398,7 @@ class TestSpanClassifiers:
 # Extractor detection
 # ---------------------------------------------------------------------------
 
+
 class TestExtractorDetection:
     def test_adk_trace_detected(self):
         span = _span(tags={OTEL_SCOPE: ADK_SCOPE_VALUE})
@@ -398,10 +421,12 @@ class TestExtractorDetection:
         assert isinstance(ext, AdkExtractor)
 
     def test_adk_takes_priority_over_genai(self):
-        span = _span(tags={
-            OTEL_SCOPE: ADK_SCOPE_VALUE,
-            OTEL_GENAI_REQUEST_MODEL: "gemini-pro",
-        })
+        span = _span(
+            tags={
+                OTEL_SCOPE: ADK_SCOPE_VALUE,
+                OTEL_GENAI_REQUEST_MODEL: "gemini-pro",
+            }
+        )
         trace = _trace([span])
         ext = get_extractor(trace)
         assert isinstance(ext, AdkExtractor)
@@ -460,15 +485,9 @@ class TestAdkExtractorSpanFinding:
 
     def test_classify_span(self):
         ext = AdkExtractor()
-        assert ext.classify_span(_span(
-            op="invoke_agent a", tags={OTEL_SCOPE: ADK_SCOPE_VALUE}
-        )) == "invocation"
-        assert ext.classify_span(_span(
-            op="call_llm", tags={OTEL_SCOPE: ADK_SCOPE_VALUE}
-        )) == "llm"
-        assert ext.classify_span(_span(
-            op="execute_tool x", tags={OTEL_SCOPE: ADK_SCOPE_VALUE}
-        )) == "tool"
+        assert ext.classify_span(_span(op="invoke_agent a", tags={OTEL_SCOPE: ADK_SCOPE_VALUE})) == "invocation"
+        assert ext.classify_span(_span(op="call_llm", tags={OTEL_SCOPE: ADK_SCOPE_VALUE})) == "llm"
+        assert ext.classify_span(_span(op="execute_tool x", tags={OTEL_SCOPE: ADK_SCOPE_VALUE})) == "tool"
         assert ext.classify_span(_span(op="random")) is None
 
 

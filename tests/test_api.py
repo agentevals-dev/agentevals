@@ -33,6 +33,8 @@ from agentevals.api.models import (
 from agentevals.api.routes import _camel_keys, router
 from agentevals.api.streaming_routes import (
     set_trace_manager as set_streaming_trace_manager,
+)
+from agentevals.api.streaming_routes import (
     streaming_router,
 )
 from agentevals.runner import MetricResult, RunResult, TraceResult
@@ -115,41 +117,53 @@ def _make_run_result() -> RunResult:
 
 
 def _make_eval_set_json() -> bytes:
-    return json.dumps({
-        "eval_set_id": "test_eval",
-        "eval_cases": [{
-            "eval_id": "case_1",
-            "conversation": [{
-                "invocation_id": "inv_1",
-                "user_content": {"role": "user", "parts": [{"text": "hello"}]},
-                "final_response": {"role": "model", "parts": [{"text": "hi"}]},
-            }],
-        }],
-    }).encode()
+    return json.dumps(
+        {
+            "eval_set_id": "test_eval",
+            "eval_cases": [
+                {
+                    "eval_id": "case_1",
+                    "conversation": [
+                        {
+                            "invocation_id": "inv_1",
+                            "user_content": {"role": "user", "parts": [{"text": "hello"}]},
+                            "final_response": {"role": "model", "parts": [{"text": "hi"}]},
+                        }
+                    ],
+                }
+            ],
+        }
+    ).encode()
 
 
 def _make_trace_json() -> bytes:
-    return json.dumps({"data": [{
-        "traceID": "abc123",
-        "spans": [{
-            "traceID": "abc123",
-            "spanID": "span1",
-            "operationName": "test",
-            "startTime": 1000000,
-            "duration": 500000,
-            "tags": [],
-            "logs": [],
-            "processID": "p1",
-            "references": [],
-        }],
-        "processes": {"p1": {"serviceName": "test", "tags": []}},
-    }]}).encode()
+    return json.dumps(
+        {
+            "data": [
+                {
+                    "traceID": "abc123",
+                    "spans": [
+                        {
+                            "traceID": "abc123",
+                            "spanID": "span1",
+                            "operationName": "test",
+                            "startTime": 1000000,
+                            "duration": 500000,
+                            "tags": [],
+                            "logs": [],
+                            "processID": "p1",
+                            "references": [],
+                        }
+                    ],
+                    "processes": {"p1": {"serviceName": "test", "tags": []}},
+                }
+            ]
+        }
+    ).encode()
 
 
 def _assert_envelope(response, status=200):
-    assert response.status_code == status, (
-        f"Expected {status}, got {response.status_code}: {response.text}"
-    )
+    assert response.status_code == status, f"Expected {status}, got {response.status_code}: {response.text}"
     body = response.json()
     assert "data" in body, f"Missing 'data' key in response: {body}"
     assert "error" in body, f"Missing 'error' key in response: {body}"
@@ -160,9 +174,7 @@ def _assert_all_keys_camel(obj, path=""):
     if isinstance(obj, dict):
         for key in obj:
             full_path = f"{path}.{key}" if path else key
-            assert _CAMEL_RE.match(key) or key in _KEY_EXCEPTIONS, (
-                f"Key {full_path!r} is not camelCase"
-            )
+            assert _CAMEL_RE.match(key) or key in _KEY_EXCEPTIONS, f"Key {full_path!r} is not camelCase"
             _assert_all_keys_camel(obj[key], full_path)
     elif isinstance(obj, list):
         for i, item in enumerate(obj):
@@ -171,6 +183,7 @@ def _assert_all_keys_camel(obj, path=""):
 
 def _make_trace_manager():
     from agentevals.streaming.ws_server import StreamingTraceManager
+
     mgr = StreamingTraceManager()
     mgr.broadcast_to_ui = AsyncMock()
     return mgr
@@ -195,9 +208,14 @@ class TestModelSerialization:
 
     def test_metric_info_requires_llm_alias(self):
         m = MetricInfo(
-            name="test", category="test", requires_eval_set=False,
-            requires_llm=True, requires_gcp=False, requires_rubrics=False,
-            description="test", working=True,
+            name="test",
+            category="test",
+            requires_eval_set=False,
+            requires_llm=True,
+            requires_gcp=False,
+            requires_rubrics=False,
+            description="test",
+            working=True,
         )
         dumped = m.model_dump(by_alias=True)
         assert "requiresLLM" in dumped
@@ -206,9 +224,14 @@ class TestModelSerialization:
 
     def test_metric_info_requires_gcp_alias(self):
         m = MetricInfo(
-            name="test", category="test", requires_eval_set=False,
-            requires_llm=False, requires_gcp=True, requires_rubrics=False,
-            description="test", working=True,
+            name="test",
+            category="test",
+            requires_eval_set=False,
+            requires_llm=False,
+            requires_gcp=True,
+            requires_rubrics=False,
+            description="test",
+            working=True,
         )
         dumped = m.model_dump(by_alias=True)
         assert "requiresGCP" in dumped
@@ -217,8 +240,11 @@ class TestModelSerialization:
 
     def test_session_info_camel_keys(self):
         s = SessionInfo(
-            session_id="s1", trace_id="t1", span_count=5,
-            is_complete=True, started_at="2024-01-01T00:00:00",
+            session_id="s1",
+            trace_id="t1",
+            span_count=5,
+            is_complete=True,
+            started_at="2024-01-01T00:00:00",
         )
         dumped = s.model_dump(by_alias=True)
         assert "sessionId" in dumped
@@ -241,11 +267,13 @@ class TestModelSerialization:
         assert "perInvocationScores" in mr
 
     def test_camel_keys_helper(self):
-        result = _camel_keys({
-            "llm_calls": {"p50": 1.0},
-            "total_prompt": 5,
-            "already_camel": [{"nested_key": True}],
-        })
+        result = _camel_keys(
+            {
+                "llm_calls": {"p50": 1.0},
+                "total_prompt": 5,
+                "already_camel": [{"nested_key": True}],
+            }
+        )
         assert result == {
             "llmCalls": {"p50": 1.0},
             "totalPrompt": 5,
@@ -286,8 +314,10 @@ class TestConfigEndpoint:
 
     def test_config_no_keys(self):
         env = {
-            "GOOGLE_API_KEY": "", "GEMINI_API_KEY": "",
-            "ANTHROPIC_API_KEY": "", "OPENAI_API_KEY": "",
+            "GOOGLE_API_KEY": "",
+            "GEMINI_API_KEY": "",
+            "ANTHROPIC_API_KEY": "",
+            "OPENAI_API_KEY": "",
         }
         with patch.dict(os.environ, env, clear=False):
             body = _assert_envelope(self.client.get("/api/config"))
@@ -296,8 +326,10 @@ class TestConfigEndpoint:
 
     def test_config_with_keys(self):
         env = {
-            "GOOGLE_API_KEY": "test-key", "GEMINI_API_KEY": "",
-            "ANTHROPIC_API_KEY": "test-key", "OPENAI_API_KEY": "",
+            "GOOGLE_API_KEY": "test-key",
+            "GEMINI_API_KEY": "",
+            "ANTHROPIC_API_KEY": "test-key",
+            "OPENAI_API_KEY": "",
         }
         with patch.dict(os.environ, env, clear=False):
             body = _assert_envelope(self.client.get("/api/config"))
@@ -348,27 +380,33 @@ class TestValidateEvalSet:
         cls.client = TestClient(_make_app())
 
     def test_validate_valid(self):
-        body = _assert_envelope(self.client.post(
-            "/api/validate/eval-set",
-            files={"eval_set_file": ("eval.json", io.BytesIO(_make_eval_set_json()))},
-        ))
+        body = _assert_envelope(
+            self.client.post(
+                "/api/validate/eval-set",
+                files={"eval_set_file": ("eval.json", io.BytesIO(_make_eval_set_json()))},
+            )
+        )
         assert body["data"]["valid"] is True
         assert body["data"]["evalSetId"] == "test_eval"
         assert body["data"]["numCases"] == 1
 
     def test_validate_invalid_json(self):
-        body = _assert_envelope(self.client.post(
-            "/api/validate/eval-set",
-            files={"eval_set_file": ("eval.json", io.BytesIO(b"not json"))},
-        ))
+        body = _assert_envelope(
+            self.client.post(
+                "/api/validate/eval-set",
+                files={"eval_set_file": ("eval.json", io.BytesIO(b"not json"))},
+            )
+        )
         assert body["data"]["valid"] is False
         assert len(body["data"]["errors"]) > 0
 
     def test_validate_missing_fields(self):
-        body = _assert_envelope(self.client.post(
-            "/api/validate/eval-set",
-            files={"eval_set_file": ("eval.json", io.BytesIO(b"{}"))},
-        ))
+        body = _assert_envelope(
+            self.client.post(
+                "/api/validate/eval-set",
+                files={"eval_set_file": ("eval.json", io.BytesIO(b"{}"))},
+            )
+        )
         assert body["data"]["valid"] is False
 
 
@@ -507,8 +545,8 @@ class TestEvaluateStream:
             data={"config": _eval_config_json()},
         )
         lines = resp.text.strip().split("\n")
-        data_lines = [l for l in lines if l.startswith("data: ")]
-        done_events = [json.loads(l[6:]) for l in data_lines if '"done"' in l]
+        data_lines = [line for line in lines if line.startswith("data: ")]
+        done_events = [json.loads(line[6:]) for line in data_lines if '"done"' in line]
         assert len(done_events) == 1
         done = done_events[0]
         assert done["done"] is True
@@ -567,9 +605,13 @@ class TestStreamingCreateEvalSet:
     def test_create_eval_set_missing_session(self):
         self.mgr.sessions.clear()
         client = TestClient(self.app)
-        resp = client.post("/api/streaming/create-eval-set", json={
-            "session_id": "nonexistent", "eval_set_id": "test",
-        })
+        resp = client.post(
+            "/api/streaming/create-eval-set",
+            json={
+                "session_id": "nonexistent",
+                "eval_set_id": "test",
+            },
+        )
         assert resp.status_code == 404
 
     @patch("agentevals.api.streaming_routes.convert_traces")
@@ -595,9 +637,15 @@ class TestStreamingCreateEvalSet:
         mock_convert.return_value = [mock_conv]
 
         client = TestClient(self.app)
-        body = _assert_envelope(client.post("/api/streaming/create-eval-set", json={
-            "session_id": "s1", "eval_set_id": "test_eval",
-        }))
+        body = _assert_envelope(
+            client.post(
+                "/api/streaming/create-eval-set",
+                json={
+                    "session_id": "s1",
+                    "eval_set_id": "test_eval",
+                },
+            )
+        )
         assert "evalSet" in body["data"]
         assert body["data"]["numInvocations"] == 1
 
@@ -609,9 +657,13 @@ class TestStreamingCreateEvalSet:
         mock_loader_cls.return_value.load.return_value = []
 
         client = TestClient(self.app)
-        resp = client.post("/api/streaming/create-eval-set", json={
-            "session_id": "s1", "eval_set_id": "test_eval",
-        })
+        resp = client.post(
+            "/api/streaming/create-eval-set",
+            json={
+                "session_id": "s1",
+                "eval_set_id": "test_eval",
+            },
+        )
         assert resp.status_code == 400
 
 
@@ -629,9 +681,13 @@ class TestStreamingEvaluateSessions:
     def test_evaluate_sessions_missing_golden(self):
         self.mgr.sessions.clear()
         client = TestClient(self.app)
-        resp = client.post("/api/streaming/evaluate-sessions", json={
-            "golden_session_id": "nonexistent", "eval_set_id": "e1",
-        })
+        resp = client.post(
+            "/api/streaming/evaluate-sessions",
+            json={
+                "golden_session_id": "nonexistent",
+                "eval_set_id": "e1",
+            },
+        )
         assert resp.status_code == 404
 
     @patch("agentevals.api.streaming_routes.run_evaluation", new_callable=AsyncMock)
@@ -651,9 +707,15 @@ class TestStreamingEvaluateSessions:
         mock_eval.return_value = _make_run_result()
 
         client = TestClient(self.app)
-        body = _assert_envelope(client.post("/api/streaming/evaluate-sessions", json={
-            "golden_session_id": "golden", "eval_set_id": "e1",
-        }))
+        body = _assert_envelope(
+            client.post(
+                "/api/streaming/evaluate-sessions",
+                json={
+                    "golden_session_id": "golden",
+                    "eval_set_id": "e1",
+                },
+            )
+        )
         assert body["data"]["goldenSessionId"] == "golden"
         assert isinstance(body["data"]["results"], list)
         assert len(body["data"]["results"]) >= 1
@@ -676,9 +738,15 @@ class TestStreamingEvaluateSessions:
         mock_eval.side_effect = RuntimeError("eval crashed")
 
         client = TestClient(self.app)
-        body = _assert_envelope(client.post("/api/streaming/evaluate-sessions", json={
-            "golden_session_id": "golden", "eval_set_id": "e1",
-        }))
+        body = _assert_envelope(
+            client.post(
+                "/api/streaming/evaluate-sessions",
+                json={
+                    "golden_session_id": "golden",
+                    "eval_set_id": "e1",
+                },
+            )
+        )
         results = body["data"]["results"]
         assert any(r.get("error") for r in results)
 
@@ -697,9 +765,13 @@ class TestStreamingPrepareEvaluation:
     def test_prepare_missing_golden(self):
         self.mgr.sessions.clear()
         client = TestClient(self.app)
-        resp = client.post("/api/streaming/prepare-evaluation", json={
-            "golden_session_id": "nonexistent", "session_ids": [],
-        })
+        resp = client.post(
+            "/api/streaming/prepare-evaluation",
+            json={
+                "golden_session_id": "nonexistent",
+                "session_ids": [],
+            },
+        )
         assert resp.status_code == 404
 
     @patch("agentevals.api.streaming_routes.create_eval_set_from_session", new_callable=AsyncMock)
@@ -717,9 +789,15 @@ class TestStreamingPrepareEvaluation:
         )
 
         client = TestClient(self.app)
-        body = _assert_envelope(client.post("/api/streaming/prepare-evaluation", json={
-            "golden_session_id": "golden", "session_ids": ["s1"],
-        }))
+        body = _assert_envelope(
+            client.post(
+                "/api/streaming/prepare-evaluation",
+                json={
+                    "golden_session_id": "golden",
+                    "session_ids": ["s1"],
+                },
+            )
+        )
         assert "evalSetUrl" in body["data"]
         assert body["data"]["numTraces"] == 1
         _assert_all_keys_camel(body)
@@ -739,9 +817,15 @@ class TestStreamingPrepareEvaluation:
         )
 
         client = TestClient(self.app)
-        body = _assert_envelope(client.post("/api/streaming/prepare-evaluation", json={
-            "golden_session_id": "golden", "session_ids": ["s1"],
-        }))
+        body = _assert_envelope(
+            client.post(
+                "/api/streaming/prepare-evaluation",
+                json={
+                    "golden_session_id": "golden",
+                    "session_ids": ["s1"],
+                },
+            )
+        )
         assert body["data"]["numTraces"] == 0
 
 
@@ -762,9 +846,7 @@ class TestStreamingDownload:
         assert resp.status_code == 404
 
     def test_download_success(self):
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False, dir=tempfile.gettempdir()
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, dir=tempfile.gettempdir()) as f:
             f.write('{"test": true}')
             fname = os.path.basename(f.name)
 
@@ -812,9 +894,12 @@ class TestStreamingGetTrace:
         self.mgr.sessions["s1"] = _make_session("s1", "t1", spans=[span])
 
         client = TestClient(self.app)
-        body = _assert_envelope(client.post(
-            "/api/streaming/get-trace", json={"session_id": "s1"},
-        ))
+        body = _assert_envelope(
+            client.post(
+                "/api/streaming/get-trace",
+                json={"session_id": "s1"},
+            )
+        )
         assert body["data"]["sessionId"] == "s1"
         assert isinstance(body["data"]["traceContent"], str)
         assert body["data"]["numSpans"] >= 1
@@ -823,14 +908,14 @@ class TestStreamingGetTrace:
         self.mgr.sessions.clear()
         self.mgr.sessions["s1"] = _make_session("s1", "t1", spans=[{"spanId": "sp1"}])
 
-        client = TestClient(self.app)
         body = self.client_get_trace("s1")
         _assert_all_keys_camel(body)
 
     def client_get_trace(self, session_id):
         client = TestClient(self.app)
         return client.post(
-            "/api/streaming/get-trace", json={"session_id": session_id},
+            "/api/streaming/get-trace",
+            json={"session_id": session_id},
         ).json()
 
 
@@ -845,24 +930,30 @@ class TestDebugBundle:
         cls.client = TestClient(_make_app())
 
     def test_bundle_returns_zip(self):
-        resp = self.client.post("/api/debug/bundle", json={
-            "user_description": "test bug",
-            "browser_info": {},
-            "console_logs": [],
-            "app_state": {},
-            "network_errors": [],
-        })
+        resp = self.client.post(
+            "/api/debug/bundle",
+            json={
+                "user_description": "test bug",
+                "browser_info": {},
+                "console_logs": [],
+                "app_state": {},
+                "network_errors": [],
+            },
+        )
         assert resp.status_code == 200
         assert "application/zip" in resp.headers["content-type"]
 
     def test_bundle_zip_contents(self):
-        resp = self.client.post("/api/debug/bundle", json={
-            "user_description": "test",
-            "browser_info": {},
-            "console_logs": [],
-            "app_state": {},
-            "network_errors": [],
-        })
+        resp = self.client.post(
+            "/api/debug/bundle",
+            json={
+                "user_description": "test",
+                "browser_info": {},
+                "console_logs": [],
+                "app_state": {},
+                "network_errors": [],
+            },
+        )
         zf = zipfile.ZipFile(io.BytesIO(resp.content))
         names = zf.namelist()
         assert any("metadata.json" in n for n in names)
@@ -919,16 +1010,24 @@ class TestDebugLoad:
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
             zf.writestr("report/sessions/sess1/spans.json", json.dumps([{"spanId": "sp1"}]))
-            zf.writestr("report/sessions/sess1/session_meta.json", json.dumps({
-                "session_id": "sess1", "trace_id": "t1",
-            }))
+            zf.writestr(
+                "report/sessions/sess1/session_meta.json",
+                json.dumps(
+                    {
+                        "session_id": "sess1",
+                        "trace_id": "t1",
+                    }
+                ),
+            )
         buf.seek(0)
 
         client = TestClient(app)
-        body = _assert_envelope(client.post(
-            "/api/debug/load",
-            files={"file": ("report.zip", buf, "application/zip")},
-        ))
+        body = _assert_envelope(
+            client.post(
+                "/api/debug/load",
+                files={"file": ("report.zip", buf, "application/zip")},
+            )
+        )
         assert body["data"]["count"] == 1
         assert "sess1" in body["data"]["loadedSessions"]
         _assert_all_keys_camel(body)

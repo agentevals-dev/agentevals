@@ -53,7 +53,9 @@ def _parse_evaluator_entry(entry: dict[str, Any]) -> tuple[str | None, CustomEva
     evaluator_def = model_cls.model_validate(entry)
 
     if evaluator_type == "builtin":
-        return name, evaluator_def if (evaluator_def.threshold is not None or evaluator_def.judge_model is not None) else None
+        return name, evaluator_def if (
+            evaluator_def.threshold is not None or evaluator_def.judge_model is not None
+        ) else None
 
     return None, evaluator_def
 
@@ -137,7 +139,6 @@ def merge_configs(file_config: EvalRunConfig, cli_config: EvalRunConfig) -> Eval
     if cli_config.output_format != "table":
         merged.output_format = cli_config.output_format
 
-    cli_metric_names = set(cli_config.metrics)
     file_metric_names = set(merged.metrics)
     for name in cli_config.metrics:
         if name not in file_metric_names:

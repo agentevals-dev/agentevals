@@ -71,9 +71,7 @@ def setup_otel_streaming(ws_url: str, session_id: str, eval_set_id: str | None =
     thread = threading.Thread(target=run_loop_in_background, daemon=True)
     thread.start()
 
-    future = asyncio.run_coroutine_threadsafe(
-        processor.connect(eval_set_id=eval_set_id), loop
-    )
+    future = asyncio.run_coroutine_threadsafe(processor.connect(eval_set_id=eval_set_id), loop)
     future.result()
 
     telemetry.tracer_provider.add_span_processor(processor)

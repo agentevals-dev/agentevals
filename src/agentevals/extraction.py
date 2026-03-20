@@ -224,10 +224,7 @@ def extract_tool_result_from_attrs(attrs: dict[str, Any]) -> dict[str, Any] | No
                     if part.get("type") == "tool_call_response" and "response" in part:
                         resp = part["response"]
                         if isinstance(resp, list):
-                            texts = [
-                                t.get("text", "") for t in resp
-                                if isinstance(t, dict) and "text" in t
-                            ]
+                            texts = [t.get("text", "") for t in resp if isinstance(t, dict) and "text" in t]
                             parsed = parse_tool_response_content(" ".join(texts))
                         elif isinstance(resp, dict):
                             parsed = resp

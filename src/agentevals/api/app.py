@@ -27,6 +27,7 @@ try:
 except ImportError:
     pass
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log_level_str = os.getenv("AGENTEVALS_LOG_LEVEL", "INFO").upper()

@@ -198,8 +198,8 @@ async def load_debug_bundle(file: UploadFile = FastAPIFile(...)):
     content = await file.read()
     try:
         zf = zipfile.ZipFile(io.BytesIO(content))
-    except zipfile.BadZipFile:
-        raise HTTPException(status_code=400, detail="Invalid ZIP file")
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(status_code=400, detail="Invalid ZIP file") from exc
 
     session_dirs: dict[str, list[str]] = {}
     for name in zf.namelist():

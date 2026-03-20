@@ -230,7 +230,7 @@ async def validate_eval_set(
     temp_dir = tempfile.mkdtemp()
     try:
         eval_set_path = os.path.join(temp_dir, eval_set_file.filename or "eval_set.json")
-        with open(eval_set_path, "wb") as f:
+        with open(eval_set_path, "wb") as f:  # noqa: ASYNC230
             content = await eval_set_file.read()
             f.write(content)
 
@@ -277,7 +277,7 @@ async def evaluate_traces(
         try:
             config_dict = json.loads(config)
         except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid config JSON: {exc}")
+            raise HTTPException(status_code=400, detail=f"Invalid config JSON: {exc}") from exc
 
         trace_paths = []
         for trace_file in trace_files:
@@ -291,7 +291,7 @@ async def evaluate_traces(
                 )
 
             trace_path = os.path.join(temp_dir, trace_file.filename)
-            with open(trace_path, "wb") as f:
+            with open(trace_path, "wb") as f:  # noqa: ASYNC230
                 content = await trace_file.read()
 
                 if len(content) > 10 * 1024 * 1024:
@@ -326,7 +326,7 @@ async def evaluate_traces(
                 )
 
             eval_set_path = os.path.join(temp_dir, eval_set_file.filename)
-            with open(eval_set_path, "wb") as f:
+            with open(eval_set_path, "wb") as f:  # noqa: ASYNC230
                 content = await eval_set_file.read()
                 if len(content) > 10 * 1024 * 1024:
                     raise HTTPException(
@@ -355,7 +355,7 @@ async def evaluate_traces(
             try:
                 custom_evaluators = _parse_custom_evaluators(raw_custom)
             except Exception as exc:
-                raise HTTPException(status_code=400, detail=f"Invalid customEvaluators: {exc}")
+                raise HTTPException(status_code=400, detail=f"Invalid customEvaluators: {exc}") from exc
 
         eval_config = EvalRunConfig(
             trace_files=trace_paths,
@@ -377,7 +377,7 @@ async def evaluate_traces(
         raise
     except Exception as exc:
         logger.exception("Evaluation failed")
-        raise HTTPException(status_code=500, detail=f"Internal error: {exc!s}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {exc!s}") from exc
 
     finally:
         shutil.rmtree(temp_dir)
@@ -410,7 +410,7 @@ async def evaluate_traces_stream(
                     return
 
                 trace_path = os.path.join(temp_dir, trace_file.filename)
-                with open(trace_path, "wb") as f:
+                with open(trace_path, "wb") as f:  # noqa: ASYNC230
                     content = await trace_file.read()
 
                     if len(content) > 10 * 1024 * 1024:
@@ -439,7 +439,7 @@ async def evaluate_traces_stream(
                     return
 
                 eval_set_path = os.path.join(temp_dir, eval_set_file.filename)
-                with open(eval_set_path, "wb") as f:
+                with open(eval_set_path, "wb") as f:  # noqa: ASYNC230
                     content = await eval_set_file.read()
                     if len(content) > 10 * 1024 * 1024:
                         yield f"data: {SSEErrorEvent(error='Eval set file exceeds 10MB').model_dump_json(by_alias=True)}\n\n"

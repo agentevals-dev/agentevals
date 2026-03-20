@@ -51,6 +51,7 @@ class InvocationData(BaseModel):
     final_response: Optional[str] = None
     intermediate_steps: IntermediateStepData = Field(default_factory=IntermediateStepData)
 
+
 class EvalInput(BaseModel):
     """Input payload sent to a custom evaluator script/container on stdin."""
 

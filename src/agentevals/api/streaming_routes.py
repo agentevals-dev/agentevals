@@ -156,7 +156,7 @@ async def create_eval_set_from_session(request: CreateEvalSetRequest):
         raise
     except Exception as exc:
         logger.exception("Failed to create eval set")
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @streaming_router.post("/evaluate-sessions", response_model=StandardResponse[EvaluateSessionsData])
@@ -245,7 +245,7 @@ async def evaluate_sessions(request: EvaluateSessionsRequest):
         raise
     except Exception as exc:
         logger.exception("Failed to evaluate sessions")
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @streaming_router.post("/prepare-evaluation", response_model=StandardResponse[PrepareEvaluationData])
@@ -269,7 +269,7 @@ async def prepare_evaluation(request: PrepareEvaluationRequest):
         temp_dir = tempfile.gettempdir()
 
         eval_set_file = os.path.join(temp_dir, f"eval_set_{request.golden_session_id}.json")
-        with open(eval_set_file, "w") as f:
+        with open(eval_set_file, "w") as f:  # noqa: ASYNC230
             json.dump(eval_set_response.data.eval_set, f)
 
         trace_files = []
@@ -298,7 +298,7 @@ async def prepare_evaluation(request: PrepareEvaluationRequest):
         raise
     except Exception as exc:
         logger.exception("Failed to prepare evaluation")
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @streaming_router.get("/download/{filename}")
@@ -310,7 +310,7 @@ async def download_file(filename: str):
     temp_dir = tempfile.gettempdir()
     file_path = os.path.join(temp_dir, filename)
 
-    if not os.path.exists(file_path):
+    if not os.path.exists(file_path):  # noqa: ASYNC240
         raise HTTPException(status_code=404, detail="File not found")
 
     if not file_path.startswith(temp_dir):
@@ -357,7 +357,7 @@ async def get_trace(request: GetTraceRequest):
 
         temp_file.close()
 
-        with open(temp_file.name) as f:
+        with open(temp_file.name) as f:  # noqa: ASYNC230
             trace_content = f.read()
 
         return StandardResponse(
@@ -370,4 +370,4 @@ async def get_trace(request: GetTraceRequest):
 
     except Exception as exc:
         logger.exception("Failed to get trace")
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

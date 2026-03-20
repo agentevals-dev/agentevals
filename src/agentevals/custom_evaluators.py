@@ -166,10 +166,10 @@ async def _run_subprocess(
             proc.communicate(input=input_json.encode()),
             timeout=timeout,
         )
-    except TimeoutError:
+    except TimeoutError as exc:
         proc.kill()
         await proc.wait()
-        raise TimeoutError(f"Custom evaluator '{metric_name}' timed out after {timeout}s")
+        raise TimeoutError(f"Custom evaluator '{metric_name}' timed out after {timeout}s") from exc
 
     stderr_text = stderr_bytes.decode(errors="replace").strip()
     if stderr_text:
@@ -386,7 +386,6 @@ class CustomEvaluatorRunner(Evaluator):
         conversation_scenario=None,
     ) -> EvaluationResult:
 
-    
         eval_input = EvalInput(
             metric_name=self._metric_name,
             threshold=self._threshold,

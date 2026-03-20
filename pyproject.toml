@@ -43,9 +43,6 @@ packages = ["src/agentevals"]
 [tool.uv]
 no-build-isolation-package = ["rouge_score"]
 
-[tool.uv.extra-build-dependencies]
-rouge-score = ["setuptools"]
-
 [tool.uv.workspace]
 members = ["packages/evaluator-sdk-py"]
 
@@ -81,3 +78,10 @@ docstring-code-format = true
 [tool.ruff.lint]
 select = ["E", "F", "W", "B", "Q", "I", "ASYNC", "T20"]
 ignore = ["F401", "E501", "B008", "ASYNC109"]
+
+[tool.ruff.lint.per-file-ignores]
+"examples/**" = ["T201", "E402", "B007"]
+"src/agentevals/sdk.py" = ["T201"]
+"src/agentevals/streaming/__init__.py" = ["T201"]
+"packages/evaluator-sdk-py/**" = ["T201"]
+"tests/test_otlp_receiver.py" = ["E402"]

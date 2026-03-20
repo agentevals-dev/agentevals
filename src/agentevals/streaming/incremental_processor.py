@@ -172,15 +172,17 @@ class IncrementalInvocationExtractor:
 
                     tool_result = extract_tool_result_from_attrs(attributes)
                     if tool_result:
-                        updates.append({
-                            "type": "tool_result",
-                            "invocationId": invocation_id,
-                            "toolCallId": call_id,
-                            "toolName": tool_call["name"],
-                            "response": tool_result["response"],
-                            "isError": tool_result["isError"],
-                            "timestamp": int(span.get("endTimeUnixNano", 0)) / 1e9,
-                        })
+                        updates.append(
+                            {
+                                "type": "tool_result",
+                                "invocationId": invocation_id,
+                                "toolCallId": call_id,
+                                "toolName": tool_call["name"],
+                                "response": tool_result["response"],
+                                "isError": tool_result["isError"],
+                                "timestamp": int(span.get("endTimeUnixNano", 0)) / 1e9,
+                            }
+                        )
 
         return updates
 
@@ -263,7 +265,11 @@ class IncrementalInvocationExtractor:
                             tool_id = tc.get("id", "unknown")
                             tool_key = f"tool:{tool_id}"
 
-                            tc_name = tc.get("function", {}).get("name", "unknown") if "function" in tc else tc.get("name", "unknown")
+                            tc_name = (
+                                tc.get("function", {}).get("name", "unknown")
+                                if "function" in tc
+                                else tc.get("name", "unknown")
+                            )
                             self.tool_names_by_id[tool_id] = tc_name
 
                             if tool_key not in self.seen_message_contents:
@@ -306,15 +312,17 @@ class IncrementalInvocationExtractor:
                     result_key = f"tool_result:{tool_id}"
                     if result_key not in self.seen_message_contents:
                         is_error = bool(response.get("isError", False))
-                        updates.append({
-                            "type": "tool_result",
-                            "invocationId": invocation_id,
-                            "toolCallId": tool_id,
-                            "toolName": tool_name,
-                            "response": response,
-                            "isError": is_error,
-                            "timestamp": _normalize_ts(log_event.get("timestamp", 0)),
-                        })
+                        updates.append(
+                            {
+                                "type": "tool_result",
+                                "invocationId": invocation_id,
+                                "toolCallId": tool_id,
+                                "toolName": tool_name,
+                                "response": response,
+                                "isError": is_error,
+                                "timestamp": _normalize_ts(log_event.get("timestamp", 0)),
+                            }
+                        )
                         self.seen_message_contents.add(result_key)
 
         return updates

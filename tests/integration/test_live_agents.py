@@ -46,10 +46,7 @@ def _run_agent(
     env = {
         **os.environ,
         "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{otlp_port}",
-        "OTEL_RESOURCE_ATTRIBUTES": (
-            f"agentevals.eval_set_id={eval_set_id},"
-            f"agentevals.session_name={session_name}"
-        ),
+        "OTEL_RESOURCE_ATTRIBUTES": (f"agentevals.eval_set_id={eval_set_id},agentevals.session_name={session_name}"),
         **(extra_env or {}),
     }
     return subprocess.run(
@@ -231,9 +228,7 @@ class TestAgentRerun:
         assert s1.is_complete and s2.is_complete
         assert len(s1.spans) > 0
         assert len(s2.spans) > 0
-        assert s1.trace_ids.isdisjoint(s2.trace_ids), (
-            f"Sessions share trace_ids: {s1.trace_ids & s2.trace_ids}"
-        )
+        assert s1.trace_ids.isdisjoint(s2.trace_ids), f"Sessions share trace_ids: {s1.trace_ids & s2.trace_ids}"
 
     def test_langchain_rerun_creates_separate_sessions(self, live_servers):
         """Run the LangChain agent twice with the same session_name.
@@ -263,9 +258,7 @@ class TestAgentRerun:
         assert s1.is_complete and s2.is_complete
         assert len(s1.spans) > 0
         assert len(s2.spans) > 0
-        assert s1.trace_ids.isdisjoint(s2.trace_ids), (
-            f"Sessions share trace_ids: {s1.trace_ids & s2.trace_ids}"
-        )
+        assert s1.trace_ids.isdisjoint(s2.trace_ids), f"Sessions share trace_ids: {s1.trace_ids & s2.trace_ids}"
 
     def test_rerun_sessions_visible_via_api(self, live_servers):
         """Both rerun sessions are visible in the API response."""

@@ -17,18 +17,10 @@ def roll_die(sides: int = 6) -> dict:
         Dictionary with sides, result, and message
     """
     if sides < 2:
-        return {
-            "sides": sides,
-            "result": None,
-            "message": "Error: Die must have at least 2 sides"
-        }
+        return {"sides": sides, "result": None, "message": "Error: Die must have at least 2 sides"}
 
     result = random.randint(1, sides)
-    return {
-        "sides": sides,
-        "result": result,
-        "message": f"Rolled a {result} on a {sides}-sided die"
-    }
+    return {"sides": sides, "result": result, "message": f"Rolled a {result} on a {sides}-sided die"}
 
 
 @tool
@@ -41,6 +33,7 @@ def check_prime(nums: list[int]) -> dict:
     Returns:
         Dictionary with results, prime_count, and prime_numbers
     """
+
     def is_prime(n: int) -> bool:
         if n < 2:
             return False
@@ -56,14 +49,10 @@ def check_prime(nums: list[int]) -> dict:
     results = {n: is_prime(n) for n in nums}
     prime_numbers = [n for n, is_p in results.items() if is_p]
 
-    return {
-        "results": results,
-        "prime_count": len(prime_numbers),
-        "prime_numbers": prime_numbers
-    }
+    return {"results": results, "prime_count": len(prime_numbers), "prime_numbers": prime_numbers}
 
 
-#def create_dice_agent(model: str = "gpt-3.5-turbo", temperature: float = 0.0):
+# def create_dice_agent(model: str = "gpt-3.5-turbo", temperature: float = 0.0):
 def create_dice_agent(model: str = "gpt-4o-mini", temperature: float = 0.0):
     llm = ChatOpenAI(model=model, temperature=temperature)
     tools = [roll_die, check_prime]

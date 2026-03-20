@@ -18,7 +18,6 @@ import uvicorn
 
 from agentevals.streaming.ws_server import StreamingTraceManager
 
-
 # ---------------------------------------------------------------------------
 # Tier 1: ASGI in-process fixtures (session grouping + timing stress tests)
 # ---------------------------------------------------------------------------
@@ -50,16 +49,14 @@ async def otlp_client(trace_manager):
     test_app.include_router(otlp_router)
 
     transport = httpx.ASGITransport(app=test_app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 
 @pytest.fixture
 async def api_client(trace_manager):
     """httpx client → main app streaming routes via ASGI transport."""
-    from agentevals.api.streaming_routes import streaming_router, set_trace_manager
+    from agentevals.api.streaming_routes import set_trace_manager, streaming_router
 
     set_trace_manager(trace_manager)
 
@@ -69,9 +66,7 @@ async def api_client(trace_manager):
     test_app.include_router(streaming_router, prefix="/api/streaming")
 
     transport = httpx.ASGITransport(app=test_app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 
@@ -121,12 +116,8 @@ def live_servers():
     mgr = get_trace_manager()
     set_trace_manager(mgr)
 
-    main_config = uvicorn.Config(
-        app, host="127.0.0.1", port=main_port, log_level="warning"
-    )
-    otlp_config = uvicorn.Config(
-        otlp_app, host="127.0.0.1", port=otlp_port, log_level="warning"
-    )
+    main_config = uvicorn.Config(app, host="127.0.0.1", port=main_port, log_level="warning")
+    otlp_config = uvicorn.Config(otlp_app, host="127.0.0.1", port=otlp_port, log_level="warning")
     main_server = uvicorn.Server(main_config)
     otlp_server = uvicorn.Server(otlp_config)
 
@@ -135,9 +126,7 @@ def live_servers():
     def _run():
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(
-                asyncio.gather(main_server.serve(), otlp_server.serve())
-            )
+            loop.run_until_complete(asyncio.gather(main_server.serve(), otlp_server.serve()))
         finally:
             loop.close()
 
@@ -186,13 +175,9 @@ def make_trace_request(
     """Build an ExportTraceServiceRequest JSON body."""
     resource_attrs = []
     if session_name:
-        resource_attrs.append(
-            {"key": "agentevals.session_name", "value": {"stringValue": session_name}}
-        )
+        resource_attrs.append({"key": "agentevals.session_name", "value": {"stringValue": session_name}})
     if eval_set_id:
-        resource_attrs.append(
-            {"key": "agentevals.eval_set_id", "value": {"stringValue": eval_set_id}}
-        )
+        resource_attrs.append({"key": "agentevals.eval_set_id", "value": {"stringValue": eval_set_id}})
     return {
         "resourceSpans": [
             {
@@ -244,9 +229,7 @@ def make_log_request(
     """Build an ExportLogsServiceRequest JSON body."""
     resource_attrs = []
     if session_name:
-        resource_attrs.append(
-            {"key": "agentevals.session_name", "value": {"stringValue": session_name}}
-        )
+        resource_attrs.append({"key": "agentevals.session_name", "value": {"stringValue": session_name}})
     return {
         "resourceLogs": [
             {
@@ -291,18 +274,14 @@ def make_genai_log(
 
 async def send_traces(client: httpx.AsyncClient, body: dict) -> httpx.Response:
     """POST /v1/traces and assert success."""
-    resp = await client.post(
-        "/v1/traces", json=body, headers={"Content-Type": "application/json"}
-    )
+    resp = await client.post("/v1/traces", json=body, headers={"Content-Type": "application/json"})
     assert resp.status_code == 200, f"POST /v1/traces failed: {resp.status_code} {resp.text}"
     return resp
 
 
 async def send_logs(client: httpx.AsyncClient, body: dict) -> httpx.Response:
     """POST /v1/logs and assert success."""
-    resp = await client.post(
-        "/v1/logs", json=body, headers={"Content-Type": "application/json"}
-    )
+    resp = await client.post("/v1/logs", json=body, headers={"Content-Type": "application/json"})
     assert resp.status_code == 200, f"POST /v1/logs failed: {resp.status_code} {resp.text}"
     return resp
 
@@ -320,10 +299,7 @@ async def wait_for_session_complete(
             return
         await asyncio.sleep(0.05)
     existing = list(mgr.sessions.keys())
-    raise TimeoutError(
-        f"Session '{session_id}' not complete after {timeout}s. "
-        f"Existing sessions: {existing}"
-    )
+    raise TimeoutError(f"Session '{session_id}' not complete after {timeout}s. Existing sessions: {existing}")
 
 
 async def wait_for_n_sessions(
@@ -337,9 +313,7 @@ async def wait_for_n_sessions(
         if len(mgr.sessions) >= n:
             return
         await asyncio.sleep(0.05)
-    raise TimeoutError(
-        f"Expected {n} sessions, got {len(mgr.sessions)} after {timeout}s"
-    )
+    raise TimeoutError(f"Expected {n} sessions, got {len(mgr.sessions)} after {timeout}s")
 
 
 def wait_for_session_complete_sync(
@@ -357,10 +331,7 @@ def wait_for_session_complete_sync(
             return
         time.sleep(0.2)
     existing = list(mgr.sessions.keys())
-    raise TimeoutError(
-        f"Session '{session_id}' not complete after {timeout}s. "
-        f"Existing sessions: {existing}"
-    )
+    raise TimeoutError(f"Session '{session_id}' not complete after {timeout}s. Existing sessions: {existing}")
 
 
 async def get_sessions(api_client: httpx.AsyncClient) -> list[dict]:

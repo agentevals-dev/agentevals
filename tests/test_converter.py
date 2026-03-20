@@ -3,17 +3,16 @@ import os
 
 import pytest
 
-from agentevals.loader.jaeger import JaegerJsonLoader
 from agentevals.converter import (
     ConversionResult,
+    _extract_final_response,
+    _extract_user_content,
+    _find_adk_spans,
     convert_trace,
     convert_traces,
-    _extract_user_content,
-    _extract_final_response,
-    _find_adk_spans,
 )
 from agentevals.loader.base import Span, Trace
-
+from agentevals.loader.jaeger import JaegerJsonLoader
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), "..", "samples")
 
@@ -179,9 +178,7 @@ class TestConverter:
 
         assert len(inv.intermediate_data.tool_responses) == 1
         assert inv.intermediate_data.tool_responses[0].name == "my_tool"
-        assert inv.intermediate_data.tool_responses[0].response == {
-            "result": "tool output"
-        }
+        assert inv.intermediate_data.tool_responses[0].response == {"result": "tool output"}
 
     def test_convert_traces_multiple(self):
         trace = _make_adk_trace()
@@ -235,11 +232,7 @@ class TestConverter:
             tags={
                 "otel.scope.name": "gcp.vertex.agent",
                 "gcp.vertex.agent.llm_request": json.dumps(
-                    {
-                        "contents": [
-                            {"role": "user", "parts": [{"text": "do something"}]}
-                        ]
-                    }
+                    {"contents": [{"role": "user", "parts": [{"text": "do something"}]}]}
                 ),
                 "gcp.vertex.agent.llm_response": json.dumps(
                     {
@@ -315,16 +308,18 @@ class TestConverter:
     def test_format_detection_with_genai_span_late_in_trace(self):
         non_llm_spans = []
         for i in range(15):
-            non_llm_spans.append(Span(
-                trace_id="test-trace",
-                span_id=f"http-{i}",
-                parent_span_id=None,
-                operation_name="http.request",
-                start_time=1000 + i * 100,
-                duration=50,
-                tags={},
-                children=[],
-            ))
+            non_llm_spans.append(
+                Span(
+                    trace_id="test-trace",
+                    span_id=f"http-{i}",
+                    parent_span_id=None,
+                    operation_name="http.request",
+                    start_time=1000 + i * 100,
+                    duration=50,
+                    tags={},
+                    children=[],
+                )
+            )
 
         genai_span = Span(
             trace_id="test-trace",

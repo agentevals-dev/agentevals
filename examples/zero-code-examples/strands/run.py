@@ -42,16 +42,13 @@ def main():
 
     os.environ.setdefault(
         "OTEL_RESOURCE_ATTRIBUTES",
-        "agentevals.eval_set_id=strands_agent_eval,"
-        "agentevals.session_name=strands-zero-code",
+        "agentevals.eval_set_id=strands_agent_eval,agentevals.session_name=strands-zero-code",
     )
 
     telemetry = StrandsTelemetry()
 
     exporter = OTLPSpanExporter()
-    telemetry.tracer_provider.add_span_processor(
-        BatchSpanProcessor(exporter, schedule_delay_millis=1000)
-    )
+    telemetry.tracer_provider.add_span_processor(BatchSpanProcessor(exporter, schedule_delay_millis=1000))
 
     agent = create_dice_agent()
 

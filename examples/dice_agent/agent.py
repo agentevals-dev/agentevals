@@ -22,11 +22,7 @@ def roll_die(sides: int = 6) -> dict:
         return {"error": "Die must have at least 2 sides"}
 
     result = random.randint(1, sides)
-    return {
-        "sides": sides,
-        "result": result,
-        "message": f"Rolled a {sides}-sided die and got {result}"
-    }
+    return {"sides": sides, "result": result, "message": f"Rolled a {sides}-sided die and got {result}"}
 
 
 def check_prime(nums: list[int]) -> dict:
@@ -38,6 +34,7 @@ def check_prime(nums: list[int]) -> dict:
     Returns:
         Dictionary mapping each number to whether it's prime
     """
+
     def is_prime(n: int) -> bool:
         if n < 2:
             return False
@@ -53,16 +50,12 @@ def check_prime(nums: list[int]) -> dict:
     results = {num: is_prime(num) for num in nums}
     prime_nums = [n for n, is_p in results.items() if is_p]
 
-    return {
-        "results": results,
-        "prime_count": len(prime_nums),
-        "prime_numbers": prime_nums
-    }
+    return {"results": results, "prime_count": len(prime_nums), "prime_numbers": prime_nums}
 
 
 dice_agent = Agent(
     name="dice_agent",
-    #model="gemini-2.5-flash",
+    # model="gemini-2.5-flash",
     model="gemini-2.5-flash-lite",
     instruction="""You are a helpful assistant that can roll dice and check if numbers are prime.
 

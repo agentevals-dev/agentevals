@@ -97,17 +97,22 @@ class TestBroadcastEnrichment:
 
     def test_choice_extracts_tool_calls_from_nested_message(self):
         spans = [_make_span()]
-        logs = [_make_log("gen_ai.choice", {
-            "index": 0,
-            "finish_reason": "tool_calls",
-            "message": {
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [
-                    {"id": "call_1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}},
-                ],
-            },
-        })]
+        logs = [
+            _make_log(
+                "gen_ai.choice",
+                {
+                    "index": 0,
+                    "finish_reason": "tool_calls",
+                    "message": {
+                        "role": "assistant",
+                        "content": "",
+                        "tool_calls": [
+                            {"id": "call_1", "type": "function", "function": {"name": "roll_die", "arguments": "{}"}},
+                        ],
+                    },
+                },
+            )
+        ]
         result = enrich_spans_with_logs(spans, logs)
 
         msgs = _get_injected_attr(result[0], "gen_ai.output.messages")
@@ -157,10 +162,14 @@ class TestPerSpanEnrichment:
     def test_tool_calls_in_assistant_message(self):
         spans = [_make_span("s1")]
         logs = [
-            _make_log("gen_ai.assistant.message", {
-                "content": "",
-                "tool_calls": [{"id": "tc1", "function": {"name": "roll", "arguments": "{}"}}],
-            }, span_id="s1"),
+            _make_log(
+                "gen_ai.assistant.message",
+                {
+                    "content": "",
+                    "tool_calls": [{"id": "tc1", "function": {"name": "roll", "arguments": "{}"}}],
+                },
+                span_id="s1",
+            ),
         ]
         result = enrich_spans_with_logs(spans, logs)
 
@@ -172,7 +181,11 @@ class TestPerSpanEnrichment:
         spans = [_make_span("s1")]
         logs = [
             _make_log("gen_ai.user.message", {"content": "hi"}, span_id="s1"),
-            _make_log("gen_ai.assistant.message", {"content": "", "tool_calls": [{"id": "t1", "function": {"name": "roll", "arguments": "{}"}}]}, span_id="s1"),
+            _make_log(
+                "gen_ai.assistant.message",
+                {"content": "", "tool_calls": [{"id": "t1", "function": {"name": "roll", "arguments": "{}"}}]},
+                span_id="s1",
+            ),
             _make_log("gen_ai.user.message", {"content": "thanks"}, span_id="s1"),
             _make_log("gen_ai.assistant.message", {"content": "you're welcome"}, span_id="s1"),
         ]

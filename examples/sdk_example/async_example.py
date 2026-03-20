@@ -47,18 +47,12 @@ async def main():
         metadata={"model": dice_agent.model},
     ):
         runner = InMemoryRunner(agent=dice_agent, app_name="dice_app")
-        session = await runner.session_service.create_session(
-            app_name="dice_app", user_id="demo_user"
-        )
+        session = await runner.session_service.create_session(app_name="dice_app", user_id="demo_user")
 
         for query in ["Roll a 20-sided die", "Is that number prime?"]:
             print(f"User: {query}")
-            content = types.Content(
-                role="user", parts=[types.Part.from_text(text=query)]
-            )
-            async for event in runner.run_async(
-                user_id="demo_user", session_id=session.id, new_message=content
-            ):
+            content = types.Content(role="user", parts=[types.Part.from_text(text=query)])
+            async for event in runner.run_async(user_id="demo_user", session_id=session.id, new_message=content):
                 if event.content.parts and event.content.parts[0].text:
                     print(f"Agent: {event.content.parts[0].text}")
 

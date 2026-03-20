@@ -457,9 +457,7 @@ def _extract_tool_calls(
                             if part.get("type") == "tool_call_response" and "response" in part:
                                 resp = part["response"]
                                 if isinstance(resp, list):
-                                    texts = [
-                                        t.get("text", "") for t in resp if isinstance(t, dict) and "text" in t
-                                    ]
+                                    texts = [t.get("text", "") for t in resp if isinstance(t, dict) and "text" in t]
                                     result_data = parse_tool_response_content(" ".join(texts))
                                 elif isinstance(resp, dict):
                                     result_data = resp

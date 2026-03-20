@@ -28,12 +28,12 @@ def create_server(server_url: str | None = None) -> FastMCP:
                 r = await client.get(f"{_url}{path}")
                 r.raise_for_status()
                 return _unwrap(r.json())
-        except httpx.ConnectError:
+        except httpx.ConnectError as exc:
             raise RuntimeError(
                 f"Cannot reach agentevals server at {_url}. Start it with: uv run agentevals serve --dev"
-            )
-        except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"Server error {e.response.status_code}: {e.response.text}")
+            ) from exc
+        except httpx.HTTPStatusError as exc:
+            raise RuntimeError(f"Server error {exc.response.status_code}: {exc.response.text}") from exc
 
     async def _post(path: str, body: dict) -> Any:
         try:
@@ -41,12 +41,12 @@ def create_server(server_url: str | None = None) -> FastMCP:
                 r = await client.post(f"{_url}{path}", json=body)
                 r.raise_for_status()
                 return _unwrap(r.json())
-        except httpx.ConnectError:
+        except httpx.ConnectError as exc:
             raise RuntimeError(
                 f"Cannot reach agentevals server at {_url}. Start it with: uv run agentevals serve --dev"
-            )
-        except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"Server error {e.response.status_code}: {e.response.text}")
+            ) from exc
+        except httpx.HTTPStatusError as exc:
+            raise RuntimeError(f"Server error {exc.response.status_code}: {exc.response.text}") from exc
 
     def _summarize_run_result(result) -> dict[str, Any]:
         traces = []
@@ -81,7 +81,7 @@ def create_server(server_url: str | None = None) -> FastMCP:
     @mcp.tool()
     async def evaluate_traces(
         trace_files: list[str],
-        metrics: list[str] = ["tool_trajectory_avg_score"],
+        metrics: list[str] | None = None,
         trace_format: str = "jaeger-json",
         eval_set_file: str | None = None,
         judge_model: str | None = None,
@@ -102,6 +102,8 @@ def create_server(server_url: str | None = None) -> FastMCP:
             threshold: Score threshold for PASS/FAIL classification (0.0–1.0).
             eval_config_file: Path to an eval config YAML file with custom evaluators.
         """
+        if metrics is None:
+            metrics = ["tool_trajectory_avg_score"]
         if eval_config_file:
             from agentevals.eval_config_loader import load_eval_config, merge_configs
 
@@ -201,7 +203,7 @@ def create_server(server_url: str | None = None) -> FastMCP:
     @mcp.tool()
     async def evaluate_sessions(
         golden_session_id: str,
-        metrics: list[str] = ["tool_trajectory_avg_score"],
+        metrics: list[str] | None = None,
         judge_model: str = "gemini-2.5-flash",
         eval_set_id: str | None = None,
     ) -> dict[str, Any]:
@@ -219,6 +221,8 @@ def create_server(server_url: str | None = None) -> FastMCP:
             eval_set_id: A label for the eval set built from the golden session. You can use
                          any string or omit it — a default will be generated automatically.
         """
+        if metrics is None:
+            metrics = ["tool_trajectory_avg_score"]
         return await _post(
             "/api/streaming/evaluate-sessions",
             {

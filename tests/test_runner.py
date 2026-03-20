@@ -4,9 +4,8 @@ import os
 import pytest
 
 from agentevals.config import EvalRunConfig
-from agentevals.runner import run_evaluation, load_eval_set
+from agentevals.runner import load_eval_set, run_evaluation
 from agentevals.trace_metrics import extract_trace_metadata
-
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), "..", "samples")
 HELM_TRACE = os.path.join(SAMPLES_DIR, "helm.json")

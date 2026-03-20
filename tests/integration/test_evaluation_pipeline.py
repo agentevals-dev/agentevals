@@ -41,32 +41,44 @@ def _make_realistic_session_traces(
         span_id = f"span-{i}"
         is_last = i == len(queries) - 1
 
-        trace_requests.append(make_trace_request(
-            trace_id=trace_id,
-            session_name=session_name,
-            eval_set_id=f"{session_name}-eval",
-            spans=[make_genai_span(
+        trace_requests.append(
+            make_trace_request(
                 trace_id=trace_id,
-                span_id=span_id,
-                parent_span_id=None if is_last else "parent",
-                name="chat gpt-4o-mini",
-            )],
-        ))
+                session_name=session_name,
+                eval_set_id=f"{session_name}-eval",
+                spans=[
+                    make_genai_span(
+                        trace_id=trace_id,
+                        span_id=span_id,
+                        parent_span_id=None if is_last else "parent",
+                        name="chat gpt-4o-mini",
+                    )
+                ],
+            )
+        )
 
-        log_requests.append(make_log_request(
-            trace_id=trace_id,
-            session_name=session_name,
-            log_records=[
-                make_genai_log(
-                    "gen_ai.user.message", query,
-                    trace_id=trace_id, span_id=span_id, role="user",
-                ),
-                make_genai_log(
-                    "gen_ai.assistant.message", f"Response to: {query}",
-                    trace_id=trace_id, span_id=span_id, role="assistant",
-                ),
-            ],
-        ))
+        log_requests.append(
+            make_log_request(
+                trace_id=trace_id,
+                session_name=session_name,
+                log_records=[
+                    make_genai_log(
+                        "gen_ai.user.message",
+                        query,
+                        trace_id=trace_id,
+                        span_id=span_id,
+                        role="user",
+                    ),
+                    make_genai_log(
+                        "gen_ai.assistant.message",
+                        f"Response to: {query}",
+                        trace_id=trace_id,
+                        span_id=span_id,
+                        role="assistant",
+                    ),
+                ],
+            )
+        )
 
     return trace_requests, log_requests
 
@@ -89,11 +101,11 @@ async def _create_session(otlp_client, trace_manager, session_name, queries):
 class TestEvalSetCreation:
     """Verify eval set creation from completed sessions (no API key needed)."""
 
-    async def test_create_eval_set_from_session(
-        self, trace_manager, otlp_client, api_client
-    ):
+    async def test_create_eval_set_from_session(self, trace_manager, otlp_client, api_client):
         await _create_session(
-            otlp_client, trace_manager, "eval-golden",
+            otlp_client,
+            trace_manager,
+            "eval-golden",
             ["What is 2+2?", "Is that prime?", "Tell me a joke"],
         )
 
@@ -111,9 +123,7 @@ class TestEvalSetCreation:
         conversation = eval_set["eval_cases"][0]["conversation"]
         assert len(conversation) == 3
 
-    async def test_create_eval_set_nonexistent_session(
-        self, trace_manager, otlp_client, api_client
-    ):
+    async def test_create_eval_set_nonexistent_session(self, trace_manager, otlp_client, api_client):
         resp = await api_client.post(
             "/api/streaming/create-eval-set",
             json={"session_id": "does-not-exist", "eval_set_id": "test"},
