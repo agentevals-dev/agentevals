@@ -6,7 +6,7 @@
   </picture>
 </p>
 
-<h3 align="center">Ship Agents Reliably</h3>
+<h1 align="center">Ship Agents Reliably</h1>
 
 <p align="center">
 Benchmark your agents before they hit production.<br>
