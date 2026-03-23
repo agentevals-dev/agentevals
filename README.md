@@ -30,14 +30,19 @@ Works with any OTel-instrumented framework (LangChain, Strands, Google ADK, and 
 
 ## Installation
 
-Grab a wheel from the [releases page](../../releases). The **core** wheel has the CLI and REST API. The **bundle** wheel adds streaming and the embedded web UI.
+**From PyPI** (recommended): the published package includes the **CLI**, **REST API**, and **embedded web UI**.
 
 ```bash
-pip install agentevals-<version>-py3-none-any.whl
-
-# For MCP server support:
-pip install "agentevals-<version>-py3-none-any.whl[live]"
+pip install agentevals-cli
 ```
+
+Optional extras:
+
+```bash
+pip install "agentevals-cli[live]"        # MCP server support
+```
+
+**GitHub [releases](../../releases)** also ship **core** wheels (CLI and API only) and **bundle** wheels (with the embedded UI) if you need a specific version or offline `pip install ./path/to.whl`.
 
 **From source** with `uv` or Nix:
 
@@ -50,10 +55,12 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions.
 
 ## Quick Start
 
+Examples use `agentevals` on your PATH after `pip install agentevals-cli`. If you are working from a clone of this repo, use `uv run agentevals` instead.
+
 Run an evaluation against a sample trace:
 
 ```bash
-uv run agentevals run samples/helm.json \
+agentevals run samples/helm.json \
   --eval-set samples/eval_set_helm.json \
   -m tool_trajectory_avg_score
 ```
@@ -61,7 +68,7 @@ uv run agentevals run samples/helm.json \
 List available evaluators:
 
 ```bash
-uv run agentevals evaluator list
+agentevals evaluator list
 ```
 
 ## Integration
@@ -72,7 +79,7 @@ Point any OTel-instrumented agent at the receiver. No SDK, no code changes:
 
 ```bash
 # Terminal 1
-uv run agentevals serve --dev
+agentevals serve --dev
 
 # Terminal 2
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
@@ -97,31 +104,31 @@ with app.session(eval_set_id="my-eval"):
     agent.invoke("Roll a 20-sided die for me")
 ```
 
-Requires `pip install "agentevals[streaming]"`. See [examples/sdk_example/](examples/sdk_example/) for framework-specific patterns.
+Requires `pip install "agentevals-cli[streaming]"`. See [examples/sdk_example/](examples/sdk_example/) for framework-specific patterns.
 
 ## CLI
 
 ```bash
 # Single trace
-uv run agentevals run samples/helm.json \
+agentevals run samples/helm.json \
   --eval-set samples/eval_set_helm.json \
   -m tool_trajectory_avg_score
 
 # Multiple traces
-uv run agentevals run samples/helm.json samples/k8s.json \
+agentevals run samples/helm.json samples/k8s.json \
   --eval-set samples/eval_set_helm.json \
   -m tool_trajectory_avg_score
 
 # JSON output
-uv run agentevals run samples/helm.json \
+agentevals run samples/helm.json \
   --eval-set samples/eval_set_helm.json \
   --output json
 
 # List available evaluators (builtin + community)
-uv run agentevals evaluator list
+agentevals evaluator list
 
 # List only builtin evaluators
-uv run agentevals evaluator list --source builtin
+agentevals evaluator list --source builtin
 ```
 
 ## Custom Evaluators
@@ -201,8 +208,8 @@ Exposes evaluation tools to MCP clients. A `.mcp.json` at the project root lets 
 | `evaluate_sessions` | yes | Evaluate sessions against a golden reference |
 
 ```bash
-# Custom server URL
-AGENTEVALS_SERVER_URL=http://localhost:9000 uv run agentevals mcp
+# Custom server URL (requires pip install "agentevals-cli[live]")
+AGENTEVALS_SERVER_URL=http://localhost:9000 agentevals mcp
 ```
 
 The React UI and MCP server share the same in-memory session state and can run simultaneously.

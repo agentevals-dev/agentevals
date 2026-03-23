@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "agentevals-cli"
 version = "0.5.2"
 description = "Standalone framework to evaluate agent correctness based on portable OpenTelemetry traces"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "google-adk[eval]>=1.25.0",

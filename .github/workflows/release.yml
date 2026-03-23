@@ -61,19 +61,31 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout GitHub Action'
-        uses: actions/checkout@main
+      - uses: actions/checkout@v6
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
-      # Repo root cwd: uv build puts artifacts in ./dist; uv publish looks for dist/* relative to cwd.
-      - name: 'Release Python Packages'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      # Same bundle as `make release` / `build-bundle`: wheel must include ui/dist in src/agentevals/_static
+      # (see [tool.hatch.build] artifacts in pyproject.toml).
+      - name: Release Python package (wheel + sdist with bundled UI)
         env:
           VERSION: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           uv sync --package agentevals-cli --all-extras
           uv version "$VERSION" --package agentevals-cli
 
+          make build-ui
+          rm -rf src/agentevals/_static
+          cp -r ui/dist src/agentevals/_static
+          rm -rf dist
           uv build --package agentevals-cli
           uv publish dist/* --token ${{ secrets.PYPI_TOKEN }}
+          rm -rf src/agentevals/_static
