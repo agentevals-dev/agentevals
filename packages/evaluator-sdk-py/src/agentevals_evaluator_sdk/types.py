@@ -79,7 +79,6 @@ class EvalResult(BaseModel):
     status: Optional[EvalStatus] = Field(
         default=None,
         description="One of EvalStatus.PASSED, EvalStatus.FAILED, EvalStatus.NOT_EVALUATED. Derived from score vs threshold if omitted.",
-        enum=EvalStatus,
     )
     per_invocation_scores: list[Optional[float]] = Field(default_factory=list)
     details: Optional[dict[str, Any]] = None
