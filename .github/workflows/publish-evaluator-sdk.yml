@@ -14,47 +14,27 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Verify tag matches pyproject.toml version
-        run: |
-          REF=${{ github.event.inputs.tag || github.ref_name }}
-          TOML_VERSION=$(grep '^version' packages/evaluator-sdk-py/pyproject.toml | cut -d'"' -f2)
-          TAG_VERSION=${REF#evaluator-sdk-v}
-          if [ "$TOML_VERSION" != "$TAG_VERSION" ]; then
-            echo "Error: $REF does not match packages/evaluator-sdk-py/pyproject.toml version $TOML_VERSION"
-            exit 1
-          fi
-
-      - name: Install build tool
-        run: pip install build
-
-      - name: Build wheel and sdist
-        run: python -m build packages/evaluator-sdk-py/ --outdir dist/
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: evaluator-sdk-dist
-          path: dist/
-
   publish:
-    needs: build
     runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write
-
     steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: evaluator-sdk-dist
-          path: dist/
+      - name: 'Checkout GitHub Action'
+        uses: actions/checkout@main
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: 'Release Python Packages'
+        working-directory: packages/evaluator-sdk-py
+        run: |
+          # if workflow_dispatch is used, use the version input
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            export VERSION=${{ github.event.inputs.version }}
+          else
+            export VERSION=$(echo "$GITHUB_REF" | cut -c12-)
+          fi
+          uv sync --all-extras
+          # Bump every package version to $VERSION first
+          uv version $VERSION --package agentevals-evaluator-sdk
+
+          uv build --package agentevals-evaluator-sdk
+          uv publish --token ${{ secrets.PYPI_TOKEN }
