@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentevals-cli"
-version = "0.5.1"
+version = "0.5.2"
 description = "Standalone framework to evaluate agent correctness based on portable OpenTelemetry traces"
 requires-python = ">=3.11"
 dependencies = [
@@ -84,3 +84,6 @@ ignore = ["F401", "E501", "B008", "ASYNC109"]
 "src/agentevals/streaming/__init__.py" = ["T201"]
 "packages/evaluator-sdk-py/**" = ["T201"]
 "tests/test_otlp_receiver.py" = ["E402"]
+
+[tool.uv.extra-build-dependencies]
+rouge-score = ["setuptools"]
