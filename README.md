@@ -56,7 +56,7 @@ Most evaluation tools require you to **re-execute your agent** for every test �
 
 agentevals follows three simple steps:
 
-1. **Collect traces** — Instrument your agent with OpenTelemetry (or export Jaeger JSON). Point the OTLP exporter at the agentevals receiver, or load trace files directly.
+1. **Collect traces** — Instrument your agent with OpenTelemetry (or export traces from your tracing backend). Point the OTLP exporter at the agentevals receiver, or load trace files directly.
 2. **Define eval sets** — Create golden evaluation sets that describe expected agent behavior: which tools should be called, in what order, and what the output should look like.
 3. **Run evaluations** — Use the CLI, Web UI, or MCP server to score traces against your eval sets. Get per-metric scores, pass/fail results, and detailed span-level breakdowns.
 
