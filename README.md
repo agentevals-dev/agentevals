@@ -60,9 +60,6 @@ agentevals follows three simple steps:
 2. **Define eval sets** — Create golden evaluation sets that describe expected agent behavior: which tools should be called, in what order, and what the output should look like.
 3. **Run evaluations** — Use the CLI, Web UI, or MCP server to score traces against your eval sets. Get per-metric scores, pass/fail results, and detailed span-level breakdowns.
 
-<p align="center">
-  <img src="docs/assets/how-it-works.gif" alt="How agentevals works" width="700" />
-</p>
 
 > [!IMPORTANT]
 > This project is under active development. Expect breaking changes.
