@@ -24,7 +24,7 @@ from ..loader.base import Trace
 from ..loader.otlp import OtlpJsonLoader
 from ..trace_attrs import OTEL_GENAI_INPUT_MESSAGES, OTEL_GENAI_REQUEST_MODEL
 from ..utils.log_enrichment import enrich_spans_with_logs
-from .incremental_processor import IncrementalInvocationExtractor
+from .incremental_processor import ClaudeCodeIncrementalExtractor, IncrementalInvocationExtractor
 from .session import TraceSession
 
 logger = logging.getLogger(__name__)
@@ -277,6 +277,71 @@ class StreamingTraceManager:
         logger.info("Auto-created OTLP session: %s (trace: %s)", session_id, trace_id)
         return session
 
+    async def get_or_create_claude_code_session(
+        self, trace_id: str, metadata: dict, session_name: str
+    ) -> TraceSession:
+        """Get or create a session for Claude Code (log-only, no spans).
+
+        Claude Code emits OTEL logs and HTTP hooks but no traces/spans.
+        Sessions use a longer idle timeout since CC tasks can be long-running.
+        """
+        active_id = self._active_session_for_name.get(session_name)
+        if active_id:
+            active = self.sessions.get(active_id)
+            if active and not active.is_complete:
+                active.trace_ids.add(trace_id)
+                return active
+
+        session_id = session_name
+        if session_id in self.sessions:
+            counter = 2
+            while f"{session_name}-{counter}" in self.sessions:
+                counter += 1
+            session_id = f"{session_name}-{counter}"
+
+        resource_attrs = metadata.get("resource_attrs", {})
+        session = TraceSession(
+            session_id=session_id,
+            trace_id=trace_id,
+            eval_set_id=metadata.get("eval_set_id"),
+            metadata={
+                **{k: v for k, v in resource_attrs.items() if not k.startswith("agentevals.")},
+                "cc_session_id": session_name,
+            },
+            source="claude_code",
+            trace_ids={trace_id},
+        )
+
+        self.sessions[session_id] = session
+        self._active_session_for_name[session_name] = session_id
+        self.incremental_extractors[session_id] = ClaudeCodeIncrementalExtractor()
+
+        replayed = self._replay_orphan_logs(session)
+        extractor = self.incremental_extractors.get(session_id)
+        if extractor and replayed:
+            for log_event in replayed:
+                updates = extractor.process_log(log_event)
+                for update in updates:
+                    update["sessionId"] = session_id
+                    await self.broadcast_to_ui(update)
+
+        await self.broadcast_to_ui(
+            WSSessionStartedEvent(
+                session=SessionInfo(
+                    session_id=session_id,
+                    trace_id=trace_id,
+                    eval_set_id=metadata.get("eval_set_id"),
+                    span_count=0,
+                    is_complete=False,
+                    started_at=session.started_at.isoformat(),
+                    metadata=session.metadata,
+                ),
+            ).model_dump(by_alias=True)
+        )
+
+        logger.info("Auto-created Claude Code session: %s", session_id)
+        return session
+
     def schedule_session_completion(self, session_id: str) -> None:
         """Schedule session completion after root span arrival.
 
@@ -428,7 +493,7 @@ class StreamingTraceManager:
             ).model_dump(by_alias=True)
         )
 
-        if session_id in self.incremental_extractors:
+        if session.source != "claude_code" and session_id in self.incremental_extractors:
             del self.incremental_extractors[session_id]
 
     async def handle_connection(self, websocket: WebSocket) -> None:
@@ -615,6 +680,9 @@ class StreamingTraceManager:
                 - toolCalls: List of tool calls with name and args
                 - modelInfo: Model metadata (model name, tokens, etc.)
         """
+        if session.source == "claude_code":
+            return self._extract_invocations_from_claude_code(session)
+
         try:
             temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False)
 
@@ -804,3 +872,86 @@ class StreamingTraceManager:
             responses = tool_results_by_span.get(bare_span_id, [])
             if responses:
                 inv["toolResponses"] = responses
+
+    def _extract_invocations_from_claude_code(self, session: TraceSession) -> list[dict]:
+        """Extract invocations from Claude Code session using logs and hook events."""
+        try:
+            from ..claude_code_converter import convert_claude_code_session
+            from ..trace_attrs import CC_EVENT_API_REQUEST, CC_PROMPT_ID
+
+            cc_logs = [log for log in session.logs if log.get("event_name", "").startswith("claude_code.")]
+
+            result = convert_claude_code_session(cc_logs, session.hook_events)
+
+            if result.warnings:
+                logger.warning("Claude Code conversion warnings: %s", result.warnings)
+
+            model_info_by_prompt: dict[str, dict] = {}
+            for log in cc_logs:
+                if log.get("event_name") == CC_EVENT_API_REQUEST:
+                    attrs = log.get("attributes", {})
+                    pid = attrs.get(CC_PROMPT_ID, "")
+                    if not pid:
+                        continue
+                    info = model_info_by_prompt.setdefault(pid, {
+                        "models": set(), "inputTokens": 0, "outputTokens": 0,
+                    })
+                    model = attrs.get("model", "")
+                    if model and model != "unknown":
+                        info["models"].add(model)
+                    info["inputTokens"] += int(attrs.get("input_tokens", 0))
+                    info["outputTokens"] += int(attrs.get("output_tokens", 0))
+
+            invocations_data = []
+            for inv in result.invocations:
+                user_text = ""
+                if inv.user_content and inv.user_content.parts:
+                    user_text = " ".join(p.text for p in inv.user_content.parts if p.text)
+
+                agent_text = ""
+                if inv.final_response and inv.final_response.parts:
+                    agent_text = " ".join(p.text for p in inv.final_response.parts if p.text)
+
+                tool_calls = []
+                if inv.intermediate_data and inv.intermediate_data.tool_uses:
+                    for tu in inv.intermediate_data.tool_uses:
+                        tool_calls.append({
+                            "name": tu.name,
+                            "args": tu.args if hasattr(tu, "args") else {},
+                            "id": getattr(tu, "id", None),
+                        })
+
+                tool_responses = []
+                if inv.intermediate_data and inv.intermediate_data.tool_responses:
+                    for tr in inv.intermediate_data.tool_responses:
+                        tool_responses.append({
+                            "name": tr.name,
+                            "response": tr.response if hasattr(tr, "response") else {},
+                            "id": getattr(tr, "id", None),
+                        })
+
+                prompt_id = inv.invocation_id.removeprefix("cc-")
+                raw_info = model_info_by_prompt.get(prompt_id, {})
+                model_info: dict[str, Any] = {}
+                if raw_info.get("models"):
+                    model_info["models"] = list(raw_info["models"])
+                if raw_info.get("inputTokens"):
+                    model_info["inputTokens"] = raw_info["inputTokens"]
+                if raw_info.get("outputTokens"):
+                    model_info["outputTokens"] = raw_info["outputTokens"]
+
+                invocations_data.append({
+                    "invocationId": inv.invocation_id,
+                    "userText": user_text,
+                    "agentText": agent_text,
+                    "toolCalls": tool_calls,
+                    "toolResponses": tool_responses,
+                    "modelInfo": model_info,
+                })
+
+            logger.debug("Extracted %d invocations from Claude Code session", len(invocations_data))
+            return invocations_data
+
+        except Exception:
+            logger.exception("Failed to extract Claude Code invocations")
+            return []

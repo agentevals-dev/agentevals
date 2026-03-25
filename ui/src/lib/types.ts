@@ -317,6 +317,7 @@ export interface StreamingInvocation {
   agentText: string;
   toolCalls: Array<{ name: string; args: any; id?: string }>;
   toolResponses?: Array<{ name: string; response: Record<string, any>; id?: string }>;
+  modelInfo?: { models?: string[]; inputTokens?: number; outputTokens?: number };
 }
 
 export interface LiveSession {

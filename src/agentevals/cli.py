@@ -581,6 +581,7 @@ def serve(dev: bool, host: str, port: int, otlp_port: int, eval_sets: str | None
         level=level,
         format="%(levelname)s %(name)s: %(message)s",
     )
+    os.environ["AGENTEVALS_LOG_LEVEL"] = logging.getLevelName(level)
 
     if headless:
         os.environ["AGENTEVALS_HEADLESS"] = "1"

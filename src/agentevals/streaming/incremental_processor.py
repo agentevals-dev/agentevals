@@ -12,6 +12,7 @@ session completion.
 
 from __future__ import annotations
 
+import json
 import logging
 
 from ..extraction import (
@@ -26,6 +27,11 @@ from ..extraction import (
 from ..trace_attrs import (
     ADK_INVOCATION_ID,
     ADK_SCOPE_VALUE,
+    CC_EVENT_API_REQUEST,
+    CC_EVENT_PREFIX,
+    CC_EVENT_TOOL_RESULT,
+    CC_EVENT_USER_PROMPT,
+    CC_PROMPT_ID,
     OTEL_GENAI_REQUEST_MODEL,
     OTEL_GENAI_TOOL_NAME,
     OTEL_SCOPE,
@@ -335,3 +341,145 @@ class IncrementalInvocationExtractor:
         if parent_span_id:
             return parent_span_id
         return span.get("spanId")
+
+
+class ClaudeCodeIncrementalExtractor:
+    """Extracts conversation elements from Claude Code log and hook events as they arrive.
+
+    Handles two event sources:
+    - OTEL log events (claude_code.*) for prompts and token updates
+    - Hook events (PostToolUse, Stop) for tool I/O and agent response
+    """
+
+    def __init__(self):
+        self.seen_prompts: set[str] = set()
+        self.seen_tool_calls: set[str] = set()
+        self.seen_message_contents: set[str] = set()
+
+    def process_span(self, span: dict) -> list[dict]:
+        return []
+
+    def process_log(self, log_event: dict) -> list[dict]:
+        updates = []
+        event_name = log_event.get("event_name", "")
+
+        if not event_name.startswith(CC_EVENT_PREFIX):
+            return updates
+
+        attrs = log_event.get("attributes", {})
+        prompt_id = attrs.get(CC_PROMPT_ID, "unknown")
+        invocation_id = f"cc-{prompt_id}"
+        timestamp = _normalize_ts(log_event.get("timestamp", 0))
+
+        logger.debug("CC extractor: event=%s prompt_id=%s", event_name, prompt_id)
+
+        if event_name == CC_EVENT_USER_PROMPT:
+            if prompt_id not in self.seen_prompts:
+                prompt_text = attrs.get("prompt", "")
+                if not prompt_text:
+                    prompt_length = attrs.get("prompt_length", 0)
+                    prompt_text = f"[User prompt: {prompt_length} chars]"
+                updates.append({
+                    "type": "user_input",
+                    "invocationId": invocation_id,
+                    "text": prompt_text,
+                    "timestamp": timestamp,
+                })
+                self.seen_prompts.add(prompt_id)
+
+        elif event_name == CC_EVENT_TOOL_RESULT:
+            tool_name = attrs.get("tool_name", "unknown")
+            event_seq = attrs.get("event.sequence", "")
+            tool_key = f"{prompt_id}:{tool_name}:{event_seq}"
+
+            if tool_key not in self.seen_tool_calls:
+                tool_params = {}
+                raw_params = attrs.get("tool_parameters")
+                if raw_params:
+                    try:
+                        tool_params = json.loads(raw_params) if isinstance(raw_params, str) else raw_params
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+                updates.append({
+                    "type": "tool_call",
+                    "invocationId": invocation_id,
+                    "toolCall": {
+                        "id": tool_key,
+                        "name": tool_name,
+                        "args": tool_params if isinstance(tool_params, dict) else {},
+                    },
+                    "timestamp": timestamp,
+                })
+                self.seen_tool_calls.add(tool_key)
+
+        elif event_name == CC_EVENT_API_REQUEST:
+            in_tokens = int(attrs.get("input_tokens", 0))
+            out_tokens = int(attrs.get("output_tokens", 0))
+            model = attrs.get("model", "unknown")
+            if in_tokens or out_tokens:
+                updates.append({
+                    "type": "token_update",
+                    "invocationId": invocation_id,
+                    "inputTokens": in_tokens,
+                    "outputTokens": out_tokens,
+                    "model": model,
+                })
+
+        if updates:
+            logger.debug("CC extractor produced %d updates: %s", len(updates), [u["type"] for u in updates])
+
+        return updates
+
+    def process_hook_event(self, event: dict) -> list[dict]:
+        """Process a Claude Code hook payload and return UI updates."""
+        updates = []
+        hook_name = event.get("hook_event_name", "")
+        timestamp = _normalize_ts(event.get("timestamp", 0))
+
+        if hook_name == "PostToolUse":
+            tool_use_id = event.get("tool_use_id", "unknown")
+            tool_name = event.get("tool_name", "unknown")
+            tool_input = event.get("tool_input", {})
+            tool_response = event.get("tool_response", {})
+
+            tool_key = f"hook:{tool_use_id}"
+            if tool_key not in self.seen_message_contents:
+                updates.append({
+                    "type": "tool_call",
+                    "invocationId": "cc-current",
+                    "toolCall": {
+                        "id": tool_use_id,
+                        "name": tool_name,
+                        "args": tool_input if isinstance(tool_input, dict) else {},
+                    },
+                    "timestamp": timestamp,
+                })
+                self.seen_message_contents.add(tool_key)
+
+                if tool_response:
+                    resp = tool_response if isinstance(tool_response, dict) else {"result": str(tool_response)}
+                    updates.append({
+                        "type": "tool_result",
+                        "invocationId": "cc-current",
+                        "toolCallId": tool_use_id,
+                        "toolName": tool_name,
+                        "response": resp,
+                        "isError": False,
+                        "timestamp": timestamp,
+                    })
+
+        elif hook_name == "Stop":
+            last_message = event.get("last_assistant_message", "")
+            if last_message:
+                msg_key = f"stop:{last_message[:100]}"
+                if msg_key not in self.seen_message_contents:
+                    updates.append({
+                        "type": "agent_response",
+                        "invocationId": "cc-current",
+                        "text": last_message,
+                        "timestamp": timestamp,
+                    })
+                    self.seen_message_contents.add(msg_key)
+
+        return updates

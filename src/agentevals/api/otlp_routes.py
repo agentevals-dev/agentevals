@@ -26,6 +26,8 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 
 from ..extraction import flatten_otlp_attributes
 from ..trace_attrs import (
+    CC_EVENT_PREFIX,
+    CC_SESSION_ID,
     OTEL_GENAI_INPUT_MESSAGES,
     OTEL_GENAI_OUTPUT_MESSAGES,
     OTEL_SCOPE,
@@ -166,7 +168,18 @@ async def _process_logs(body: dict) -> None:
                 if not log_event:
                     continue
 
+                logger.debug(
+                    "Accepted log event_name=%s attrs_keys=%s",
+                    log_event.get("event_name"),
+                    list(log_event.get("attributes", {}).keys())[:10],
+                )
+
                 trace_id = log_record.get("traceId", "")
+
+                if not trace_id and _is_claude_code_log(log_event):
+                    cc_sid = log_event.get("attributes", {}).get(CC_SESSION_ID, "")
+                    trace_id = cc_sid or f"cc-{id(log_record)}"
+
                 if not trace_id:
                     continue
 
@@ -178,6 +191,21 @@ async def _process_logs(body: dict) -> None:
                     if candidate and not candidate.is_complete:
                         candidate.trace_ids.add(trace_id)
                         session = candidate
+
+                if session and session.source == "claude_code" and metadata.get("resource_attrs"):
+                    if _enrich_session_metadata(session, metadata):
+                        await _trace_manager.broadcast_to_ui({
+                            "type": "session_metadata_update",
+                            "sessionId": session.session_id,
+                            "metadata": session.metadata,
+                        })
+
+                if not session and _is_claude_code_log(log_event):
+                    cc_session_id = log_event.get("attributes", {}).get(CC_SESSION_ID, "")
+                    cc_session_name = cc_session_id or session_name or f"claude-code-{trace_id[:12]}"
+                    session = await _trace_manager.get_or_create_claude_code_session(
+                        trace_id, metadata, cc_session_name
+                    )
 
                 if not session:
                     if _trace_manager:
@@ -196,21 +224,24 @@ async def _process_logs(body: dict) -> None:
 
                 if session.is_complete:
                     sessions_needing_reextraction.add(session.session_id)
-                else:
+
+                if not session.is_complete:
                     _trace_manager.reset_idle_timer(session.session_id)
 
-                    extractor = _trace_manager.incremental_extractors.get(session.session_id)
-                    if extractor:
-                        updates = extractor.process_log(log_event)
-                        for update in updates:
-                            update["sessionId"] = session.session_id
-                            await _trace_manager.broadcast_to_ui(update)
+                extractor = _trace_manager.incremental_extractors.get(session.session_id)
+                if extractor:
+                    updates = extractor.process_log(log_event)
+                    for update in updates:
+                        update["sessionId"] = session.session_id
+                        await _trace_manager.broadcast_to_ui(update)
 
     for session_id in sessions_needing_reextraction:
         _trace_manager.schedule_log_reextraction(session_id)
 
 
 _GENAI_EVENT_KEYS = {OTEL_GENAI_INPUT_MESSAGES, OTEL_GENAI_OUTPUT_MESSAGES}
+
+_CC_SHORT_EVENT_NAMES = {"user_prompt", "tool_result", "api_request", "api_error", "tool_decision"}
 
 
 def _normalize_span(span_data: dict, scope_name: str, scope_version: str) -> dict:
@@ -258,6 +289,38 @@ def _extract_agentevals_metadata(resource_attrs: list[dict]) -> dict:
     }
 
 
+def _enrich_session_metadata(session, metadata: dict) -> bool:
+    """Merge OTEL resource attributes into an existing session's metadata.
+
+    When hooks create a session before OTEL logs arrive, the session starts
+    with sparse metadata. This fills in service.name, host info, and other
+    resource attributes from the first OTEL log batch.
+
+    Returns True if any metadata was updated.
+    """
+    resource_attrs = metadata.get("resource_attrs", {})
+    if not resource_attrs:
+        return False
+
+    updated = False
+    for key, value in resource_attrs.items():
+        if key.startswith("agentevals."):
+            continue
+        if key not in session.metadata or not session.metadata[key]:
+            session.metadata[key] = value
+            updated = True
+
+    if updated:
+        logger.debug("Enriched session %s metadata with OTEL resource attrs", session.session_id)
+
+    return updated
+
+
+def _is_claude_code_log(log_event: dict) -> bool:
+    """Check if a converted log event originated from Claude Code."""
+    return log_event.get("event_name", "").startswith(CC_EVENT_PREFIX)
+
+
 def _convert_otlp_log_record(log_record: dict) -> dict | None:
     """Convert OTLP log record to internal log event format.
 
@@ -271,7 +334,12 @@ def _convert_otlp_log_record(log_record: dict) -> dict | None:
     attrs = flatten_otlp_attributes(log_record.get("attributes", []))
     event_name = log_record.get("eventName") or attrs.get("event.name", "")
 
-    if not event_name or not event_name.startswith("gen_ai."):
+    if event_name and not event_name.startswith(CC_EVENT_PREFIX) and event_name in _CC_SHORT_EVENT_NAMES:
+        event_name = f"{CC_EVENT_PREFIX}{event_name}"
+
+    _ACCEPTED_LOG_PREFIXES = ("gen_ai.", CC_EVENT_PREFIX)
+    if not event_name or not any(event_name.startswith(p) for p in _ACCEPTED_LOG_PREFIXES):
+        logger.debug("Dropping log record with unrecognized event_name=%r", event_name)
         return None
 
     body_raw = log_record.get("body", {})

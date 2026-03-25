@@ -4,6 +4,23 @@ import { SessionCard } from './SessionCard';
 import { config } from '../../config';
 import type { ConversationElement, LiveSession, StreamingInvocation } from '../../lib/types';
 
+function _aggregateModelInfoFromInvocations(invocations?: StreamingInvocation[]) {
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let model: string | undefined;
+  if (invocations) {
+    for (const inv of invocations) {
+      const mi = inv.modelInfo;
+      if (mi) {
+        totalInputTokens += mi.inputTokens || 0;
+        totalOutputTokens += mi.outputTokens || 0;
+        if (!model && mi.models?.[0]) model = mi.models[0];
+      }
+    }
+  }
+  return { totalInputTokens, totalOutputTokens, ...(model ? { model } : {}) };
+}
+
 function invocationsToElements(invocations: StreamingInvocation[]): ConversationElement[] {
   return invocations.flatMap((inv, idx) => {
     const elements: ConversationElement[] = [];
@@ -318,10 +335,24 @@ export function LiveStreamingView() {
             });
             break;
 
-          case 'session_complete':
+          case 'session_metadata_update':
+            setActiveSessions(prev => {
+              const session = prev.get(data.sessionId);
+              if (!session) return prev;
+              const newMap = new Map(prev);
+              newMap.set(data.sessionId, {
+                ...session,
+                metadata: { ...session.metadata, ...data.metadata },
+              });
+              return newMap;
+            });
+            break;
+
+          case 'session_complete': {
             if (import.meta.env.DEV) {
               console.log('[Streaming] Session complete with invocations:', data.invocations?.length);
             }
+            const completionStats = _aggregateModelInfoFromInvocations(data.invocations);
             setActiveSessions(prev => {
               const session = prev.get(data.sessionId);
 
@@ -342,13 +373,16 @@ export function LiveStreamingView() {
                   liveElements: data.invocations?.length
                     ? invocationsToElements(data.invocations)
                     : [],
-                  liveStats: {
-                    totalInputTokens: 0,
-                    totalOutputTokens: 0,
-                  },
+                  liveStats: completionStats,
                   startedAt: new Date().toISOString(),
                 });
               } else {
+                const mergedStats = {
+                  totalInputTokens: Math.max(session.liveStats.totalInputTokens, completionStats.totalInputTokens),
+                  totalOutputTokens: Math.max(session.liveStats.totalOutputTokens, completionStats.totalOutputTokens),
+                  ...(completionStats.model ? { model: completionStats.model } : {}),
+                  ...(session.liveStats.model ? { model: session.liveStats.model } : {}),
+                };
                 newMap.set(data.sessionId, {
                   ...session,
                   status: 'complete',
@@ -356,12 +390,14 @@ export function LiveStreamingView() {
                   liveElements: data.invocations?.length
                     ? invocationsToElements(data.invocations)
                     : session.liveElements,
+                  liveStats: mergedStats,
                 });
               }
 
               return newMap;
             });
             break;
+          }
 
         }
       };
