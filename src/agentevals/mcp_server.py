@@ -13,8 +13,9 @@ from agentevals.runner import run_evaluation
 _DEFAULT_SERVER_URL = "http://localhost:8001"
 
 
-def create_server(server_url: str | None = None) -> FastMCP:
-    mcp = FastMCP("agentevals")
+def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastMCP:
+    """Build the FastMCP server. Extra keyword arguments are passed to :class:`FastMCP` (e.g. ``host``, ``port``)."""
+    mcp = FastMCP("agentevals", **fastmcp_kwargs)
     _url = (server_url or os.environ.get("AGENTEVALS_SERVER_URL", _DEFAULT_SERVER_URL)).rstrip("/")
 
     def _unwrap(response_json: dict) -> Any:

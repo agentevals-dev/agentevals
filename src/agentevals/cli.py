@@ -505,11 +505,12 @@ async def _run_servers(
     port: int,
     otlp_port: int,
     *,
+    mcp_port: int | None = None,
     reload: bool = False,
     reload_dirs: list[str] | None = None,
     log_level: str = "warning",
 ) -> None:
-    """Start the main API and OTLP HTTP servers."""
+    """Start the main API, OTLP HTTP server, and optionally MCP (Streamable HTTP)."""
     import uvicorn
 
     shared_kwargs: dict = {
@@ -522,8 +523,24 @@ async def _run_servers(
 
     main_server = uvicorn.Server(uvicorn.Config("agentevals.api.app:app", port=port, **shared_kwargs))
     otlp_server = uvicorn.Server(uvicorn.Config("agentevals.api.otlp_app:otlp_app", port=otlp_port, **shared_kwargs))
-    _link_server_shutdown(main_server, otlp_server)
-    await asyncio.gather(main_server.serve(), otlp_server.serve())
+    servers: list = [main_server, otlp_server]
+
+    if mcp_port is not None:
+        from .mcp_server import create_server as create_mcp_server
+
+        backend = (os.environ.get("AGENTEVALS_SERVER_URL") or f"http://127.0.0.1:{port}").rstrip("/")
+        mcp_instance = create_mcp_server(
+            server_url=backend,
+            host=host,
+            port=mcp_port,
+        )
+        mcp_app = mcp_instance.streamable_http_app()
+        mcp_kwargs = {**shared_kwargs, "reload": False, "port": mcp_port}
+        mcp_uvicorn = uvicorn.Server(uvicorn.Config(mcp_app, **mcp_kwargs))
+        servers.append(mcp_uvicorn)
+
+    _link_server_shutdown(*servers)
+    await asyncio.gather(*(s.serve() for s in servers))
 
 
 @main.command("serve")
@@ -549,6 +566,12 @@ async def _run_servers(
     help="Port for OTLP HTTP receiver (default: 4318, standard OTLP HTTP port).",
 )
 @click.option(
+    "--mcp-port",
+    default=None,
+    type=int,
+    help="If set, expose the MCP interface over Streamable HTTP on this port (requires [live] extras).",
+)
+@click.option(
     "--eval-sets",
     type=click.Path(exists=True),
     default=None,
@@ -565,7 +588,16 @@ async def _run_servers(
     count=True,
     help="Increase verbosity (-v for INFO, -vv for DEBUG).",
 )
-def serve(dev: bool, host: str, port: int, otlp_port: int, eval_sets: str | None, headless: bool, verbose: int) -> None:
+def serve(
+    dev: bool,
+    host: str,
+    port: int,
+    otlp_port: int,
+    mcp_port: int | None,
+    eval_sets: str | None,
+    headless: bool,
+    verbose: int,
+) -> None:
     """Start the agentevals API server.
 
     Use --dev to enable live streaming mode for agent development.
@@ -590,11 +622,20 @@ def serve(dev: bool, host: str, port: int, otlp_port: int, eval_sets: str | None
 
     os.environ["AGENTEVALS_LIVE"] = "1"
 
+    if mcp_port is not None:
+        try:
+            from . import mcp_server as _mcp_server_check  # noqa: F401
+        except ImportError:
+            click.echo('MCP HTTP requires the live extras: pip install "agentevals[live]"', err=True)
+            raise SystemExit(1) from None
+
     if dev:
         click.echo("agentevals dev server starting...")
         click.echo(f"  OTLP HTTP: http://{host}:{otlp_port}  (OTEL_EXPORTER_OTLP_ENDPOINT default)")
         click.echo(f"  WebSocket: ws://{host}:{port}/ws/traces")
         click.echo(f"  API:       http://{host}:{port}/api")
+        if mcp_port is not None:
+            click.echo(f"  MCP:       http://{host}:{mcp_port}/mcp")
         click.echo("  Web UI:    http://localhost:5173")
         click.echo()
 
@@ -607,19 +648,33 @@ def serve(dev: bool, host: str, port: int, otlp_port: int, eval_sets: str | None
 
         src_path = Path(__file__).parent.parent
         reload_dirs = [str(src_path)]
-        asyncio.run(_run_servers(host, port, otlp_port, reload=True, reload_dirs=reload_dirs, log_level="info"))
+        asyncio.run(
+            _run_servers(
+                host,
+                port,
+                otlp_port,
+                mcp_port=mcp_port,
+                reload=True,
+                reload_dirs=reload_dirs,
+                log_level="info",
+            )
+        )
     elif has_ui and not headless:
         click.echo(f"agentevals: http://{host}:{port}")
         click.echo(f"  OTLP HTTP: http://{host}:{otlp_port}")
+        if mcp_port is not None:
+            click.echo(f"  MCP (Streamable HTTP): http://{host}:{mcp_port}/mcp")
         click.echo()
 
-        asyncio.run(_run_servers(host, port, otlp_port))
+        asyncio.run(_run_servers(host, port, otlp_port, mcp_port=mcp_port))
     else:
         click.echo(f"agentevals API:  http://{host}:{port}/api")
         click.echo(f"  OTLP HTTP: http://{host}:{otlp_port}")
+        if mcp_port is not None:
+            click.echo(f"  MCP (Streamable HTTP): http://{host}:{mcp_port}/mcp")
         click.echo()
 
-        asyncio.run(_run_servers(host, port, otlp_port))
+        asyncio.run(_run_servers(host, port, otlp_port, mcp_port=mcp_port))
 
 
 @main.command("mcp")

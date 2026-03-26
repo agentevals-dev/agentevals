@@ -1,0 +1,12 @@
+1. UI and API are available at port {{ .Values.service.uiPort }} (Service port name: http).
+2. OTLP HTTP receiver: port {{ .Values.service.otlpPort }} (OTEL_EXPORTER_OTLP_ENDPOINT=http://<service>:{{ .Values.service.otlpPort }}).
+3. MCP (Streamable HTTP): port {{ .Values.service.mcpPort }}, path /mcp (e.g. http://<service>:{{ .Values.service.mcpPort }}/mcp).
+{{- if .Values.ephemeralVolume.enabled }}
+4. An emptyDir is mounted at /tmp with HOME=/tmp/agentevals-home (ephemeral; lost on pod restart). Set ephemeralVolume.enabled=false and readOnlyRootFilesystem=false if you need a writable root without this mount.
+{{- end }}
+
+Get the Service URL:
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "agentevals.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME {{ .Values.service.uiPort }}:{{ .Values.service.uiPort }}
+
+Health check: GET http://<pod-ip>:{{ .Values.service.uiPort }}/api/health

@@ -1,10 +1,21 @@
 VERSION := $(shell grep '^version' pyproject.toml | cut -d'"' -f2)
 WHEEL := dist/agentevals_cli-$(VERSION)-py3-none-any.whl
 
-.PHONY: build build-bundle build-ui release clean dev-backend dev-frontend dev-bundle test test-unit test-integration test-e2e
+DOCKER_REGISTRY ?= soloio
+DOCKER_IMAGE ?= agentevals
+DOCKER_TAG ?= $(VERSION)
+DOCKER_IMAGE_REF := $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY:%/=%)/$(DOCKER_IMAGE),$(DOCKER_IMAGE))
+
+# Multi-arch build (requires docker buildx). Manifest lists must be pushed — use build-docker-local for a single-arch --load.
+PLATFORMS ?= linux/amd64,linux/arm64
+
+.PHONY: build build-bundle build-docker build-ui release clean dev-backend dev-frontend dev-bundle test test-unit test-integration test-e2e
 
 build:
 	uv build
+
+build-docker:
+	docker buildx build --platform $(PLATFORMS) -t $(DOCKER_IMAGE_REF):$(DOCKER_TAG) --push .
 
 build-ui:
 	cd ui && npm ci && npm run build

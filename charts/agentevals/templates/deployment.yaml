@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agentevals.fullname" . }}
+  labels:
+    {{- include "agentevals.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "agentevals.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "agentevals.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "agentevals.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.ephemeralVolume.enabled }}
+      volumes:
+        - name: agentevals-tmp
+          {{- if or .Values.ephemeralVolume.sizeLimit (eq .Values.ephemeralVolume.medium "Memory") }}
+          emptyDir:
+            {{- if eq .Values.ephemeralVolume.medium "Memory" }}
+            medium: Memory
+            {{- end }}
+            {{- with .Values.ephemeralVolume.sizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- end }}
+      containers:
+        - name: agentevals
+          securityContext:
+            {{- $sc := deepCopy .Values.securityContext }}
+            {{- if not .Values.ephemeralVolume.enabled }}
+            {{- $_ := set $sc "readOnlyRootFilesystem" false }}
+            {{- end }}
+            {{- toYaml $sc | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.uiPort }}
+              protocol: TCP
+            - name: otlp-http
+              containerPort: {{ .Values.service.otlpPort }}
+              protocol: TCP
+            - name: mcp
+              containerPort: {{ .Values.service.mcpPort }}
+              protocol: TCP
+          env:
+            - name: AGENTEVALS_SERVER_URL
+              value: "http://127.0.0.1:{{ .Values.service.uiPort }}"
+            {{- if .Values.ephemeralVolume.enabled }}
+            - name: TMPDIR
+              value: "/tmp"
+            - name: HOME
+              value: "/tmp/agentevals-home"
+            {{- end }}
+          {{- if .Values.ephemeralVolume.enabled }}
+          volumeMounts:
+            - name: agentevals-tmp
+              mountPath: /tmp
+          {{- end }}
+          {{- if .Values.command }}
+          command:
+            {{- toYaml .Values.command | nindent 12 }}
+          {{- end }}
+          {{- if .Values.args }}
+          args:
+            {{- toYaml .Values.args | nindent 12 }}
+          {{- end }}
+          # Holds liveness/readiness until first success; avoids restarts on slow cold start.
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            failureThreshold: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
