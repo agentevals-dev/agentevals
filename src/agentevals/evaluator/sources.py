@@ -8,7 +8,7 @@ import logging
 import os
 import time
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 
@@ -220,7 +220,7 @@ class GitHubEvaluatorSource(EvaluatorSource):
             dest.write_text(resp.text, encoding="utf-8")  # noqa: ASYNC240
 
             # Also try to fetch requirements.txt from the same directory.
-            ref_dir = str(Path(ref).parent)
+            ref_dir = str(PurePosixPath(ref).parent)
             req_ref = f"{ref_dir}/requirements.txt"
             req_url = self._raw_url(req_ref)
             try:

@@ -32,14 +32,3 @@ evaluators:
     ref: evaluators/random_evaluator/random_evaluator.py
     threshold: 0.110
     executor: local
-
-  # TODO switch to GitHub once PR is approved.
-  - name: bertscore
-    type: code
-    path: ../evaluators/evaluators/bertscore/bertscore.py
-    threshold: 0.7
-    timeout: 300
-    config:
-      expected: "There are two Helm releases installed in the cluster: kagent in namespace kagent (revision 2, deployed, chart kagent-0.7.14) and kagent-crds in namespace kagent (revision 1, deployed, chart kagent-crds-0.7.14)."
-      metric: "f1"
-

@@ -96,6 +96,7 @@ def ensure_venv(evaluator_path: Path) -> Path | None:
     )
 
     try:
+        venv_dir.parent.mkdir(parents=True, exist_ok=True)
         _create_venv(venv_dir, uv)
         _install_deps(venv_dir, requirements, uv)
     except subprocess.CalledProcessError as exc:
