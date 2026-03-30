@@ -85,7 +85,9 @@ agentevals run traces/my_trace.json \
 
 ## Eval Config Reference
 
-Each evaluator entry in the `evaluators` list uses the following fields:
+Each evaluator entry in the `evaluators` list uses the following fields. The `type` field determines which other fields are valid.
+
+### `type: code` (local scripts)
 
 | Field | Required | Default | Description |
 |---|---|---|---|
@@ -95,6 +97,16 @@ Each evaluator entry in the `evaluators` list uses the following fields:
 | `threshold` | no | `0.5` | Score at or above this value means PASSED |
 | `timeout` | no | `30` | Subprocess timeout in seconds |
 | `config` | no | `{}` | Arbitrary key-value pairs passed to the evaluator |
+
+### `type: openai_eval` (OpenAI Evals API)
+
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `name` | yes | | Unique name for the evaluator (used in output) |
+| `type` | yes | | `openai_eval` for OpenAI Evals API graders |
+| `threshold` | no | `0.5` | Maps to `pass_threshold` in the OpenAI grader |
+| `timeout` | no | `120` | Max seconds to wait for the OpenAI eval run |
+| `grader` | yes | | OpenAI grader config (see [OpenAI Evals Graders](#openai-evals-api-graders)) |
 
 ## Protocol
 
@@ -275,6 +287,40 @@ evaluators:
 
 Remote evaluators are cached in `~/.cache/agentevals/evaluators/`. To force a re-download, delete the cached file.
 
+## OpenAI Evals API Graders
+
+You can delegate grading to the [OpenAI Evals API](https://developers.openai.com/api/reference/resources/evals/methods/create) instead of running scoring logic locally. This requires `pip install "agentevals-cli[openai]"` and `OPENAI_API_KEY` to be set.
+
+### Text Similarity Grader
+
+Compares the agent's response against a golden reference using text similarity metrics. Requires an eval set.
+
+```yaml
+evaluators:
+  - name: response_similarity
+    type: openai_eval
+    threshold: 0.8
+    grader:
+      type: text_similarity
+      evaluation_metric: fuzzy_match
+```
+
+The `grader.evaluation_metric` field selects the similarity algorithm:
+
+| Metric | Description |
+|---|---|
+| `fuzzy_match` | Approximate string matching using edit distance |
+| `bleu` | N-gram overlap score, commonly used for translation quality |
+| `gleu` | Google's variant of BLEU with sentence-level scoring |
+| `meteor` | Alignment-based metric considering synonyms and paraphrases |
+| `cosine` | Cosine similarity on vectorized text |
+| `rouge_1` through `rouge_5` | Unigram through 5-gram overlap (F-measure) |
+| `rouge_l` | Longest common subsequence overlap (F-measure) |
+
+### How it works
+
+Under the hood, agentevals creates an ephemeral eval on OpenAI, submits the actual and expected responses as JSONL items, polls for results, and cleans up. The agent's response and the golden reference are both placed in the `item` namespace (with `include_sample_schema: false`), so OpenAI only grades the provided text without generating any model outputs.
+
 ### Configuring the GitHub source
 
 By default, evaluators are fetched from the official community repository. Override with environment variables:
@@ -303,42 +349,43 @@ The community repo uses per-evaluator manifests. A CI workflow compiles all `eva
 Custom evaluators use a layered architecture designed for extensibility.
 
 ```
-┌─────────────────────────────────────────┐
-│  Eval Config (YAML)                     │
-│  type: code | remote                    │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│  EvaluatorResolver                      │
-│  Downloads remote → local cache         │
-│  (passthrough for type: code)           │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│  CustomEvaluatorRunner                  │
-│  ADK Evaluator adapter                  │
-│  Invocation ↔ EvalInput/EvalResult      │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│  EvaluatorBackend (ABC) — executor factory │
-│  async run(EvalInput) → EvalResult      │
-├─────────────────────────────────────────┤
-│  "local"  → SubprocessBackend           │
-│  "docker" → DockerBackend (future)      │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│  Runtime registry                       │
-│  PythonRuntime (.py)                    │
-│  NodeRuntime (.js, .ts)                 │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│  Eval Config (YAML)                         │
+│  type: code | remote | openai_eval          │
+└──────────────┬─────────────┬────────────────┘
+               │             │
+     code/remote         openai_eval
+               │             │
+               ▼             ▼
+┌──────────────────────┐  ┌──────────────────────┐
+│  EvaluatorResolver   │  │  OpenAI Evals API    │
+│  remote → local      │  │  create eval + run   │
+│  (passthrough: code) │  │  poll → get results  │
+└──────────┬───────────┘  └──────────────────────┘
+           │
+           ▼
+┌──────────────────────────┐
+│  CustomEvaluatorRunner   │
+│  ADK Evaluator adapter   │
+│  Invocation ↔ EvalInput  │
+└──────────┬───────────────┘
+           │
+           ▼
+┌──────────────────────────┐
+│  EvaluatorBackend (ABC)  │
+│  "local"  → Subprocess   │
+│  "docker" → (future)     │
+└──────────┬───────────────┘
+           │
+           ▼
+┌──────────────────────────┐
+│  Runtime registry        │
+│  PythonRuntime (.py)     │
+│  NodeRuntime (.js, .ts)  │
+└──────────────────────────┘
 ```
 
+- **`type: openai_eval`** takes a separate path: it calls the OpenAI Evals API directly (create eval, create run, poll, collect results) and returns a `MetricResult`. It does not go through the subprocess/backend stack.
 - **`EvaluatorSource`** is the registry abstraction. Implementations (`BuiltinEvaluatorSource`, `GitHubEvaluatorSource`) list and fetch evaluators from different registries.
 - **`EvaluatorResolver`** downloads remote evaluators and converts `RemoteEvaluatorDef` to `CodeEvaluatorDef` with a local cached path.
 - **`EvaluatorBackend`** is the execution abstraction. The `executor` field in config selects which factory to use (`"local"` → `SubprocessBackend`). New executors (e.g. `DockerBackend`) register via `register_executor()`.
