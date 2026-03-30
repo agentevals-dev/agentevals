@@ -66,23 +66,6 @@
             "parts": [
               {"text": "[number] is [prime/not prime]."}
             ]
-          },
-          "intermediate_data": {
-            "tool_uses": [
-              {
-                "name": "check_prime",
-                "args": {"number": 0},
-                "id": "call_check_prime_1"
-              }
-            ],
-            "tool_responses": [
-              {
-                "name": "check_prime",
-                "response": {
-                  "content": [{"type": "text", "text": "[true/false]"}]
-                }
-              }
-            ]
           }
         }
       ]
