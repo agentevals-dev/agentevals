@@ -1,0 +1,74 @@
+{
+  "eval_set_id": "openai_agents_eval",
+  "name": "OpenAI Agents Dice Agent Eval Set",
+  "description": "Golden eval cases for the OpenAI Agents SDK zero-code example. One multi-turn session covering greeting, die roll, and prime check.",
+  "eval_cases": [
+    {
+      "eval_id": "dice-roll-session",
+      "conversation": [
+        {
+          "invocation_id": "inv-1",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {"text": "Hi! Can you help me?"}
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {"text": "Hello! Yes, I can help you. I have tools that can roll dice and check if numbers are prime. What would you like me to do?"}
+            ]
+          }
+        },
+        {
+          "invocation_id": "inv-2",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {"text": "Roll a 20-sided die for me"}
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {"text": "I rolled a 20-sided die and got [number]. Let me know if you'd like to check if it's prime!"}
+            ]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "roll_die",
+                "args": {"sides": 20},
+                "id": "call_roll_die_1"
+              }
+            ],
+            "tool_responses": [
+              {
+                "name": "roll_die",
+                "response": {
+                  "content": [{"type": "text", "text": "[number]"}]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "invocation_id": "inv-3",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {"text": "Is the number you rolled prime?"}
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {"text": "[number] is [prime/not prime]."}
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
