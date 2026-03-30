@@ -425,8 +425,13 @@ async def evaluate_custom_evaluator(
     """
     import inspect as _inspect
 
-    from .config import CodeEvaluatorDef, RemoteEvaluatorDef
+    from .config import CodeEvaluatorDef, OpenAIEvalDef, RemoteEvaluatorDef
     from .runner import MetricResult
+
+    if isinstance(evaluator_def, OpenAIEvalDef):
+        from .openai_eval_backend import evaluate_openai_eval
+
+        return await evaluate_openai_eval(evaluator_def, actual_invocations, expected_invocations)
 
     if isinstance(evaluator_def, RemoteEvaluatorDef):
         from .evaluator.resolver import get_default_resolver

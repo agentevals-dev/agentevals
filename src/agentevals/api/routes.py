@@ -22,6 +22,7 @@ from ..config import (
     CodeEvaluatorDef,
     CustomEvaluatorDef,
     EvalRunConfig,
+    OpenAIEvalDef,
 )
 from ..extraction import get_extractor
 from ..runner import RunResult, get_loader, load_eval_set, run_evaluation
@@ -58,6 +59,7 @@ router = APIRouter()
 _TYPE_TO_MODEL = {
     "builtin": BuiltinMetricDef,
     "code": CodeEvaluatorDef,
+    "openai_eval": OpenAIEvalDef,
 }
 
 

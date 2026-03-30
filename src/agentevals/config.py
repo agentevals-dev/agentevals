@@ -53,8 +53,48 @@ class RemoteEvaluatorDef(BaseEvaluatorDef):
     ref: str = Field(description="Source-specific reference (e.g. path within the repo).")
 
 
+_VALID_SIMILARITY_METRICS = frozenset(
+    {
+        "fuzzy_match",
+        "bleu",
+        "gleu",
+        "meteor",
+        "cosine",
+        "rouge_1",
+        "rouge_2",
+        "rouge_3",
+        "rouge_4",
+        "rouge_5",
+        "rouge_l",
+    }
+)
+
+
+class OpenAIEvalDef(BaseModel):
+    """An evaluator that delegates grading to the OpenAI Evals API."""
+
+    type: Literal["openai_eval"] = "openai_eval"
+    name: str
+    threshold: float = 0.5
+    timeout: int = Field(default=120, description="Max seconds to wait for the OpenAI eval run to complete.")
+    grader: dict[str, Any] = Field(description="OpenAI grader config passed to testing_criteria.")
+
+    @field_validator("grader")
+    @classmethod
+    def _validate_grader(cls, v: dict[str, Any]) -> dict[str, Any]:
+        grader_type = v.get("type")
+        if grader_type != "text_similarity":
+            raise ValueError(f"Only 'text_similarity' grader type is currently supported, got '{grader_type}'")
+        metric = v.get("evaluation_metric")
+        if not metric:
+            raise ValueError("'evaluation_metric' is required for text_similarity grader")
+        if metric not in _VALID_SIMILARITY_METRICS:
+            raise ValueError(f"Unknown evaluation_metric '{metric}'. Valid: {sorted(_VALID_SIMILARITY_METRICS)}")
+        return v
+
+
 CustomEvaluatorDef = Annotated[
-    BuiltinMetricDef | CodeEvaluatorDef | RemoteEvaluatorDef,
+    BuiltinMetricDef | CodeEvaluatorDef | RemoteEvaluatorDef | OpenAIEvalDef,
     Field(discriminator="type"),
 ]
 

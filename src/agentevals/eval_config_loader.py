@@ -13,6 +13,7 @@ from .config import (
     CodeEvaluatorDef,
     CustomEvaluatorDef,
     EvalRunConfig,
+    OpenAIEvalDef,
     RemoteEvaluatorDef,
 )
 
@@ -22,6 +23,7 @@ _TYPE_TO_MODEL = {
     "builtin": BuiltinMetricDef,
     "code": CodeEvaluatorDef,
     "remote": RemoteEvaluatorDef,
+    "openai_eval": OpenAIEvalDef,
 }
 
 
@@ -42,7 +44,7 @@ def _parse_evaluator_entry(entry: dict[str, Any]) -> tuple[str | None, CustomEva
 
     evaluator_type = entry.get("type")
     if not evaluator_type:
-        raise ValueError(f"Evaluator entry '{name}' must have a 'type' field (builtin, code, or remote)")
+        raise ValueError(f"Evaluator entry '{name}' must have a 'type' field ({', '.join(_TYPE_TO_MODEL)})")
 
     if evaluator_type not in _TYPE_TO_MODEL:
         raise ValueError(
