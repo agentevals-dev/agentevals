@@ -91,6 +91,7 @@ Optional extras:
 
 ```bash
 pip install "agentevals-cli[live]"        # MCP server support
+pip install "agentevals-cli[openai]"      # OpenAI Evals API graders
 ```
 
 **GitHub [releases](../../releases)** also ship **core** wheels (CLI and API only) and **bundle** wheels (with the embedded UI) if you need a specific version or offline `pip install ./path/to.whl`.
@@ -215,7 +216,7 @@ evaluators:
 agentevals run trace.json --config eval_config.yaml --eval-set eval_set.json
 ```
 
-Community evaluators can be referenced directly from a shared GitHub repository using `type: remote`. See the [Custom Evaluators guide](docs/custom-evaluators.md) for the full protocol reference, SDK usage, and how to contribute evaluators.
+Community evaluators can be referenced directly from a shared GitHub repository using `type: remote`. You can also delegate grading to the [OpenAI Evals API](https://developers.openai.com/api/reference/resources/evals/methods/create) using `type: openai_eval` (requires `pip install "agentevals-cli[openai]"` and `OPENAI_API_KEY`). See the [Custom Evaluators guide](docs/custom-evaluators.md) for the full protocol reference, SDK usage, and how to contribute evaluators.
 
 ## Web UI
 
