@@ -77,6 +77,27 @@ export interface Invocation {
   creationTimestamp?: number;
 }
 
+// Trace conversion API response types
+export interface TraceConversionMetadata {
+  agentName?: string;
+  model?: string;
+  startTime?: number;
+  userInputPreview?: string;
+  finalOutputPreview?: string;
+  sessionName?: string;
+}
+
+export interface TraceConversionEntry {
+  traceId: string;
+  invocations: Invocation[];
+  warnings: string[];
+  metadata: TraceConversionMetadata;
+}
+
+export interface ConvertTracesResponse {
+  traces: TraceConversionEntry[];
+}
+
 // Evaluation results
 export type EvalStatus = 'PASSED' | 'FAILED' | 'NOT_EVALUATED' | 'ERROR';
 

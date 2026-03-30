@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 from typing import Any
@@ -24,12 +25,14 @@ from ..config import (
     EvalRunConfig,
     OpenAIEvalDef,
 )
+from ..converter import convert_traces
 from ..extraction import get_extractor
 from ..runner import RunResult, get_loader, load_eval_set, run_evaluation
 from ..trace_metrics import extract_performance_metrics, extract_trace_metadata
 from .models import (
     ApiKeyStatus,
     ConfigData,
+    ConvertTracesData,
     EvalSetValidation,
     HealthData,
     MetricInfo,
@@ -40,6 +43,8 @@ from .models import (
     SSETraceProgress,
     SSETraceProgressEvent,
     StandardResponse,
+    TraceConversionEntry,
+    TraceConversionMetadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -253,6 +258,131 @@ async def validate_eval_set(
                 )
             )
 
+    finally:
+        shutil.rmtree(temp_dir)
+
+
+def _session_name_from_filename(filename: str) -> str | None:
+    """Extract a session name from a trace filename, stripping known prefixes."""
+    base = re.sub(r"\.(jsonl?|json)$", "", filename, flags=re.IGNORECASE)
+    for prefix in ("trace_", "agentevals_"):
+        if base.startswith(prefix):
+            return base[len(prefix) :]
+    return None
+
+
+def _serialize_invocation(inv) -> dict[str, Any]:
+    """Serialize an ADK Invocation to a camelCase dict matching the frontend Invocation type."""
+    inv_dict: dict[str, Any] = {
+        "invocation_id": inv.invocation_id,
+    }
+    if inv.user_content:
+        inv_dict["user_content"] = inv.user_content.model_dump(exclude_none=True)
+    if inv.final_response:
+        inv_dict["final_response"] = inv.final_response.model_dump(exclude_none=True)
+    if inv.intermediate_data:
+        inv_dict["intermediate_data"] = inv.intermediate_data.model_dump(exclude_none=True)
+    if inv.creation_timestamp:
+        inv_dict["creation_timestamp"] = inv.creation_timestamp
+    return _camel_keys(inv_dict)
+
+
+@router.post("/convert", response_model=StandardResponse[ConvertTracesData])
+async def convert_trace_files(
+    trace_files: list[UploadFile] = File(...),
+    trace_format: str = Form(""),
+):
+    """Convert trace files to invocations and metadata without running evaluation."""
+    temp_dir = tempfile.mkdtemp()
+    try:
+        trace_paths = []
+        for trace_file in trace_files:
+            if not trace_file.filename:
+                continue
+
+            if not (trace_file.filename.endswith(".json") or trace_file.filename.endswith(".jsonl")):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid file extension for {trace_file.filename}. Only .json and .jsonl files are allowed.",
+                )
+
+            trace_path = os.path.join(temp_dir, trace_file.filename)
+            with open(trace_path, "wb") as f:  # noqa: ASYNC230
+                content = await trace_file.read()
+
+                if len(content) > 10 * 1024 * 1024:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"File {trace_file.filename} exceeds 10MB limit",
+                    )
+
+                f.write(content)
+            trace_paths.append(trace_path)
+
+        if not trace_paths:
+            raise HTTPException(status_code=400, detail="No valid trace files provided")
+
+        fmt = trace_format
+        if not fmt:
+            if trace_paths[0].endswith(".jsonl"):
+                fmt = "otlp-json"
+            else:
+                fmt = "jaeger-json"
+
+        loader = get_loader(fmt)
+        all_traces = []
+        trace_to_filename: dict[str, str] = {}
+        for path in trace_paths:
+            try:
+                traces = loader.load(path)
+                filename = os.path.basename(path)
+                for t in traces:
+                    trace_to_filename[t.trace_id] = filename
+                all_traces.extend(traces)
+            except Exception as exc:
+                logger.warning(f"Failed to load trace file '{path}': {exc}")
+
+        if not all_traces:
+            raise HTTPException(status_code=400, detail="No traces found in uploaded files")
+
+        conversion_results = convert_traces(all_traces)
+        trace_map = {t.trace_id: t for t in all_traces}
+
+        entries: list[TraceConversionEntry] = []
+        for conv_result in conversion_results:
+            invocations = [_serialize_invocation(inv) for inv in conv_result.invocations]
+
+            trace = trace_map.get(conv_result.trace_id)
+            meta = TraceConversionMetadata()
+            if trace:
+                meta_dict = extract_trace_metadata(trace)
+                filename = trace_to_filename.get(conv_result.trace_id, "")
+                session_name = _session_name_from_filename(filename)
+                meta = TraceConversionMetadata(
+                    agent_name=meta_dict.get("agent_name"),
+                    model=meta_dict.get("model"),
+                    start_time=meta_dict.get("start_time"),
+                    user_input_preview=meta_dict.get("user_input_preview"),
+                    final_output_preview=meta_dict.get("final_output_preview"),
+                    session_name=session_name,
+                )
+
+            entries.append(
+                TraceConversionEntry(
+                    trace_id=conv_result.trace_id,
+                    invocations=invocations,
+                    warnings=conv_result.warnings,
+                    metadata=meta,
+                )
+            )
+
+        return StandardResponse(data=ConvertTracesData(traces=entries))
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Trace conversion failed")
+        raise HTTPException(status_code=500, detail=f"Internal error: {exc!s}") from exc
     finally:
         shutil.rmtree(temp_dir)
 

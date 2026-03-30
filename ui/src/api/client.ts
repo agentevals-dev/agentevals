@@ -1,4 +1,4 @@
-import type { RunResult, EvalConfig, TraceResult, MetricMetadata, StandardResponse } from '../lib/types';
+import type { RunResult, EvalConfig, TraceResult, MetricMetadata, StandardResponse, ConvertTracesResponse } from '../lib/types';
 import { config } from '../config';
 
 const API_BASE_URL = `${config.api.baseUrl}/api`;
@@ -9,6 +9,34 @@ async function unwrap<T>(response: Response): Promise<T> {
     throw new Error(json.error);
   }
   return json.data;
+}
+
+export async function convertTraces(traceFiles: File[], traceFormat?: string): Promise<ConvertTracesResponse> {
+  const formData = new FormData();
+  traceFiles.forEach(file => formData.append('trace_files', file));
+  if (traceFormat) {
+    formData.append('trace_format', traceFormat);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/convert`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorMessage = `API error: ${response.statusText}`;
+    try {
+      const errorData = await response.json();
+      if (errorData.detail) {
+        errorMessage = errorData.detail;
+      }
+    } catch {
+      // Fallback to statusText
+    }
+    throw new Error(errorMessage);
+  }
+
+  return unwrap<ConvertTracesResponse>(response);
 }
 
 export async function evaluateTracesAPI(

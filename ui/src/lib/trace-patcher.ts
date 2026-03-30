@@ -6,7 +6,7 @@ import {
   findDescendantLLMSpans,
   USER_ROLES,
   ASSISTANT_ROLES,
-} from './trace-converter';
+} from './trace-helpers';
 
 export function parseTraceFileForEditing(content: string, fileName: string): ParsedTraceFile {
   const trimmed = content.trim();

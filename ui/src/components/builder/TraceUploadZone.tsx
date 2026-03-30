@@ -2,8 +2,8 @@ import React, { useCallback } from 'react';
 import { css } from '@emotion/react';
 import { Upload, FileJson } from 'lucide-react';
 import { message } from 'antd';
-import { loadJaegerTraces } from '../../lib/trace-loader';
-import { generateEvalSetFromTraces } from '../../lib/evalset-builder';
+import { convertTraces } from '../../api/client';
+import { generateEvalSet } from '../../lib/evalset-builder';
 import { useTraceContext } from '../../context/TraceContext';
 
 export const TraceUploadZone: React.FC = () => {
@@ -11,32 +11,32 @@ export const TraceUploadZone: React.FC = () => {
 
   const handleFileUpload = useCallback(async (file: File) => {
     try {
-      const content = await file.text();
-      const traces = await loadJaegerTraces(content);
+      const response = await convertTraces([file]);
 
-      if (traces.length === 0) {
+      if (response.traces.length === 0) {
         message.error('No valid traces found in the file');
         return;
       }
 
-      const filename = file.name.replace('.json', '');
-      const evalSet = generateEvalSetFromTraces(traces, filename);
+      const filename = file.name.replace(/\.(jsonl?|json)$/i, '');
+      const traceData = response.traces.map(t => ({ traceId: t.traceId, invocations: t.invocations }));
+      const evalSet = generateEvalSet(traceData, filename);
 
       actions.setBuilderEvalSet(evalSet);
-      message.success(`Loaded ${traces.length} trace(s) and generated EvalSet!`);
+      message.success(`Loaded ${response.traces.length} trace(s) and generated EvalSet!`);
     } catch (error) {
       console.error('Failed to load trace:', error);
-      message.error('Failed to load trace file. Please ensure it is a valid Jaeger JSON file.');
+      message.error('Failed to load trace file. Please ensure it is a valid trace file.');
     }
   }, [actions]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.json')) {
+    if (file && (file.name.endsWith('.json') || file.name.endsWith('.jsonl'))) {
       handleFileUpload(file);
     } else {
-      message.error('Please upload a .json file');
+      message.error('Please upload a .json or .jsonl file');
     }
   }, [handleFileUpload]);
 
@@ -67,7 +67,7 @@ export const TraceUploadZone: React.FC = () => {
           <input
             type="file"
             id="trace-file-input"
-            accept=".json"
+            accept=".json,.jsonl"
             onChange={handleFileInput}
             css={fileInputStyle}
           />

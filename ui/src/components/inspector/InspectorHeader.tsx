@@ -5,8 +5,7 @@ import { Button, message } from 'antd';
 import { truncateTraceId } from '../../lib/utils';
 import type { TraceResult } from '../../lib/types';
 import { useTraceContext } from '../../context/TraceContext';
-import { loadJaegerTraces } from '../../lib/trace-loader';
-import { generateEvalSetFromTraces } from '../../lib/evalset-builder';
+import { generateEvalSet } from '../../lib/evalset-builder';
 interface InspectorHeaderProps {
   traceResult: TraceResult;
   onBack: () => void;
@@ -25,29 +24,21 @@ export const InspectorHeader: React.FC<InspectorHeaderProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleCreateEvalSet = async () => {
+  const handleCreateEvalSet = () => {
     try {
-      let matchingTrace = null;
-      let matchingFilename = '';
+      const metadata = state.traceMetadata.get(traceResult.traceId);
+      const invocations = metadata?.invocations || [];
 
-      for (const file of state.traceFiles) {
-        const content = await file.text();
-        const traces = await loadJaegerTraces(content);
-        const found = traces.find(t => t.traceId === traceResult.traceId);
-
-        if (found) {
-          matchingTrace = found;
-          matchingFilename = file.name.replace('.json', '');
-          break;
-        }
-      }
-
-      if (!matchingTrace) {
-        message.error('Could not find trace in uploaded files');
+      if (invocations.length === 0) {
+        message.error('No invocations found for this trace');
         return;
       }
 
-      const evalSet = generateEvalSetFromTraces([matchingTrace], matchingFilename);
+      const filename = metadata?.sessionId || traceResult.traceId.substring(0, 12);
+      const evalSet = generateEvalSet(
+        [{ traceId: traceResult.traceId, invocations }],
+        filename
+      );
       actions.setBuilderEvalSet(evalSet);
       actions.setCurrentView('builder');
       message.success('EvalSet created! Edit and save when ready.');

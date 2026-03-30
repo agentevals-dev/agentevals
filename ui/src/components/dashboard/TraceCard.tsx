@@ -7,8 +7,7 @@ import type { TraceResult } from '../../lib/types';
 import { truncateTraceId, getStatusColor, getStatusGlow, copyToClipboard } from '../../lib/utils';
 import { MetricScoreCard } from './MetricScoreCard';
 import { useTraceContext } from '../../context/TraceContext';
-import { loadJaegerTraces } from '../../lib/trace-loader';
-import { generateEvalSetFromTraces } from '../../lib/evalset-builder';
+import { generateEvalSet } from '../../lib/evalset-builder';
 
 interface TraceCardProps {
   traceResult: TraceResult;
@@ -162,31 +161,23 @@ export const TraceCard: React.FC<TraceCardProps> = ({ traceResult, threshold, on
     copyToClipboard(traceId);
   };
 
-  const handleCreateEvalSet = async (e: React.MouseEvent) => {
+  const handleCreateEvalSet = (e: React.MouseEvent) => {
     e.stopPropagation();
 
     try {
-      let matchingTrace = null;
-      let matchingFilename = '';
+      const metadata = state.traceMetadata.get(traceId);
+      const invocations = metadata?.invocations || [];
 
-      for (const file of state.traceFiles) {
-        const content = await file.text();
-        const traces = await loadJaegerTraces(content);
-        const found = traces.find(t => t.traceId === traceId);
-
-        if (found) {
-          matchingTrace = found;
-          matchingFilename = file.name.replace('.json', '');
-          break;
-        }
-      }
-
-      if (!matchingTrace) {
-        message.error('Could not find trace in uploaded files');
+      if (invocations.length === 0) {
+        message.error('No invocations found for this trace');
         return;
       }
 
-      const evalSet = generateEvalSetFromTraces([matchingTrace], matchingFilename);
+      const filename = metadata?.sessionId || traceId.substring(0, 12);
+      const evalSet = generateEvalSet(
+        [{ traceId, invocations }],
+        filename
+      );
       actions.setBuilderEvalSet(evalSet);
       actions.setCurrentView('builder');
       message.success('EvalSet created! Edit and save when ready.');

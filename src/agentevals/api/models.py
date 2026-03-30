@@ -111,6 +111,26 @@ class DebugLoadData(CamelModel):
     count: int
 
 
+class TraceConversionMetadata(CamelModel):
+    agent_name: str | None = None
+    model: str | None = None
+    start_time: int | None = None
+    user_input_preview: str | None = None
+    final_output_preview: str | None = None
+    session_name: str | None = None
+
+
+class TraceConversionEntry(CamelModel):
+    trace_id: str
+    invocations: list[dict[str, Any]]
+    warnings: list[str] = Field(default_factory=list)
+    metadata: TraceConversionMetadata = Field(default_factory=TraceConversionMetadata)
+
+
+class ConvertTracesData(CamelModel):
+    traces: list[TraceConversionEntry]
+
+
 # ---------------------------------------------------------------------------
 # SSE evaluation event models
 # ---------------------------------------------------------------------------

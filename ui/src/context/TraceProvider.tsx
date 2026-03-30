@@ -3,8 +3,7 @@ import type { ReactNode } from 'react';
 import { TraceContext } from './TraceContext';
 import type { TraceState } from './TraceContext';
 import type { ViewType, EvalSet, EvalSetMetadata, EvalCase, LiveSession, AnnotationQueue, Annotation } from '../lib/types';
-import { evaluateTracesStreaming, getConfig, healthCheck } from '../api/client';
-import { extractMetadataFromTraceFile } from '../lib/trace-metadata';
+import { evaluateTracesStreaming, convertTraces, getConfig, healthCheck } from '../api/client';
 
 interface TraceProviderProps {
   children: ReactNode;
@@ -52,19 +51,30 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
       setTraceFiles: async (files: File[]) => {
         setState((prev) => ({ ...prev, traceFiles: files, isLoadingMetadata: true }));
 
-        const metadataMap = new Map();
-        for (const file of files) {
-          try {
-            const metadataList = await extractMetadataFromTraceFile(file);
-            for (const metadata of metadataList) {
-              metadataMap.set(metadata.traceId, metadata);
-            }
-          } catch (error) {
-            console.error(`Failed to extract metadata from ${file.name}:`, error);
+        try {
+          const response = await convertTraces(files);
+          const metadataMap = new Map();
+          for (const entry of response.traces) {
+            metadataMap.set(entry.traceId, {
+              traceId: entry.traceId,
+              sessionId: entry.metadata?.sessionName || entry.metadata?.agentName || entry.traceId.substring(0, 12),
+              agentName: entry.metadata?.agentName,
+              startTime: entry.metadata?.startTime,
+              model: entry.metadata?.model,
+              userInputPreview: entry.metadata?.userInputPreview,
+              finalOutputPreview: entry.metadata?.finalOutputPreview,
+              invocations: entry.invocations,
+            });
           }
+          setState((prev) => ({ ...prev, traceMetadata: metadataMap, isLoadingMetadata: false }));
+        } catch (error) {
+          console.error('Failed to convert traces:', error);
+          setState((prev) => ({
+            ...prev,
+            isLoadingMetadata: false,
+            errors: [error instanceof Error ? error.message : 'Failed to convert trace files'],
+          }));
         }
-
-        setState((prev) => ({ ...prev, traceMetadata: metadataMap, isLoadingMetadata: false }));
       },
 
       setEvalSet: (file: File | null) =>

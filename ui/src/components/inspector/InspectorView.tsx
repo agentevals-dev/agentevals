@@ -5,9 +5,7 @@ import { InspectorHeader } from './InspectorHeader';
 import { InspectorLayout } from './InspectorLayout';
 import { InvocationSummaryPanel } from './InvocationSummaryPanel';
 import { ComparisonPanel } from './ComparisonPanel';
-import type { Trace, Invocation } from '../../lib/types';
-import { loadJaegerTraces } from '../../lib/trace-loader';
-import { convertTracesToInvocations } from '../../lib/trace-converter';
+import type { Invocation } from '../../lib/types';
 import { readFileAsText } from '../../lib/utils';
 
 export const InspectorView: React.FC = () => {
@@ -37,10 +35,10 @@ export const InspectorView: React.FC = () => {
     return state.results.find(r => r.traceId === state.selectedTraceId);
   }, [state.tableRows, state.results, state.selectedTraceId]);
 
-  // Load trace data when component mounts
+  // Load invocations from state (already converted by backend) and eval set from file
   useEffect(() => {
-    const loadTraceData = async () => {
-      if (!traceResult || !state.traceFiles.length) {
+    const loadData = async () => {
+      if (!traceResult) {
         setError('Trace data not available');
         setLoading(false);
         return;
@@ -50,47 +48,21 @@ export const InspectorView: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Find the matching trace file by reading and parsing each one
-        let foundTrace: Trace | null = null;
-        for (const file of state.traceFiles) {
-          const content = await readFileAsText(file);
-          const traces = await loadJaegerTraces(content);
-          const matchingTrace = traces.find(t => t.traceId === traceResult.traceId);
-          if (matchingTrace) {
-            foundTrace = matchingTrace;
-            break;
-          }
-        }
+        const tableRow = state.tableRows.get(traceResult.traceId);
+        const metadata = state.traceMetadata.get(traceResult.traceId);
+        const invs = tableRow?.invocations || metadata?.invocations || [];
+        setInvocations(invs);
 
-        if (!foundTrace) {
-          setError('Could not find trace in uploaded files');
-          setLoading(false);
-          return;
-        }
-
-        // Convert to invocations
-        const conversionResults = convertTracesToInvocations([foundTrace]);
-        const result = conversionResults.get(foundTrace.traceId);
-
-        if (result) {
-          setInvocations(result.invocations);
-        } else {
-          setInvocations([]);
-        }
-
-        // Load evalset if available
         if (state.evalSetFile) {
           try {
             const evalSetContent = await readFileAsText(state.evalSetFile);
             const evalSet = JSON.parse(evalSetContent);
 
-            // Extract expected invocations from eval cases
             const expectedInvs: Invocation[] = [];
             if (evalSet.eval_cases) {
               for (const evalCase of evalSet.eval_cases) {
                 if (evalCase.conversation) {
                   for (const inv of evalCase.conversation) {
-                    // Map eval case format to Invocation format
                     const intermediateData = inv.intermediate_data || {};
                     expectedInvs.push({
                       invocationId: inv.invocationId || evalCase.eval_id,
@@ -105,7 +77,6 @@ export const InspectorView: React.FC = () => {
                 }
               }
             }
-            console.log('Loaded expected invocations:', expectedInvs);
             setExpectedInvocations(expectedInvs);
           } catch (err) {
             console.error('Error loading evalset:', err);
@@ -121,8 +92,8 @@ export const InspectorView: React.FC = () => {
       }
     };
 
-    loadTraceData();
-  }, [traceResult, state.traceFiles]);
+    loadData();
+  }, [traceResult, state.traceMetadata, state.tableRows, state.evalSetFile]);
 
   // Handle back to dashboard
   const handleBack = () => {

@@ -7,7 +7,7 @@ import { InvocationEditor } from '../builder/InvocationEditor';
 import { RawJsonPreview } from './RawJsonPreview';
 import { readFileAsText } from '../../lib/utils';
 import { loadJaegerTraces } from '../../lib/trace-loader';
-import { convertTracesToInvocations } from '../../lib/trace-converter';
+import { convertTraces } from '../../api/client';
 import { parseTraceFileForEditing, buildEditMappings, applyEditsAndSerialize } from '../../lib/trace-patcher';
 import type { Invocation, ParsedTraceFile, SpanEditMapping } from '../../lib/types';
 
@@ -39,26 +39,23 @@ export const TraceEditorDrawer: React.FC<TraceEditorDrawerProps> = ({ file, file
     setError(null);
     setDirty(false);
 
-    readFileAsText(file)
-      .then(async (content) => {
+    Promise.all([
+      readFileAsText(file).then(async (content) => {
         const parsed = parseTraceFileForEditing(content, file.name);
         setParsedFile(parsed);
 
         const traces = await loadJaegerTraces(content);
-        const conversionResults = convertTracesToInvocations(traces);
         const mappings = buildEditMappings(traces, parsed);
         setEditMappings(mappings);
-
-        const groups: TraceGroup[] = [];
-        for (const trace of traces) {
-          const result = conversionResults.get(trace.traceId);
-          if (result && result.invocations.length > 0) {
-            groups.push({ traceId: trace.traceId, invocations: result.invocations });
-          }
-        }
+      }),
+      convertTraces([file]).then((response) => {
+        const groups: TraceGroup[] = response.traces
+          .filter(t => t.invocations.length > 0)
+          .map(t => ({ traceId: t.traceId, invocations: t.invocations }));
         setTraceGroups(groups);
-        setLoading(false);
-      })
+      }),
+    ])
+      .then(() => setLoading(false))
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Failed to parse trace file');
         setLoading(false);
