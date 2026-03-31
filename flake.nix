@@ -84,6 +84,11 @@
 
             # C++ standard library for numpy
             pkgs.stdenv.cc.cc.lib
+
+            # Kubernetes
+            pkgs.k3d
+            pkgs.kubernetes-helm
+            pkgs.kubectl
           ];
 
           # Make libstdc++.so.6 available to uv's .venv
