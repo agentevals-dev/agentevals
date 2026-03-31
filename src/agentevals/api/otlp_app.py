@@ -8,16 +8,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .otlp_routes import otlp_router, set_trace_manager
+from .otlp_routes import otlp_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from .app import get_trace_manager
+    from .app import app as main_app
 
-    mgr = get_trace_manager()
+    mgr = getattr(main_app.state, "trace_manager", None)
     if mgr:
-        set_trace_manager(mgr)
+        app.state.trace_manager = mgr
     yield
 
 

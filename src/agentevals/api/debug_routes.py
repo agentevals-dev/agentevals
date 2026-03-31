@@ -13,7 +13,7 @@ import zipfile
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi import File as FastAPIFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from agentevals import __version__
 
 from ..utils.log_buffer import log_buffer
+from .dependencies import get_trace_manager, require_trace_manager
 from .models import DebugLoadData, SessionInfo, StandardResponse, WSSessionCompleteEvent, WSSessionStartedEvent
 
 if TYPE_CHECKING:
@@ -29,13 +30,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 debug_router = APIRouter()
-
-_trace_manager: StreamingTraceManager | None = None
-
-
-def set_trace_manager(manager: StreamingTraceManager) -> None:
-    global _trace_manager
-    _trace_manager = manager
 
 
 class FrontendDiagnostics(BaseModel):
@@ -83,12 +77,12 @@ def _collect_environment() -> dict:
     }
 
 
-def _collect_sessions() -> list[dict]:
-    if not _trace_manager:
+def _collect_sessions(manager: StreamingTraceManager | None) -> list[dict]:
+    if not manager:
         return []
 
     sessions_data = []
-    for session in _trace_manager.sessions.values():
+    for session in manager.sessions.values():
         sessions_data.append(
             {
                 "session_id": session.session_id,
@@ -128,7 +122,10 @@ def _collect_temp_files(session_ids: set[str] | None = None) -> dict[str, str]:
 
 
 @debug_router.post("/bundle")
-async def create_debug_bundle(diagnostics: FrontendDiagnostics):
+async def create_debug_bundle(
+    diagnostics: FrontendDiagnostics,
+    manager: StreamingTraceManager | None = Depends(get_trace_manager),
+):
     timestamp = datetime.now(tz=UTC).strftime("%Y%m%d-%H%M%S")
     prefix = f"bug-report-{timestamp}"
 
@@ -142,7 +139,7 @@ async def create_debug_bundle(diagnostics: FrontendDiagnostics):
         }
         zf.writestr(f"{prefix}/metadata.json", json.dumps(metadata, indent=2))
 
-        sessions = _collect_sessions()
+        sessions = _collect_sessions(manager)
         for s in sessions:
             sid = s["session_id"]
             zf.writestr(
@@ -188,13 +185,10 @@ async def create_debug_bundle(diagnostics: FrontendDiagnostics):
 
 
 @debug_router.post("/load", response_model=StandardResponse[DebugLoadData])
-async def load_debug_bundle(file: UploadFile = FastAPIFile(...)):
-    if not _trace_manager:
-        raise HTTPException(
-            status_code=400,
-            detail="Live mode is not enabled. Start with: agentevals serve --dev",
-        )
-
+async def load_debug_bundle(
+    file: UploadFile = FastAPIFile(...),
+    manager: StreamingTraceManager = Depends(require_trace_manager),
+):
     content = await file.read()
     try:
         zf = zipfile.ZipFile(io.BytesIO(content))
@@ -236,9 +230,9 @@ async def load_debug_bundle(file: UploadFile = FastAPIFile(...)):
             metadata=meta.get("metadata", {}),
         )
 
-        _trace_manager.sessions[session.session_id] = session
+        manager.sessions[session.session_id] = session
 
-        await _trace_manager.broadcast_to_ui(
+        await manager.broadcast_to_ui(
             WSSessionStartedEvent(
                 session=SessionInfo(
                     session_id=session.session_id,
@@ -252,10 +246,10 @@ async def load_debug_bundle(file: UploadFile = FastAPIFile(...)):
             ).model_dump(by_alias=True)
         )
 
-        invocations_data = await _trace_manager._extract_invocations(session)
-        await _trace_manager._save_spans_to_temp_file(session)
+        invocations_data = await manager._extract_invocations(session)
+        await manager._save_spans_to_temp_file(session)
 
-        await _trace_manager.broadcast_to_ui(
+        await manager.broadcast_to_ui(
             WSSessionCompleteEvent(
                 session_id=session.session_id,
                 invocations=invocations_data,

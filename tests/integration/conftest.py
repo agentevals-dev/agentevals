@@ -39,13 +39,12 @@ async def trace_manager():
 @pytest.fixture
 async def otlp_client(trace_manager):
     """httpx client → OTLP app via ASGI transport (no real server)."""
-    from agentevals.api.otlp_routes import otlp_router, set_trace_manager
-
-    set_trace_manager(trace_manager)
+    from agentevals.api.otlp_routes import otlp_router
 
     from fastapi import FastAPI
 
     test_app = FastAPI()
+    test_app.state.trace_manager = trace_manager
     test_app.include_router(otlp_router)
 
     transport = httpx.ASGITransport(app=test_app)
@@ -56,13 +55,12 @@ async def otlp_client(trace_manager):
 @pytest.fixture
 async def api_client(trace_manager):
     """httpx client → main app streaming routes via ASGI transport."""
-    from agentevals.api.streaming_routes import set_trace_manager, streaming_router
-
-    set_trace_manager(trace_manager)
+    from agentevals.api.streaming_routes import streaming_router
 
     from fastapi import FastAPI
 
     test_app = FastAPI()
+    test_app.state.trace_manager = trace_manager
     test_app.include_router(streaming_router, prefix="/api/streaming")
 
     transport = httpx.ASGITransport(app=test_app)
@@ -109,12 +107,12 @@ def live_servers():
 
     importlib.reload(app_module)
 
-    from agentevals.api.app import app, get_trace_manager
+    from agentevals.api.app import app
     from agentevals.api.otlp_app import otlp_app
-    from agentevals.api.otlp_routes import set_trace_manager
 
-    mgr = get_trace_manager()
-    set_trace_manager(mgr)
+    mgr = getattr(app.state, "trace_manager", None)
+    if mgr:
+        otlp_app.state.trace_manager = mgr
 
     main_config = uvicorn.Config(app, host="127.0.0.1", port=main_port, log_level="warning")
     otlp_config = uvicorn.Config(otlp_app, host="127.0.0.1", port=otlp_port, log_level="warning")

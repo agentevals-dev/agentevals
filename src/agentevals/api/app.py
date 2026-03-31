@@ -15,7 +15,6 @@ from agentevals import __version__
 
 from ..utils.log_buffer import log_buffer
 from .debug_routes import debug_router
-from .debug_routes import set_trace_manager as set_debug_trace_manager
 from .routes import router
 
 try:
@@ -42,11 +41,12 @@ async def lifespan(app: FastAPI):
     if log_buffer not in ae_logger.handlers:
         log_buffer.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
         ae_logger.addHandler(log_buffer)
-    if _trace_manager:
-        _trace_manager.start_cleanup_task()
+    mgr = getattr(app.state, "trace_manager", None)
+    if mgr:
+        mgr.start_cleanup_task()
     yield
-    if _trace_manager:
-        await _trace_manager.shutdown()
+    if mgr:
+        await mgr.shutdown()
     ae_logger.removeHandler(log_buffer)
 
 
@@ -70,27 +70,27 @@ app.include_router(router, prefix="/api")
 app.include_router(debug_router, prefix="/api/debug")
 
 _live_mode = os.getenv("AGENTEVALS_LIVE") == "1"
-_trace_manager = None
 
 if _live_mode:
+    from fastapi import Request as _Request
     from fastapi import WebSocket
 
     from ..streaming.ws_server import StreamingTraceManager
-    from .streaming_routes import set_trace_manager, streaming_router
+    from .streaming_routes import streaming_router
 
     app.include_router(streaming_router, prefix="/api/streaming")
-    _trace_manager = StreamingTraceManager()
-    set_trace_manager(_trace_manager)
-    set_debug_trace_manager(_trace_manager)
+    app.state.trace_manager = StreamingTraceManager()
 
     @app.websocket("/ws/traces")
     async def websocket_endpoint(websocket: WebSocket):
-        await _trace_manager.handle_connection(websocket)
+        await websocket.app.state.trace_manager.handle_connection(websocket)
 
     @app.get("/stream/ui-updates")
-    async def ui_updates_stream():
+    async def ui_updates_stream(request: _Request):
+        mgr = request.app.state.trace_manager
+
         async def event_generator():
-            queue = _trace_manager.register_sse_client()
+            queue = mgr.register_sse_client()
             try:
                 while True:
                     event = await queue.get()
@@ -100,7 +100,7 @@ if _live_mode:
             except asyncio.CancelledError:
                 pass
             finally:
-                _trace_manager.unregister_sse_client(queue)
+                mgr.unregister_sse_client(queue)
 
         return StreamingResponse(
             event_generator(),
@@ -110,10 +110,6 @@ if _live_mode:
                 "Connection": "keep-alive",
             },
         )
-
-
-def get_trace_manager():
-    return _trace_manager
 
 
 _static_dir = Path(__file__).parent.parent / "_static"

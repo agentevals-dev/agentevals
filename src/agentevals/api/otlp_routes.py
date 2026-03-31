@@ -15,7 +15,7 @@ import base64
 import logging
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from google.protobuf.json_format import MessageToDict
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest as LogsServiceRequestPB,
@@ -31,6 +31,7 @@ from ..trace_attrs import (
     OTEL_SCOPE,
     OTEL_SCOPE_VERSION,
 )
+from .dependencies import require_trace_manager
 from .models import WSSpanReceivedEvent
 
 if TYPE_CHECKING:
@@ -39,23 +40,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 otlp_router = APIRouter()
-_trace_manager: StreamingTraceManager | None = None
 
 AGENTEVALS_EVAL_SET_ID = "agentevals.eval_set_id"
 AGENTEVALS_SESSION_NAME = "agentevals.session_name"
 
 
-def set_trace_manager(manager: StreamingTraceManager) -> None:
-    global _trace_manager
-    _trace_manager = manager
-
-
 @otlp_router.post("/v1/traces")
-async def receive_traces(request: Request) -> Response:
+async def receive_traces(
+    request: Request,
+    manager: StreamingTraceManager = Depends(require_trace_manager),
+) -> Response:
     """OTLP HTTP trace receiver (ExportTraceServiceRequest)."""
-    if not _trace_manager:
-        return Response(status_code=503, content="Live mode not enabled")
-
     content_type = request.headers.get("content-type", "")
 
     if "application/x-protobuf" in content_type:
@@ -64,7 +59,7 @@ async def receive_traces(request: Request) -> Response:
     else:
         body = await request.json()
 
-    await _process_traces(body)
+    await _process_traces(body, manager)
     return Response(
         status_code=200,
         content='{"partialSuccess":{}}',
@@ -73,11 +68,11 @@ async def receive_traces(request: Request) -> Response:
 
 
 @otlp_router.post("/v1/logs")
-async def receive_logs(request: Request) -> Response:
+async def receive_logs(
+    request: Request,
+    manager: StreamingTraceManager = Depends(require_trace_manager),
+) -> Response:
     """OTLP HTTP log receiver (ExportLogsServiceRequest)."""
-    if not _trace_manager:
-        return Response(status_code=503, content="Live mode not enabled")
-
     content_type = request.headers.get("content-type", "")
 
     if "application/x-protobuf" in content_type:
@@ -86,7 +81,7 @@ async def receive_logs(request: Request) -> Response:
     else:
         body = await request.json()
 
-    await _process_logs(body)
+    await _process_logs(body, manager)
     return Response(
         status_code=200,
         content='{"partialSuccess":{}}',
@@ -94,7 +89,7 @@ async def receive_logs(request: Request) -> Response:
     )
 
 
-async def _process_traces(body: dict) -> None:
+async def _process_traces(body: dict, manager: StreamingTraceManager) -> None:
     """Parse ExportTraceServiceRequest and feed spans to the pipeline."""
     for resource_span in body.get("resourceSpans", []):
         resource_attrs = resource_span.get("resource", {}).get("attributes", [])
@@ -112,7 +107,7 @@ async def _process_traces(body: dict) -> None:
                 if not trace_id:
                     continue
 
-                session = await _trace_manager.get_or_create_otlp_session(trace_id, metadata)
+                session = await manager.get_or_create_otlp_session(trace_id, metadata)
 
                 if not session.can_accept_span():
                     logger.warning("Session %s at span limit", session.session_id)
@@ -120,28 +115,28 @@ async def _process_traces(body: dict) -> None:
 
                 session.spans.append(span)
 
-                extractor = _trace_manager.incremental_extractors.get(session.session_id)
+                extractor = manager.incremental_extractors.get(session.session_id)
                 if extractor:
                     updates = extractor.process_span(span)
                     for update in updates:
                         update["sessionId"] = session.session_id
-                        await _trace_manager.broadcast_to_ui(update)
+                        await manager.broadcast_to_ui(update)
 
-                await _trace_manager.broadcast_to_ui(
+                await manager.broadcast_to_ui(
                     WSSpanReceivedEvent(
                         session_id=session.session_id,
                         span=span,
                     ).model_dump(by_alias=True)
                 )
 
-                _trace_manager.reset_idle_timer(session.session_id)
+                manager.reset_idle_timer(session.session_id)
 
                 if not span.get("parentSpanId"):
                     session.has_root_span = True
-                    _trace_manager.schedule_session_completion(session.session_id)
+                    manager.schedule_session_completion(session.session_id)
 
 
-async def _process_logs(body: dict) -> None:
+async def _process_logs(body: dict, manager: StreamingTraceManager) -> None:
     """Parse ExportLogsServiceRequest and feed logs to sessions.
 
     Logs and spans arrive via separate OTLP exporters (BatchLogRecordProcessor
@@ -170,23 +165,22 @@ async def _process_logs(body: dict) -> None:
                 if not trace_id:
                     continue
 
-                session = _trace_manager.find_session_by_trace_id(trace_id)
+                session = manager.find_session_by_trace_id(trace_id)
 
-                if not session and session_name and _trace_manager:
-                    active_id = _trace_manager._active_session_for_name.get(session_name)
-                    candidate = _trace_manager.sessions.get(active_id) if active_id else None
+                if not session and session_name:
+                    active_id = manager._active_session_for_name.get(session_name)
+                    candidate = manager.sessions.get(active_id) if active_id else None
                     if candidate and not candidate.is_complete:
                         candidate.trace_ids.add(trace_id)
                         session = candidate
 
                 if not session:
-                    if _trace_manager:
-                        _trace_manager.buffer_orphan_log(trace_id, session_name, log_event)
-                        logger.debug(
-                            "Buffered orphan log trace_id=%s session_name=%s",
-                            trace_id[:12],
-                            session_name,
-                        )
+                    manager.buffer_orphan_log(trace_id, session_name, log_event)
+                    logger.debug(
+                        "Buffered orphan log trace_id=%s session_name=%s",
+                        trace_id[:12],
+                        session_name,
+                    )
                     continue
 
                 if not session.can_accept_log():
@@ -197,17 +191,17 @@ async def _process_logs(body: dict) -> None:
                 if session.is_complete:
                     sessions_needing_reextraction.add(session.session_id)
                 else:
-                    _trace_manager.reset_idle_timer(session.session_id)
+                    manager.reset_idle_timer(session.session_id)
 
-                    extractor = _trace_manager.incremental_extractors.get(session.session_id)
+                    extractor = manager.incremental_extractors.get(session.session_id)
                     if extractor:
                         updates = extractor.process_log(log_event)
                         for update in updates:
                             update["sessionId"] = session.session_id
-                            await _trace_manager.broadcast_to_ui(update)
+                            await manager.broadcast_to_ui(update)
 
     for session_id in sessions_needing_reextraction:
-        _trace_manager.schedule_log_reextraction(session_id)
+        manager.schedule_log_reextraction(session_id)
 
 
 _GENAI_EVENT_KEYS = {OTEL_GENAI_INPUT_MESSAGES, OTEL_GENAI_OUTPUT_MESSAGES}

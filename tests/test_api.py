@@ -21,7 +21,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from agentevals.api.debug_routes import debug_router
-from agentevals.api.debug_routes import set_trace_manager as set_debug_trace_manager
 from agentevals.api.models import (
     CamelModel,
     CreateEvalSetData,
@@ -31,12 +30,7 @@ from agentevals.api.models import (
     StandardResponse,
 )
 from agentevals.api.routes import _camel_keys, router
-from agentevals.api.streaming_routes import (
-    set_trace_manager as set_streaming_trace_manager,
-)
-from agentevals.api.streaming_routes import (
-    streaming_router,
-)
+from agentevals.api.streaming_routes import streaming_router
 from agentevals.runner import MetricResult, RunResult, TraceResult
 from agentevals.streaming.session import TraceSession
 
@@ -58,8 +52,7 @@ def _make_app() -> FastAPI:
 def _make_live_app(mgr) -> FastAPI:
     app = _make_app()
     app.include_router(streaming_router, prefix="/api/streaming")
-    set_streaming_trace_manager(mgr)
-    set_debug_trace_manager(mgr)
+    app.state.trace_manager = mgr
     return app
 
 
@@ -691,7 +684,7 @@ class TestStreamingEvaluateSessions:
         assert resp.status_code == 404
 
     @patch("agentevals.api.streaming_routes.run_evaluation", new_callable=AsyncMock)
-    @patch("agentevals.api.streaming_routes.create_eval_set_from_session", new_callable=AsyncMock)
+    @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
     def test_evaluate_sessions_success(self, mock_create_eval, mock_eval):
         self.mgr.sessions.clear()
         self.mgr.sessions["golden"] = _make_session("golden", "tg")
@@ -722,7 +715,7 @@ class TestStreamingEvaluateSessions:
         _assert_all_keys_camel(body)
 
     @patch("agentevals.api.streaming_routes.run_evaluation", new_callable=AsyncMock)
-    @patch("agentevals.api.streaming_routes.create_eval_set_from_session", new_callable=AsyncMock)
+    @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
     def test_evaluate_sessions_eval_failure(self, mock_create_eval, mock_eval):
         self.mgr.sessions.clear()
         self.mgr.sessions["golden"] = _make_session("golden", "tg")
@@ -774,7 +767,7 @@ class TestStreamingPrepareEvaluation:
         )
         assert resp.status_code == 404
 
-    @patch("agentevals.api.streaming_routes.create_eval_set_from_session", new_callable=AsyncMock)
+    @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
     def test_prepare_success(self, mock_create_eval):
         self.mgr.sessions.clear()
         self.mgr.sessions["golden"] = _make_session("golden", "tg")
@@ -802,7 +795,7 @@ class TestStreamingPrepareEvaluation:
         assert body["data"]["numTraces"] == 1
         _assert_all_keys_camel(body)
 
-    @patch("agentevals.api.streaming_routes.create_eval_set_from_session", new_callable=AsyncMock)
+    @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
     def test_prepare_skips_incomplete(self, mock_create_eval):
         self.mgr.sessions.clear()
         self.mgr.sessions["golden"] = _make_session("golden", "tg")
@@ -968,13 +961,12 @@ class TestDebugBundle:
 
 class TestDebugLoad:
     def test_load_no_live_mode(self):
-        set_debug_trace_manager(None)
         client = TestClient(_make_app())
         resp = client.post(
             "/api/debug/load",
             files={"file": ("report.zip", io.BytesIO(b"fake"), "application/zip")},
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 503
 
     def test_load_invalid_zip(self):
         mgr = _make_trace_manager()

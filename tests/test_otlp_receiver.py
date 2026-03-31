@@ -14,7 +14,6 @@ from agentevals.api.otlp_routes import (
     _parse_otlp_body,
     _process_logs,
     _process_traces,
-    set_trace_manager,
 )
 from agentevals.streaming.session import TraceSession
 from agentevals.streaming.ws_server import StreamingTraceManager
@@ -475,7 +474,6 @@ class TestLateLogReextraction:
     def test_late_logs_accepted_for_completed_session(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             meta = {"eval_set_id": None, "session_name": "s1", "resource_attrs": {}}
             session = await mgr.get_or_create_otlp_session("trace-abc", meta)
             session.is_complete = True
@@ -507,7 +505,7 @@ class TestLateLogReextraction:
                     }
                 ]
             }
-            await _process_logs(body)
+            await _process_logs(body, mgr)
 
             assert len(session.logs) == 1
             mgr.schedule_log_reextraction.assert_called_once_with("s1")
@@ -520,7 +518,6 @@ class TestLateLogReextraction:
 
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             meta = {"eval_set_id": None, "session_name": "named-session", "resource_attrs": {}}
             session = await mgr.get_or_create_otlp_session("trace-abc", meta)
             session.is_complete = True
@@ -550,7 +547,7 @@ class TestLateLogReextraction:
                     }
                 ]
             }
-            await _process_logs(body)
+            await _process_logs(body, mgr)
 
             assert len(session.logs) == 0
             assert "new-trace-id" not in session.trace_ids
@@ -759,14 +756,13 @@ class TestProcessTraces:
     def test_single_span_creates_session(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             body = _make_export_request(
                 spans=[_make_span(trace_id="t1", parent_span_id="p1")],
                 resource_attrs=[
                     _make_otlp_attr("agentevals.session_name", "test-session"),
                 ],
             )
-            await _process_traces(body)
+            await _process_traces(body, mgr)
             assert "test-session" in mgr.sessions
             session = mgr.sessions["test-session"]
             assert len(session.spans) == 1
@@ -778,14 +774,13 @@ class TestProcessTraces:
     def test_multiple_spans_same_trace(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             body = _make_export_request(
                 spans=[
                     _make_span(trace_id="t1", span_id="s1", parent_span_id="p1"),
                     _make_span(trace_id="t1", span_id="s2", parent_span_id="p1"),
                 ],
             )
-            await _process_traces(body)
+            await _process_traces(body, mgr)
             sessions = [s for s in mgr.sessions.values() if s.trace_id == "t1"]
             assert len(sessions) == 1
             assert len(sessions[0].spans) == 2
@@ -796,7 +791,6 @@ class TestProcessTraces:
     def test_different_traces_create_different_sessions(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             body = {
                 "resourceSpans": [
                     {
@@ -823,7 +817,7 @@ class TestProcessTraces:
                     },
                 ]
             }
-            await _process_traces(body)
+            await _process_traces(body, mgr)
             trace_ids = {s.trace_id for s in mgr.sessions.values()}
             assert "t1" in trace_ids
             assert "t2" in trace_ids
@@ -834,13 +828,12 @@ class TestProcessTraces:
     def test_scope_injected_into_spans(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             body = _make_export_request(
                 spans=[_make_span(trace_id="t1")],
                 scope_name="gcp.vertex.agent",
                 scope_version="1.2.3",
             )
-            await _process_traces(body)
+            await _process_traces(body, mgr)
             session = list(mgr.sessions.values())[0]
             span = session.spans[0]
             attr_map = {a["key"]: a["value"] for a in span["attributes"]}
@@ -856,11 +849,10 @@ class TestProcessTraces:
         async def go():
             mgr = _make_mgr()
             mgr.schedule_session_completion = MagicMock()
-            set_trace_manager(mgr)
             body = _make_export_request(
                 spans=[_make_span(trace_id="t1", parent_span_id=None)],
             )
-            await _process_traces(body)
+            await _process_traces(body, mgr)
             session = list(mgr.sessions.values())[0]
             assert session.has_root_span is True
             mgr.schedule_session_completion.assert_called_once_with(session.session_id)
@@ -872,14 +864,13 @@ class TestProcessTraces:
         async def go():
             mgr = _make_mgr()
             mgr.reset_idle_timer = MagicMock()
-            set_trace_manager(mgr)
             body = _make_export_request(
                 spans=[
                     _make_span(trace_id="t1", span_id="s1"),
                     _make_span(trace_id="t1", span_id="s2"),
                 ],
             )
-            await _process_traces(body)
+            await _process_traces(body, mgr)
             assert mgr.reset_idle_timer.call_count == 2
             _cancel_timers(mgr)
 
@@ -890,7 +881,6 @@ class TestProcessTraces:
 
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             meta = _make_resource_attrs(session_name="my-session")
 
             body1 = _make_export_request(
@@ -901,8 +891,8 @@ class TestProcessTraces:
                 spans=[_make_span(trace_id="trace-b", span_id="s2")],
                 resource_attrs=meta,
             )
-            await _process_traces(body1)
-            await _process_traces(body2)
+            await _process_traces(body1, mgr)
+            await _process_traces(body2, mgr)
 
             assert len(mgr.sessions) == 1
             session = mgr.sessions["my-session"]
@@ -917,7 +907,6 @@ class TestProcessTraces:
 
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             meta = _make_resource_attrs(session_name="my-session")
 
             body1 = _make_export_request(
@@ -928,8 +917,8 @@ class TestProcessTraces:
                 spans=[_make_span(trace_id="trace-b")],
                 resource_attrs=meta,
             )
-            await _process_traces(body1)
-            await _process_traces(body2)
+            await _process_traces(body1, mgr)
+            await _process_traces(body2, mgr)
 
             log_body = {
                 "resourceLogs": [
@@ -960,7 +949,7 @@ class TestProcessTraces:
                     }
                 ]
             }
-            await _process_logs(log_body)
+            await _process_logs(log_body, mgr)
 
             session = mgr.sessions["my-session"]
             assert len(session.logs) == 2
@@ -971,8 +960,7 @@ class TestProcessTraces:
     def test_empty_request(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
-            await _process_traces({"resourceSpans": []})
+            await _process_traces({"resourceSpans": []}, mgr)
             assert len(mgr.sessions) == 0
 
         _run(go())
@@ -980,11 +968,10 @@ class TestProcessTraces:
     def test_broadcasts_span_received(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             body = _make_export_request(
                 spans=[_make_span(trace_id="t1")],
             )
-            await _process_traces(body)
+            await _process_traces(body, mgr)
             span_received_calls = [c for c in mgr.broadcast_to_ui.call_args_list if c[0][0]["type"] == "span_received"]
             assert len(span_received_calls) == 1
             _cancel_timers(mgr)
@@ -1005,7 +992,6 @@ class TestOrphanLogBuffer:
 
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             body = {
                 "resourceLogs": [
                     {
@@ -1037,7 +1023,7 @@ class TestOrphanLogBuffer:
                     }
                 ]
             }
-            await _process_logs(body)
+            await _process_logs(body, mgr)
             assert len(mgr._orphan_logs) == 1
             assert mgr._orphan_logs[0]["trace_id"] == "trace-1"
             assert mgr._orphan_logs[0]["session_name"] == "my-agent"
@@ -1049,7 +1035,6 @@ class TestOrphanLogBuffer:
 
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
 
             log_body = {
                 "resourceLogs": [
@@ -1082,7 +1067,7 @@ class TestOrphanLogBuffer:
                     }
                 ]
             }
-            await _process_logs(log_body)
+            await _process_logs(log_body, mgr)
             assert len(mgr._orphan_logs) == 1
 
             meta = {"eval_set_id": None, "session_name": "my-agent", "resource_attrs": {}}
@@ -1099,7 +1084,6 @@ class TestOrphanLogBuffer:
 
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
 
             log_body = {
                 "resourceLogs": [
@@ -1132,7 +1116,7 @@ class TestOrphanLogBuffer:
                     }
                 ]
             }
-            await _process_logs(log_body)
+            await _process_logs(log_body, mgr)
 
             meta = {"eval_set_id": None, "session_name": "my-agent", "resource_attrs": {}}
             session = await mgr.get_or_create_otlp_session("trace-1", meta)
@@ -1147,7 +1131,6 @@ class TestOrphanLogBuffer:
 
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
 
             mgr._orphan_logs.append(
                 {
@@ -1175,7 +1158,6 @@ class TestOrphanLogBuffer:
 
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
 
             for i in range(3):
                 log_body = {
@@ -1209,7 +1191,7 @@ class TestOrphanLogBuffer:
                         }
                     ]
                 }
-                await _process_logs(log_body)
+                await _process_logs(log_body, mgr)
 
             assert len(mgr._orphan_logs) == 3
 
@@ -1226,7 +1208,6 @@ class TestProcessLogs:
     def test_routes_log_to_session_by_trace_id(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             meta = {"eval_set_id": None, "session_name": "s1", "resource_attrs": {}}
             await mgr.get_or_create_otlp_session("trace-abc", meta)
             body = {
@@ -1250,7 +1231,7 @@ class TestProcessLogs:
                     }
                 ]
             }
-            await _process_logs(body)
+            await _process_logs(body, mgr)
             session = mgr.sessions["s1"]
             assert len(session.logs) == 1
             assert session.logs[0]["event_name"] == "gen_ai.user.message"
@@ -1260,7 +1241,6 @@ class TestProcessLogs:
     def test_buffers_log_with_unknown_trace_id(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             body = {
                 "resourceLogs": [
                     {
@@ -1282,7 +1262,7 @@ class TestProcessLogs:
                     }
                 ]
             }
-            await _process_logs(body)
+            await _process_logs(body, mgr)
             assert len(mgr.sessions) == 0
             assert len(mgr._orphan_logs) == 1
 
@@ -1291,7 +1271,6 @@ class TestProcessLogs:
     def test_ignores_non_genai_logs(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
             meta = {"eval_set_id": None, "session_name": "s1", "resource_attrs": {}}
             await mgr.get_or_create_otlp_session("trace-1", meta)
             body = {
@@ -1315,7 +1294,7 @@ class TestProcessLogs:
                     }
                 ]
             }
-            await _process_logs(body)
+            await _process_logs(body, mgr)
             session = mgr.sessions["s1"]
             assert len(session.logs) == 0
 
@@ -1595,7 +1574,6 @@ class TestProtobufJsonParity:
     def test_protobuf_traces_create_session(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
 
             resource_attrs = [
                 KeyValue(key="agentevals.session_name", value=AnyValue(string_value="pb-session")),
@@ -1606,7 +1584,7 @@ class TestProtobufJsonParity:
             raw = request.SerializeToString()
 
             body = _decode_protobuf_traces(raw)
-            await _process_traces(body)
+            await _process_traces(body, mgr)
 
             assert "pb-session" in mgr.sessions
             session = mgr.sessions["pb-session"]
@@ -1621,14 +1599,13 @@ class TestProtobufJsonParity:
         async def go():
             mgr = _make_mgr()
             mgr.schedule_session_completion = MagicMock()
-            set_trace_manager(mgr)
 
             span = _make_pb_span(parent_span_id_hex=None)
             request = _make_pb_export_request([span])
             raw = request.SerializeToString()
 
             body = _decode_protobuf_traces(raw)
-            await _process_traces(body)
+            await _process_traces(body, mgr)
 
             session = list(mgr.sessions.values())[0]
             assert session.has_root_span is True
@@ -1640,14 +1617,13 @@ class TestProtobufJsonParity:
     def test_protobuf_scope_injection(self):
         async def go():
             mgr = _make_mgr()
-            set_trace_manager(mgr)
 
             span = _make_pb_span()
             request = _make_pb_export_request([span], scope_name="strands.agent", scope_version="2.0.0")
             raw = request.SerializeToString()
 
             body = _decode_protobuf_traces(raw)
-            await _process_traces(body)
+            await _process_traces(body, mgr)
 
             session = list(mgr.sessions.values())[0]
             stored_span = session.spans[0]

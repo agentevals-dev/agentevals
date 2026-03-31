@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -16,6 +17,7 @@ from ..loader.otlp import OtlpJsonLoader
 from ..runner import run_evaluation
 from ..trace_attrs import OTEL_GENAI_INPUT_MESSAGES, OTEL_GENAI_REQUEST_MODEL
 from ..utils.log_enrichment import enrich_spans_with_logs
+from .dependencies import require_trace_manager
 from .models import (
     CreateEvalSetData,
     EvaluateSessionsData,
@@ -26,17 +28,12 @@ from .models import (
     StandardResponse,
 )
 
+if TYPE_CHECKING:
+    from ..streaming.ws_server import StreamingTraceManager
+
 logger = logging.getLogger(__name__)
 
 streaming_router = APIRouter()
-
-trace_manager = None
-
-
-def set_trace_manager(manager):
-    """Set the trace manager instance."""
-    global trace_manager
-    trace_manager = manager
 
 
 class CreateEvalSetRequest(BaseModel):
@@ -60,35 +57,16 @@ class GetTraceRequest(BaseModel):
     session_id: str
 
 
-@streaming_router.get("/sessions", response_model=StandardResponse[list[SessionInfo]])
-async def list_sessions():
-    sessions_data = []
-
-    for session_id, session in trace_manager.sessions.items():
-        info = SessionInfo(
-            session_id=session_id,
-            trace_id=session.trace_id,
-            eval_set_id=session.eval_set_id,
-            span_count=len(session.spans),
-            is_complete=session.is_complete,
-            started_at=session.started_at.isoformat(),
-            metadata=session.metadata,
-            invocations=session.invocations if session.is_complete and session.invocations else None,
-        )
-        sessions_data.append(info)
-
-    return StandardResponse(data=sessions_data)
-
-
-@streaming_router.post("/create-eval-set", response_model=StandardResponse[CreateEvalSetData])
-async def create_eval_set_from_session(request: CreateEvalSetRequest):
-    """Convert a session's trace into an EvalSet."""
-    session = trace_manager.sessions.get(request.session_id)
+async def _do_create_eval_set(
+    request: CreateEvalSetRequest, manager: StreamingTraceManager
+) -> StandardResponse[CreateEvalSetData]:
+    """Shared logic for creating an EvalSet from a session's trace."""
+    session = manager.sessions.get(request.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
     try:
-        trace_file = await trace_manager._save_spans_to_temp_file(session)
+        trace_file = await manager._save_spans_to_temp_file(session)
         logger.debug(
             "Session %s: %d spans, %d logs saved to %s",
             request.session_id,
@@ -159,19 +137,52 @@ async def create_eval_set_from_session(request: CreateEvalSetRequest):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@streaming_router.get("/sessions", response_model=StandardResponse[list[SessionInfo]])
+async def list_sessions(manager: StreamingTraceManager = Depends(require_trace_manager)):
+    sessions_data = []
+
+    for session_id, session in manager.sessions.items():
+        info = SessionInfo(
+            session_id=session_id,
+            trace_id=session.trace_id,
+            eval_set_id=session.eval_set_id,
+            span_count=len(session.spans),
+            is_complete=session.is_complete,
+            started_at=session.started_at.isoformat(),
+            metadata=session.metadata,
+            invocations=session.invocations if session.is_complete and session.invocations else None,
+        )
+        sessions_data.append(info)
+
+    return StandardResponse(data=sessions_data)
+
+
+@streaming_router.post("/create-eval-set", response_model=StandardResponse[CreateEvalSetData])
+async def create_eval_set_from_session(
+    request: CreateEvalSetRequest,
+    manager: StreamingTraceManager = Depends(require_trace_manager),
+):
+    """Convert a session's trace into an EvalSet."""
+    return await _do_create_eval_set(request, manager)
+
+
 @streaming_router.post("/evaluate-sessions", response_model=StandardResponse[EvaluateSessionsData])
-async def evaluate_sessions(request: EvaluateSessionsRequest):
+async def evaluate_sessions(
+    request: EvaluateSessionsRequest,
+    manager: StreamingTraceManager = Depends(require_trace_manager),
+):
     """Evaluate all sessions against a golden session converted to EvalSet."""
-    golden_session = trace_manager.sessions.get(request.golden_session_id)
+    golden_session = manager.sessions.get(request.golden_session_id)
     if not golden_session:
         raise HTTPException(status_code=404, detail="Golden session not found")
 
     try:
-        eval_set_response = await create_eval_set_from_session(
+        eval_set_response = await _do_create_eval_set(
             CreateEvalSetRequest(
                 session_id=request.golden_session_id,
                 eval_set_id=request.eval_set_id,
-            )
+            ),
+            manager,
         )
 
         import tempfile
@@ -181,19 +192,17 @@ async def evaluate_sessions(request: EvaluateSessionsRequest):
         eval_set_file.close()
 
         sessions_to_evaluate = [
-            (session_id, session) for session_id, session in trace_manager.sessions.items() if session.is_complete
+            (session_id, session) for session_id, session in manager.sessions.items() if session.is_complete
         ]
 
-        logger.info(
-            "Evaluating %d complete sessions (of %d total)", len(sessions_to_evaluate), len(trace_manager.sessions)
-        )
+        logger.info("Evaluating %d complete sessions (of %d total)", len(sessions_to_evaluate), len(manager.sessions))
 
         sem = asyncio.Semaphore(5)
 
         async def eval_one_session(session_id: str, session) -> SessionEvalResult:
             async with sem:
                 try:
-                    trace_file = await trace_manager._save_spans_to_temp_file(session)
+                    trace_file = await manager._save_spans_to_temp_file(session)
 
                     config = EvalRunConfig(
                         trace_files=[str(trace_file)],
@@ -249,18 +258,22 @@ async def evaluate_sessions(request: EvaluateSessionsRequest):
 
 
 @streaming_router.post("/prepare-evaluation", response_model=StandardResponse[PrepareEvaluationData])
-async def prepare_evaluation(request: PrepareEvaluationRequest):
+async def prepare_evaluation(
+    request: PrepareEvaluationRequest,
+    manager: StreamingTraceManager = Depends(require_trace_manager),
+):
     """Prepare evaluation by saving traces and eval set as downloadable files."""
-    golden_session = trace_manager.sessions.get(request.golden_session_id)
+    golden_session = manager.sessions.get(request.golden_session_id)
     if not golden_session:
         raise HTTPException(status_code=404, detail="Golden session not found")
 
     try:
-        eval_set_response = await create_eval_set_from_session(
+        eval_set_response = await _do_create_eval_set(
             CreateEvalSetRequest(
                 session_id=request.golden_session_id,
                 eval_set_id=f"golden_{request.golden_session_id}",
-            )
+            ),
+            manager,
         )
 
         import os
@@ -274,11 +287,11 @@ async def prepare_evaluation(request: PrepareEvaluationRequest):
 
         trace_files = []
         for session_id in request.session_ids:
-            session = trace_manager.sessions.get(session_id)
+            session = manager.sessions.get(session_id)
             if not session or not session.is_complete:
                 continue
 
-            trace_file = await trace_manager._save_spans_to_temp_file(session)
+            trace_file = await manager._save_spans_to_temp_file(session)
             trace_files.append(
                 {
                     "session_id": session_id,
@@ -320,8 +333,11 @@ async def download_file(filename: str):
 
 
 @streaming_router.post("/get-trace", response_model=StandardResponse[GetTraceData])
-async def get_trace(request: GetTraceRequest):
-    session = trace_manager.sessions.get(request.session_id)
+async def get_trace(
+    request: GetTraceRequest,
+    manager: StreamingTraceManager = Depends(require_trace_manager),
+):
+    session = manager.sessions.get(request.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
