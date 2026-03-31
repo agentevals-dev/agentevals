@@ -5,6 +5,16 @@ export const ADK_SCOPE = 'gcp.vertex.agent';
 export const USER_ROLES = ['user', 'human'];
 export const ASSISTANT_ROLES = ['assistant', 'model', 'ai'];
 
+function isGenAISpan(span: Span): boolean {
+  return !!(
+    span.tags['gen_ai.request.model'] ||
+    span.tags['gen_ai.system'] ||
+    span.tags['gen_ai.input.messages'] ||
+    span.tags['gen_ai.prompt'] ||
+    span.tags['gen_ai.request.messages']
+  );
+}
+
 export function detectTraceFormat(trace: Trace): 'adk' | 'genai' {
   const check = (spans: Span[]): 'adk' | 'genai' | null => {
     let hasGenai = false;
@@ -12,7 +22,7 @@ export function detectTraceFormat(trace: Trace): 'adk' | 'genai' {
       if (span.tags['otel.scope.name'] === ADK_SCOPE) {
         return 'adk';
       }
-      if (!hasGenai && (span.tags['gen_ai.request.model'] || span.tags['gen_ai.input.messages'])) {
+      if (!hasGenai && isGenAISpan(span)) {
         hasGenai = true;
       }
     }
@@ -52,7 +62,7 @@ export function findDescendantLLMSpans(root: Span): Span[] {
 
   while (queue.length > 0) {
     const span = queue.shift()!;
-    if (span.tags['gen_ai.request.model'] || span.tags['gen_ai.input.messages']) {
+    if (isGenAISpan(span)) {
       results.push(span);
     }
     queue.push(...span.children);

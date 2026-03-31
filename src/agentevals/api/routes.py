@@ -276,15 +276,22 @@ def _serialize_invocation(inv) -> dict[str, Any]:
     inv_dict: dict[str, Any] = {
         "invocation_id": inv.invocation_id,
     }
-    if inv.user_content:
+    if inv.user_content is not None:
         inv_dict["user_content"] = inv.user_content.model_dump(exclude_none=True)
-    if inv.final_response:
+    if inv.final_response is not None:
         inv_dict["final_response"] = inv.final_response.model_dump(exclude_none=True)
-    if inv.intermediate_data:
+    if inv.intermediate_data is not None:
         inv_dict["intermediate_data"] = inv.intermediate_data.model_dump(exclude_none=True)
-    if inv.creation_timestamp:
+    if inv.creation_timestamp is not None:
         inv_dict["creation_timestamp"] = inv.creation_timestamp
     return _camel_keys(inv_dict)
+
+
+def _get_format_for_file(path: str, explicit_format: str) -> str:
+    """Return the loader format for a single file, auto-detecting from extension."""
+    if explicit_format:
+        return explicit_format
+    return "otlp-json" if path.lower().endswith(".jsonl") else "jaeger-json"
 
 
 @router.post("/convert", response_model=StandardResponse[ConvertTracesData])
@@ -295,55 +302,57 @@ async def convert_trace_files(
     """Convert trace files to invocations and metadata without running evaluation."""
     temp_dir = tempfile.mkdtemp()
     try:
-        trace_paths = []
-        for trace_file in trace_files:
+        saved_files: list[tuple[str, str]] = []  # (path, original_filename)
+        for idx, trace_file in enumerate(trace_files):
             if not trace_file.filename:
                 continue
 
-            if not (trace_file.filename.endswith(".json") or trace_file.filename.endswith(".jsonl")):
+            original = trace_file.filename
+            lower = original.lower()
+            if not (lower.endswith(".json") or lower.endswith(".jsonl")):
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid file extension for {trace_file.filename}. Only .json and .jsonl files are allowed.",
+                    detail=f"Invalid file extension for {original}. Only .json and .jsonl files are allowed.",
                 )
 
-            trace_path = os.path.join(temp_dir, trace_file.filename)
+            safe_name = f"{idx}_{os.path.basename(original)}"
+            trace_path = os.path.join(temp_dir, safe_name)
             with open(trace_path, "wb") as f:  # noqa: ASYNC230
                 content = await trace_file.read()
 
                 if len(content) > 10 * 1024 * 1024:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"File {trace_file.filename} exceeds 10MB limit",
+                        detail=f"File {original} exceeds 10MB limit",
                     )
 
                 f.write(content)
-            trace_paths.append(trace_path)
+            saved_files.append((trace_path, original))
 
-        if not trace_paths:
+        if not saved_files:
             raise HTTPException(status_code=400, detail="No valid trace files provided")
 
-        fmt = trace_format
-        if not fmt:
-            if trace_paths[0].endswith(".jsonl"):
-                fmt = "otlp-json"
-            else:
-                fmt = "jaeger-json"
-
-        loader = get_loader(fmt)
         all_traces = []
         trace_to_filename: dict[str, str] = {}
-        for path in trace_paths:
+        load_warnings: list[str] = []
+        for path, original in saved_files:
+            fmt = _get_format_for_file(path, trace_format)
+            loader = get_loader(fmt)
             try:
                 traces = loader.load(path)
-                filename = os.path.basename(path)
                 for t in traces:
-                    trace_to_filename[t.trace_id] = filename
+                    trace_to_filename[t.trace_id] = original
                 all_traces.extend(traces)
             except Exception as exc:
-                logger.warning(f"Failed to load trace file '{path}': {exc}")
+                msg = f"Failed to load '{original}': {exc}"
+                logger.warning(msg)
+                load_warnings.append(msg)
 
         if not all_traces:
-            raise HTTPException(status_code=400, detail="No traces found in uploaded files")
+            detail = "No traces found in uploaded files"
+            if load_warnings:
+                detail += ". Errors: " + "; ".join(load_warnings)
+            raise HTTPException(status_code=400, detail=detail)
 
         conversion_results = convert_traces(all_traces)
         trace_map = {t.trace_id: t for t in all_traces}
@@ -351,6 +360,7 @@ async def convert_trace_files(
         entries: list[TraceConversionEntry] = []
         for conv_result in conversion_results:
             invocations = [_serialize_invocation(inv) for inv in conv_result.invocations]
+            warnings = list(conv_result.warnings)
 
             trace = trace_map.get(conv_result.trace_id)
             meta = TraceConversionMetadata()
@@ -371,7 +381,7 @@ async def convert_trace_files(
                 TraceConversionEntry(
                     trace_id=conv_result.trace_id,
                     invocations=invocations,
-                    warnings=conv_result.warnings,
+                    warnings=warnings,
                     metadata=meta,
                 )
             )

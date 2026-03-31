@@ -1,24 +1,5 @@
 import type { Invocation, EvalSet, EvalCase } from './types';
-
-/**
- * Convert camelCase keys to snake_case recursively
- */
-function convertCamelToSnake(obj: any): any {
-  if (Array.isArray(obj)) {
-    return obj.map(convertCamelToSnake);
-  }
-
-  if (obj !== null && typeof obj === 'object') {
-    const converted: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-      converted[snakeKey] = convertCamelToSnake(value);
-    }
-    return converted;
-  }
-
-  return obj;
-}
+import { convertCamelToSnake } from './utils';
 
 /**
  * Generate an EvalSet from pre-converted invocations (backend is source of truth).
