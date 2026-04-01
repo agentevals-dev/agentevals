@@ -51,6 +51,15 @@ def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
             "pass_threshold": evaluator_def.threshold,
         }
 
+    if grader_type == "string_check":
+        return {
+            "type": "string_check",
+            "name": evaluator_def.name,
+            "input": "{{ item.actual_response }}",
+            "reference": grader["reference"],
+            "operation": grader["operation"],
+        }
+
     raise ValueError(f"Unsupported grader type: {grader_type}")
 
 
