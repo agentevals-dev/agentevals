@@ -46,6 +46,7 @@ class EvaluateSessionsRequest(BaseModel):
     eval_set_id: str
     metrics: list[str] = ["tool_trajectory_avg_score"]
     judge_model: str = "gemini-2.5-flash"
+    trajectory_match_type: str | None = None
 
 
 class PrepareEvaluationRequest(BaseModel):
@@ -210,6 +211,7 @@ async def evaluate_sessions(
                         eval_set_file=eval_set_file.name,
                         metrics=request.metrics,
                         judge_model=request.judge_model,
+                        trajectory_match_type=request.trajectory_match_type,
                     )
 
                     eval_result = await run_evaluation(config)

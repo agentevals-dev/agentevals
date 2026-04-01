@@ -109,6 +109,12 @@ def main(verbose: int) -> None:
     help="Score threshold for pass/fail.",
 )
 @click.option(
+    "--trajectory-match-type",
+    type=click.Choice(["EXACT", "IN_ORDER", "ANY_ORDER"], case_sensitive=False),
+    default=None,
+    help="Match type for tool_trajectory_avg_score: EXACT (default), IN_ORDER, or ANY_ORDER.",
+)
+@click.option(
     "--output",
     "-o",
     type=click.Choice(["table", "json", "summary"]),
@@ -130,6 +136,7 @@ def run(
     trace_format: str,
     judge_model: str | None,
     threshold: float | None,
+    trajectory_match_type: str | None,
     output: str,
     config_file: str | None,
 ) -> None:
@@ -152,6 +159,7 @@ def run(
             trace_format=trace_format,
             judge_model=judge_model,
             threshold=threshold,
+            trajectory_match_type=trajectory_match_type,
             output_format=output,
         )
         config = merge_configs(file_config, cli_config)
@@ -164,6 +172,7 @@ def run(
             trace_format=trace_format,
             judge_model=judge_model,
             threshold=threshold,
+            trajectory_match_type=trajectory_match_type,
             output_format=output,
         )
 

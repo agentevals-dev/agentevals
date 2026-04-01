@@ -1,0 +1,34 @@
+{
+  "eval_set_id": "helm_multi_tool_eval_set",
+  "name": "Helm Multi-Tool Eval Set",
+  "description": "Golden eval case with two tools in a specific order for match-type smoke testing.",
+  "eval_cases": [
+    {
+      "eval_id": "helm_multi_tool_inv_1",
+      "conversation": [
+        {
+          "invocation_id": "helm_multi_tool_inv_1",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {"text": "list all Helm releases and get details for kagent"}
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {"text": "I found the releases and their details."}
+            ]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "helm_list_releases", "args": {}, "id": "call_e1"},
+              {"name": "helm_get_release", "args": {}, "id": "call_e2"}
+            ],
+            "tool_responses": []
+          }
+        }
+      ]
+    }
+  ]
+}

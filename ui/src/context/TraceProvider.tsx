@@ -16,6 +16,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
     selectedMetrics: ['tool_trajectory_avg_score'],
     judgeModel: 'gemini-2.5-flash',
     threshold: 0.8,
+    trajectoryMatchType: 'EXACT',
     traceMetadata: new Map(),
     isLoadingMetadata: false,
     apiKeyStatus: null,
@@ -94,6 +95,9 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
       setThreshold: (threshold: number) =>
         setState((prev) => ({ ...prev, threshold })),
 
+      setTrajectoryMatchType: (matchType: string) =>
+        setState((prev) => ({ ...prev, trajectoryMatchType: matchType })),
+
       runEvaluation: async () => {
         const initialRows = new Map();
         const metadataArray = Array.from(state.traceMetadata.values());
@@ -133,6 +137,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
               metrics: state.selectedMetrics,
               judgeModel: state.judgeModel,
               threshold: state.threshold,
+              trajectoryMatchType: state.trajectoryMatchType !== 'EXACT' ? state.trajectoryMatchType : undefined,
             },
             (message) => {
               setState((prev) => ({ ...prev, progressMessage: message }));
@@ -378,7 +383,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
           };
         }),
     }),
-    [state.traceFiles, state.traceMetadata, state.evalSetFile, state.selectedMetrics, state.judgeModel, state.threshold]
+    [state.traceFiles, state.traceMetadata, state.evalSetFile, state.selectedMetrics, state.judgeModel, state.threshold, state.trajectoryMatchType]
   );
 
   return (

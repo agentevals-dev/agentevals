@@ -507,6 +507,7 @@ async def evaluate_traces(
             trace_format=trace_format,
             judge_model=config_dict.get("judgeModel"),
             threshold=threshold,
+            trajectory_match_type=config_dict.get("trajectoryMatchType"),
         )
 
         logger.info(f"Evaluating {len(trace_paths)} trace file(s) with metrics: {metrics}")
@@ -615,6 +616,7 @@ async def evaluate_traces_stream(
                 trace_format=trace_format,
                 judge_model=config_dict.get("judgeModel"),
                 threshold=threshold,
+                trajectory_match_type=config_dict.get("trajectoryMatchType"),
             )
 
             loader = get_loader(eval_config.trace_format)

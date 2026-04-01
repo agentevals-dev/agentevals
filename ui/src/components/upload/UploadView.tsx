@@ -525,6 +525,26 @@ export const UploadView: React.FC = () => {
               Minimum score to pass
             </span>
           </div>
+
+          {state.selectedMetrics.includes('tool_trajectory_avg_score') && (
+            <div className="setting-item" style={{ marginTop: 10 }}>
+              <label className="setting-label">Trajectory Match Type</label>
+              <Select
+                value={state.trajectoryMatchType}
+                onChange={actions.setTrajectoryMatchType}
+                options={[
+                  { value: 'EXACT', label: 'EXACT — tools must match in exact order' },
+                  { value: 'IN_ORDER', label: 'IN_ORDER — expected tools appear in order (extras allowed)' },
+                  { value: 'ANY_ORDER', label: 'ANY_ORDER — expected tools appear in any order' },
+                ]}
+                style={{ width: '100%' }}
+                size="small"
+              />
+              <span className="setting-hint">
+                How to compare tool call sequences for tool_trajectory_avg_score
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

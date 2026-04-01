@@ -111,6 +111,8 @@ def load_eval_config(path: str | Path) -> EvalRunConfig:
         config.judge_model = data["judge_model"]
     if "threshold" in data:
         config.threshold = float(data["threshold"])
+    if "trajectory_match_type" in data:
+        config.trajectory_match_type = data["trajectory_match_type"]
     if "trace_format" in data:
         config.trace_format = data["trace_format"]
 
@@ -136,6 +138,8 @@ def merge_configs(file_config: EvalRunConfig, cli_config: EvalRunConfig) -> Eval
         merged.judge_model = cli_config.judge_model
     if cli_config.threshold is not None:
         merged.threshold = cli_config.threshold
+    if cli_config.trajectory_match_type is not None:
+        merged.trajectory_match_type = cli_config.trajectory_match_type
     if cli_config.trace_format != "jaeger-json":
         merged.trace_format = cli_config.trace_format
     if cli_config.output_format != "table":

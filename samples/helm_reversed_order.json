@@ -1,0 +1,84 @@
+{
+  "data": [
+    {
+      "traceID": "aabbccdd11223344aabbccdd11223344",
+      "spans": [
+        {
+          "traceID": "aabbccdd11223344aabbccdd11223344",
+          "spanID": "invoke00000001",
+          "operationName": "invoke_agent helm_agent",
+          "references": [],
+          "startTime": 1771900000000000,
+          "duration": 5000000,
+          "tags": [
+            {"key": "otel.scope.name", "type": "string", "value": "gcp.vertex.agent"},
+            {"key": "otel.scope.version", "type": "string", "value": "1.0.0"},
+            {"key": "gcp.vertex.agent.invocation_id", "type": "string", "value": "helm_multi_tool_inv_1"},
+            {"key": "gen_ai.agent.name", "type": "string", "value": "helm_agent"}
+          ],
+          "processID": "p1"
+        },
+        {
+          "traceID": "aabbccdd11223344aabbccdd11223344",
+          "spanID": "calllm000000001",
+          "operationName": "call_llm",
+          "references": [
+            {"refType": "CHILD_OF", "traceID": "aabbccdd11223344aabbccdd11223344", "spanID": "invoke00000001"}
+          ],
+          "startTime": 1771900000100000,
+          "duration": 1000000,
+          "tags": [
+            {"key": "otel.scope.name", "type": "string", "value": "gcp.vertex.agent"},
+            {"key": "gcp.vertex.agent.llm_request", "type": "string", "value": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"list all Helm releases and get details for kagent\"}]}]}"},
+            {"key": "gen_ai.request.model", "type": "string", "value": "gemini-2.0-flash"}
+          ],
+          "processID": "p1"
+        },
+        {
+          "traceID": "aabbccdd11223344aabbccdd11223344",
+          "spanID": "toolget00000001",
+          "operationName": "execute_tool helm_get_release",
+          "references": [
+            {"refType": "CHILD_OF", "traceID": "aabbccdd11223344aabbccdd11223344", "spanID": "invoke00000001"}
+          ],
+          "startTime": 1771900001200000,
+          "duration": 200000,
+          "tags": [
+            {"key": "otel.scope.name", "type": "string", "value": "gcp.vertex.agent"}
+          ],
+          "processID": "p1"
+        },
+        {
+          "traceID": "aabbccdd11223344aabbccdd11223344",
+          "spanID": "toollist0000001",
+          "operationName": "execute_tool helm_list_releases",
+          "references": [
+            {"refType": "CHILD_OF", "traceID": "aabbccdd11223344aabbccdd11223344", "spanID": "invoke00000001"}
+          ],
+          "startTime": 1771900001500000,
+          "duration": 200000,
+          "tags": [
+            {"key": "otel.scope.name", "type": "string", "value": "gcp.vertex.agent"}
+          ],
+          "processID": "p1"
+        },
+        {
+          "traceID": "aabbccdd11223344aabbccdd11223344",
+          "spanID": "calllm000000002",
+          "operationName": "call_llm",
+          "references": [
+            {"refType": "CHILD_OF", "traceID": "aabbccdd11223344aabbccdd11223344", "spanID": "invoke00000001"}
+          ],
+          "startTime": 1771900002000000,
+          "duration": 1000000,
+          "tags": [
+            {"key": "otel.scope.name", "type": "string", "value": "gcp.vertex.agent"},
+            {"key": "gcp.vertex.agent.llm_response", "type": "string", "value": "{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"I found the releases and their details.\"}]}}"},
+            {"key": "gen_ai.request.model", "type": "string", "value": "gemini-2.0-flash"}
+          ],
+          "processID": "p1"
+        }
+      ]
+    }
+  ]
+}

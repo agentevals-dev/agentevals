@@ -140,6 +140,7 @@ async def run_evaluation(
                 eval_set=eval_set,
                 judge_model=config.judge_model,
                 threshold=config.threshold,
+                trajectory_match_type=config.trajectory_match_type,
                 eval_semaphore=eval_semaphore,
                 progress_callback=progress_callback,
                 trace_progress_callback=trace_progress_callback,
@@ -196,7 +197,8 @@ async def _evaluate_trace(
     eval_set: EvalSet | None,
     judge_model: str | None,
     threshold: float | None,
-    eval_semaphore: asyncio.Semaphore,
+    trajectory_match_type: str | None = None,
+    eval_semaphore: asyncio.Semaphore = None,
     progress_callback: ProgressCallback | None = None,
     trace_progress_callback: TraceProgressCallback | None = None,
     trace=None,
@@ -243,6 +245,7 @@ async def _evaluate_trace(
                 expected_invocations=expected_invocations,
                 judge_model=judge_model,
                 threshold=threshold,
+                match_type=trajectory_match_type,
             )
             result.duration_ms = (time.monotonic() - t0) * 1000
         return await _append_result(result)

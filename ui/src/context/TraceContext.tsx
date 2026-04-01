@@ -15,6 +15,7 @@ export interface TraceState {
   selectedMetrics: string[];
   judgeModel: string;
   threshold: number;
+  trajectoryMatchType: string;
   traceMetadata: Map<string, TraceMetadata>;
   isLoadingMetadata: boolean;
   apiKeyStatus: ApiKeyStatus | null;
@@ -54,6 +55,7 @@ export interface TraceContextType {
     toggleMetric: (metric: string) => void;
     setJudgeModel: (model: string) => void;
     setThreshold: (threshold: number) => void;
+    setTrajectoryMatchType: (matchType: string) => void;
     runEvaluation: () => Promise<void>;
     setCurrentView: (view: ViewType) => void;
     setEvaluationOrigin: (view: ViewType | null) => void;

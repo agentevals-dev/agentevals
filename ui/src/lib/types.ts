@@ -199,6 +199,7 @@ export interface EvalConfig {
   metrics: string[];
   judgeModel: string;
   threshold: number;
+  trajectoryMatchType?: string;
 }
 
 // EvalSet types

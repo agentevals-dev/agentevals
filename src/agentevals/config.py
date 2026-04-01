@@ -132,6 +132,11 @@ class EvalRunConfig(BaseModel):
         description="Score threshold for pass/fail.",
     )
 
+    trajectory_match_type: str | None = Field(
+        default=None,
+        description="Match type for tool_trajectory_avg_score: 'EXACT', 'IN_ORDER', or 'ANY_ORDER'. Default: EXACT.",
+    )
+
     output_format: str = Field(
         default="table",
         description="Output format: 'table', 'json', or 'summary'.",
