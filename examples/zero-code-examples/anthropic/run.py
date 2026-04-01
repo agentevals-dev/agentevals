@@ -40,9 +40,7 @@ TOOLS = [
         "description": "Roll a single die with the given number of sides and return the result.",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "n_sides": {"type": "integer", "description": "Number of sides on the die."}
-            },
+            "properties": {"n_sides": {"type": "integer", "description": "Number of sides on the die."}},
             "required": ["n_sides"],
         },
     },
@@ -51,9 +49,7 @@ TOOLS = [
         "description": "Return true if the given number is prime, false otherwise.",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "number": {"type": "integer", "description": "The number to check."}
-            },
+            "properties": {"number": {"type": "integer", "description": "The number to check."}},
             "required": ["number"],
         },
     },
@@ -99,9 +95,7 @@ def run_agent(client: anthropic.Anthropic, query: str) -> str:
                     result = check_prime(**block.input)
                 else:
                     result = "Unknown tool"
-                tool_results.append(
-                    {"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)}
-                )
+                tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)})
 
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results})
