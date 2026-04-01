@@ -1,0 +1,7 @@
+langchain>=1.2.0
+langchain-openai>=1.1.10
+
+opentelemetry-sdk>=1.36.0
+opentelemetry-exporter-otlp-proto-http>=1.36.0
+opentelemetry-instrumentation-openai-v2
+python-dotenv>=1.0.0
