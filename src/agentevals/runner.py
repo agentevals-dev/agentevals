@@ -197,7 +197,7 @@ async def _evaluate_trace(
     eval_set: EvalSet | None,
     judge_model: str | None,
     threshold: float | None,
-    eval_semaphore: asyncio.Semaphore = None,
+    eval_semaphore: asyncio.Semaphore,
     progress_callback: ProgressCallback | None = None,
     trace_progress_callback: TraceProgressCallback | None = None,
     trace=None,

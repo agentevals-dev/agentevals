@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -46,7 +46,7 @@ class EvaluateSessionsRequest(BaseModel):
     eval_set_id: str
     metrics: list[str] = ["tool_trajectory_avg_score"]
     judge_model: str = "gemini-2.5-flash"
-    trajectory_match_type: str | None = None
+    trajectory_match_type: Literal["EXACT", "IN_ORDER", "ANY_ORDER"] | None = None
 
 
 class PrepareEvaluationRequest(BaseModel):
