@@ -580,7 +580,7 @@ async def _run_servers(
 
     _install_shared_exit_handler(
         *uvicorn_servers,
-        otlp_grpc_server,
+        grpc_server=otlp_grpc_server,
     )
 
     try:

@@ -68,7 +68,7 @@ helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
   --set config.service.pipelines.logs.exporters[0]=otlp
 ```
 
-> **Note:** If you deployed agentevals in a namespace other than `default`, update the `endpoint` value accordingly: `http://agentevals.<namespace>.svc.cluster.local:4318`.
+> **Note:** If you deployed agentevals in a namespace other than `default`, update the `endpoint` value accordingly: `http://agentevals.<namespace>.svc.cluster.local:4317`.
 
 ### 3. kagent
 
@@ -97,6 +97,8 @@ helm upgrade --install kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent \
 ```
 
 This installs kagent with only the default Helm agent (`helm-agent`) and the K8s troubleshooter enabled, and points its OTel exporter at the Collector.
+
+> **Note:** In case you are not using the OTel Collector, you can set the `otel.tracing.exporter.otlp.endpoint` to `agentevals.default.svc.cluster.local:4317`.
 
 ### Verify the deployment
 
