@@ -98,7 +98,7 @@ helm upgrade --install kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent \
 
 This installs kagent with only the default Helm agent (`helm-agent`) and the K8s troubleshooter enabled, and points its OTel exporter at the Collector.
 
-> **Note:** In case you are not using the OTel Collector, you can set the `otel.tracing.exporter.otlp.endpoint` to `agentevals.default.svc.cluster.local:4317`.
+> **Note:** If you are not running an OTel Collector, point `otel.tracing.exporter.otlp.endpoint` directly to the agentevals OTLP gRPC endpoint instead: `agentevals.default.svc.cluster.local:4317`.
 
 ### Verify the deployment
 
