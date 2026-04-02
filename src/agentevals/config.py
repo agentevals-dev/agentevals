@@ -82,7 +82,7 @@ _VALID_STRING_CHECK_OPERATIONS = frozenset(
     }
 )
 
-# All supported grader types — use this constant in error messages and checks.
+# All supported grader types — used in error messages and type checks.
 _SUPPORTED_GRADER_TYPES = frozenset({"text_similarity", "string_check"})
 
 
@@ -99,11 +99,6 @@ class OpenAIEvalDef(BaseModel):
     @classmethod
     def _validate_grader(cls, v: dict[str, Any]) -> dict[str, Any]:
         grader_type = v.get("type")
-        if grader_type not in _SUPPORTED_GRADER_TYPES:
-            raise ValueError(
-                f"Unsupported grader type '{grader_type}'. "
-                f"Supported: {sorted(_SUPPORTED_GRADER_TYPES)}"
-            )
 
         if grader_type == "text_similarity":
             metric = v.get("evaluation_metric")
@@ -123,6 +118,11 @@ class OpenAIEvalDef(BaseModel):
                 )
             if "reference" not in v:
                 raise ValueError("'reference' is required for string_check grader")
+        else:
+            raise ValueError(
+                f"Unsupported grader type '{grader_type}'. "
+                f"Supported: {sorted(_SUPPORTED_GRADER_TYPES)}"
+            )
 
         return v
 
@@ -131,3 +131,65 @@ CustomEvaluatorDef = Annotated[
     BuiltinMetricDef | CodeEvaluatorDef | RemoteEvaluatorDef | OpenAIEvalDef,
     Field(discriminator="type"),
 ]
+
+
+class EvalRunConfig(BaseModel):
+    trace_files: list[str] = Field(description="Paths to trace files (Jaeger JSON or OTLP JSON).")
+
+    eval_set_file: str | None = Field(
+        default=None,
+        description="Path to a golden eval set JSON file (ADK EvalSet format).",
+    )
+
+    metrics: list[str] = Field(
+        default_factory=lambda: ["tool_trajectory_avg_score"],
+        description="List of built-in metric names to evaluate.",
+    )
+
+    custom_evaluators: list[CustomEvaluatorDef] = Field(
+        default_factory=list,
+        description="Custom evaluator definitions.",
+    )
+
+    trace_format: str = Field(
+        default="jaeger-json",
+        description="Format of the trace files (jaeger-json or otlp-json).",
+    )
+
+    judge_model: str | None = Field(
+        default=None,
+        description="LLM model for judge-based metrics.",
+    )
+
+    threshold: float | None = Field(
+        default=None,
+        description="Score threshold for pass/fail.",
+    )
+
+    trajectory_match_type: str | None = Field(
+        default=None,
+        description="Match type for tool_trajectory_avg_score: 'EXACT', 'IN_ORDER', or 'ANY_ORDER'. Default: EXACT.",
+    )
+
+    @field_validator("trajectory_match_type")
+    @classmethod
+    def _validate_trajectory_match_type(cls, v: str | None) -> str | None:
+        valid = {"EXACT", "IN_ORDER", "ANY_ORDER"}
+        if v is not None and v.upper() not in valid:
+            raise ValueError(f"Invalid trajectory_match_type '{v}'. Valid values: {sorted(valid)}")
+        return v.upper() if v is not None else v
+
+    output_format: str = Field(
+        default="table",
+        description="Output format: 'table', 'json', or 'summary'.",
+    )
+
+    max_concurrent_traces: int = Field(
+        default=10,
+        description="Maximum number of traces to evaluate concurrently.",
+    )
+
+    max_concurrent_evals: int = Field(
+        default=5,
+        description="Maximum number of concurrent metric evaluations (LLM API calls).",
+    )

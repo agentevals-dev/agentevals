@@ -258,10 +258,18 @@ async def _collect_results(client: Any, eval_id: str, run_id: str, run: Any, eva
     total = result_counts.total if result_counts else 0
     eval_status = "PASSED" if failed == 0 and total > 0 else "FAILED"
 
+    grader_type = evaluator_def.grader.get("type", "")
+    # Include the grader-relevant key depending on type
+    # (evaluation_metric for text_similarity, operation for string_check)
+    if grader_type == "string_check":
+        grader_detail_key = "operation"
+    else:
+        grader_detail_key = "evaluation_metric"
+
     details: dict[str, Any] = {
         "openai_eval_id": eval_id,
         "openai_run_id": run_id,
-        "evaluation_metric": evaluator_def.grader.get("evaluation_metric"),
+        grader_detail_key: evaluator_def.grader.get(grader_detail_key),
         "result_counts": {"passed": passed, "failed": failed, "total": total},
     }
     per_criteria = getattr(run, "per_testing_criteria_results", None)
