@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 import click
 
 from . import __version__
+from .api.otlp_grpc import create_otlp_grpc_server, stop_otlp_grpc_server
 
 
 def _relative_time(iso_str: str | None) -> str:
@@ -491,15 +492,14 @@ def _install_shared_exit_handler(
     requests gRPC shutdown alongside the uvicorn servers.
     """
     import signal as _signal
-
+    
     loop = asyncio.get_running_loop()
     shutdown_requested = False
 
     def _request_grpc_shutdown(force: bool) -> None:
         if loop.is_closed():
             return
-        grace = None if force else GRPC_SHUTDOWN_GRACE_SECONDS
-        loop.create_task(grpc_server.stop(grace=grace))
+        loop.create_task(stop_otlp_grpc_server(grpc_server, force=force))
 
     def _shared_exit(sig, frame):
         nonlocal shutdown_requested
@@ -516,10 +516,6 @@ def _install_shared_exit_handler(
 
     for s in uvicorn_servers:
         s.handle_exit = _shared_exit
-
-
-GRPC_SHUTDOWN_GRACE_SECONDS = 5
-
 
 async def _run_servers(
     host: str,
@@ -567,7 +563,6 @@ async def _run_servers(
 
     from .api.app import app as main_app
     from .api.dependencies import require_trace_manager_from_app
-    from .api.otlp_grpc import create_otlp_grpc_server
 
     mgr = require_trace_manager_from_app(main_app)
     otlp_grpc_server = create_otlp_grpc_server(host=host, port=otlp_grpc_port, manager=mgr)
@@ -583,7 +578,7 @@ async def _run_servers(
     finally:
         # The shared exit handler only requests gRPC shutdown on SIGINT/SIGTERM.
         # We still await a final stop here so non-signal exits also clean up.
-        await otlp_grpc_server.stop(grace=GRPC_SHUTDOWN_GRACE_SECONDS)
+        await stop_otlp_grpc_server(otlp_grpc_server)
 
 
 @main.command("serve")

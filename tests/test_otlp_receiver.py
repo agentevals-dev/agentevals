@@ -9,7 +9,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from agentevals.api.otlp_grpc import OtlpLogsService, OtlpTraceService, create_otlp_grpc_server
+from agentevals.api.otlp_grpc import (
+    GRPC_SHUTDOWN_GRACE_SECONDS,
+    OtlpLogsService,
+    OtlpTraceService,
+    create_otlp_grpc_server,
+)
 from agentevals.api.otlp_processing import (
     _convert_otlp_log_record,
     _extract_agentevals_metadata,
@@ -21,7 +26,7 @@ from agentevals.api.otlp_processing import (
     process_logs,
     process_traces,
 )
-from agentevals.cli import GRPC_SHUTDOWN_GRACE_SECONDS, _install_shared_exit_handler
+from agentevals.cli import _install_shared_exit_handler
 from agentevals.streaming.session import TraceSession
 from agentevals.streaming.ws_server import StreamingTraceManager
 
@@ -1642,7 +1647,7 @@ class TestInstallSharedExitHandler:
 
             assert server_a.force_exit is True
             assert server_b.force_exit is True
-            assert grpc_server.grace_values == [GRPC_SHUTDOWN_GRACE_SECONDS, None]
+            assert grpc_server.grace_values == [GRPC_SHUTDOWN_GRACE_SECONDS, 0]
 
         _run(go())
 

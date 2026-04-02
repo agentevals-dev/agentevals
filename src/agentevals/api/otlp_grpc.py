@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+GRPC_SHUTDOWN_GRACE_SECONDS = 5
 DEFAULT_GRPC_MAX_CONCURRENT_RPCS = 32
 DEFAULT_GRPC_MAX_MESSAGE_BYTES = 8 * 1024 * 1024
 
@@ -91,3 +92,9 @@ def create_otlp_grpc_server(
         max_message_bytes,
     )
     return server
+
+
+async def stop_otlp_grpc_server(server: aio.Server, *, force: bool = False) -> None:
+    """Stop the OTLP gRPC server with graceful or forced semantics."""
+    grace = 0 if force else GRPC_SHUTDOWN_GRACE_SECONDS
+    await server.stop(grace=grace)
