@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_SECONDS = 2
 
+# Schema for graders that compare actual vs expected (e.g. text_similarity).
 _TEXT_PAIR_SCHEMA = {
     "type": "object",
     "properties": {
@@ -30,6 +31,22 @@ _TEXT_PAIR_SCHEMA = {
     },
     "required": ["actual_response", "expected_response"],
 }
+
+# Schema for graders that only need the actual response (e.g. string_check).
+_ACTUAL_ONLY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "actual_response": {"type": "string"},
+    },
+    "required": ["actual_response"],
+}
+
+
+def _get_item_schema(grader_type: str) -> dict[str, Any]:
+    """Return the appropriate item schema for the given grader type."""
+    if grader_type == "string_check":
+        return _ACTUAL_ONLY_SCHEMA
+    return _TEXT_PAIR_SCHEMA
 
 
 def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
@@ -120,13 +137,20 @@ async def evaluate_openai_eval(
             error="OPENAI_API_KEY environment variable is not set.",
         )
 
-    if expected_invocations is None:
+    grader_type = evaluator_def.grader.get("type", "")
+
+    # string_check graders use a static reference from config and don't need
+    # expected_invocations — only text_similarity requires a golden eval set.
+    if grader_type != "string_check" and expected_invocations is None:
         return MetricResult(
             metric_name=evaluator_def.name,
-            error="OpenAI text_similarity grader requires expected invocations (golden eval set).",
+            error=f"OpenAI {grader_type} grader requires expected invocations (golden eval set).",
         )
 
-    items = _build_jsonl_items(actual_invocations, expected_invocations)
+    items = _build_jsonl_items(
+        actual_invocations,
+        expected_invocations if expected_invocations is not None else [],
+    )
     if not items:
         return MetricResult(
             metric_name=evaluator_def.name,
@@ -144,7 +168,7 @@ async def evaluate_openai_eval(
             name=f"agentevals-{evaluator_def.name}",
             data_source_config={
                 "type": "custom",
-                "item_schema": _TEXT_PAIR_SCHEMA,
+                "item_schema": _get_item_schema(grader_type),
                 "include_sample_schema": False,
             },
             testing_criteria=[testing_criteria],
