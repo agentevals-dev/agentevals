@@ -83,22 +83,26 @@ def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
 def _build_jsonl_items(
     actual_invocations: list[Invocation],
     expected_invocations: list[Invocation],
+    grader_type: str = "",
 ) -> list[dict[str, Any]]:
+    """Build JSONL items matching the grader-aware item schema.
+
+    string_check graders use a static reference from config and only need
+    ``actual_response`` in each item.  All other graders (e.g. text_similarity)
+    also require ``expected_response``.
+    """
+    include_expected = grader_type != "string_check"
     items = []
     for i, actual_inv in enumerate(actual_invocations):
         actual_text = _content_to_text(actual_inv.final_response)
-        if i < len(expected_invocations):
-            expected_text = _content_to_text(expected_invocations[i].final_response)
-        else:
-            expected_text = ""
-        items.append(
-            {
-                "item": {
-                    "actual_response": actual_text,
-                    "expected_response": expected_text,
-                }
-            }
-        )
+        item: dict[str, Any] = {"actual_response": actual_text}
+        if include_expected:
+            if i < len(expected_invocations):
+                expected_text = _content_to_text(expected_invocations[i].final_response)
+            else:
+                expected_text = ""
+            item["expected_response"] = expected_text
+        items.append({"item": item})
     return items
 
 
@@ -150,6 +154,7 @@ async def evaluate_openai_eval(
     items = _build_jsonl_items(
         actual_invocations,
         expected_invocations if expected_invocations is not None else [],
+        grader_type=grader_type,
     )
     if not items:
         return MetricResult(

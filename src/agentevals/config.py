@@ -116,7 +116,7 @@ class OpenAIEvalDef(BaseModel):
                 raise ValueError(
                     f"Unknown operation '{operation}'. Valid: {sorted(_VALID_STRING_CHECK_OPERATIONS)}"
                 )
-            if "reference" not in v:
+            if not v.get("reference"):
                 raise ValueError("'reference' is required for string_check grader")
         else:
             raise ValueError(
