@@ -111,6 +111,10 @@ service:
   otlpHttp:
     port: 4318
     containerPort: 4318
+  # -- OTLP gRPC receiver port
+  otlpGrpc:
+    port: 4317
+    containerPort: 4317
   # -- MCP (Streamable HTTP) port
   mcp:
     port: 8080

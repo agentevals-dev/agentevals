@@ -3,13 +3,14 @@
 Run agentevals alongside [kagent](https://github.com/kagent-dev/kagent) on Kubernetes to evaluate AI agent conversations in real time. This example deploys three components:
 
 1. **agentevals** receives OTLP traces over HTTP and serves the evaluation UI
-2. **OTel Collector** bridges the protocol gap: kagent exports traces via gRPC, but agentevals only supports OTLP/HTTP today, so the Collector converts gRPC to HTTP
+2. **OTel Collector** Optional, useful when you want centralized telemetry
+controls.
 3. **kagent** provides Kubernetes-native AI agents with built-in OTel instrumentation (gRPC export only)
 
 ```
-kagent (gRPC :4317) --> OTel Collector --> agentevals (HTTP :4318)
-                                              |
-                                         UI on :8001
+kagent (gRPC :4317) --> OTel Collector( optional ) --> agentevals (gRPC :4317 / HTTP :4318)
+                                                           |
+                                                      UI on :8001
 ```
 
 ## Prerequisites
@@ -33,12 +34,20 @@ This creates a single pod exposing:
 | Port | Purpose |
 |------|---------|
 | 8001 | Web UI and API |
+| 4317 | OTLP gRPC receiver (traces and logs) |
 | 4318 | OTLP HTTP receiver (traces and logs) |
 | 8080 | MCP (Streamable HTTP) |
 
-### 2. OTel Collector (gRPC to HTTP bridge)
+### 2. OTel Collector (optional)
 
-kagent exports traces over gRPC (port 4317), but agentevals accepts OTLP over HTTP (port 4318). The OTel Collector bridges the two protocols.
+Native gRPC ingestion in agentevals is sufficient for most setups, but an
+intermediate collector is still useful when you want centralized telemetry
+controls:
+
+- traffic shaping (batching, retries, backpressure)
+- filtering or redaction before data reaches agentevals
+- routing/fan-out to additional backends
+- protocol translation for mixed clients
 
 ```bash
 helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
@@ -51,15 +60,15 @@ helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
   --set image.repository=otel/opentelemetry-collector \
   --set ports.otlp.enabled=true \
   --set ports.otlp-http.enabled=false \
-  --set config.exporters.otlphttp.endpoint="http://agentevals.default.svc.cluster.local:4318" \
-  --set config.exporters.otlphttp.compression="none" \
+  --set config.exporters.otlp.endpoint="agentevals.default.svc.cluster.local:4317" \
+  --set config.exporters.otlp.compression="gzip" \
   --set config.service.pipelines.traces.receivers[0]=otlp \
-  --set config.service.pipelines.traces.exporters[0]=otlphttp \
+  --set config.service.pipelines.traces.exporters[0]=otlp \
   --set config.service.pipelines.logs.receivers[0]=otlp \
-  --set config.service.pipelines.logs.exporters[0]=otlphttp
+  --set config.service.pipelines.logs.exporters[0]=otlp
 ```
 
-> **Note:** If you deployed agentevals in a namespace other than `default`, update the `endpoint` value accordingly: `http://agentevals.<namespace>.svc.cluster.local:4318`.
+> **Note:** If you deployed agentevals in a namespace other than `default`, update the `endpoint` value accordingly: `http://agentevals.<namespace>.svc.cluster.local:4317`.
 
 ### 3. kagent
 
@@ -88,6 +97,8 @@ helm upgrade --install kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent \
 ```
 
 This installs kagent with only the default Helm agent (`helm-agent`) and the K8s troubleshooter enabled, and points its OTel exporter at the Collector.
+
+> **Note:** If you are not running an OTel Collector, point `otel.tracing.exporter.otlp.endpoint` directly to the agentevals OTLP gRPC endpoint instead: `agentevals.default.svc.cluster.local:4317`.
 
 ### Verify the deployment
 

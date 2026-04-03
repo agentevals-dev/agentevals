@@ -14,7 +14,14 @@ export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent,agentevals.eva
 python your_agent.py
 ```
 
-The OTLP receiver runs on port 4318 (standard OTLP HTTP port) and accepts both `http/protobuf` and `http/json`. Sessions are auto-created from incoming traces and grouped by `agentevals.session_name`.
+For OTLP/gRPC exporters, use:
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
+export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+```
+
+agentevals accepts OTLP/HTTP on port 4318 (`http/protobuf` and `http/json`) and OTLP/gRPC on port 4317. Sessions are auto-created from incoming traces and grouped by `agentevals.session_name`.
 
 | Example | Framework | LLM Provider |
 |---------|-----------|-------------|
@@ -108,7 +115,7 @@ The zero-code and SDK examples implement the same toy agent (dice rolling + prim
 
 | Example | Description |
 |---------|-------------|
-| [kubernetes/](./kubernetes/) | Deploy agentevals with kagent on Kubernetes, using an OTel Collector as a gRPC to HTTP bridge. Includes a walkthrough for comparing two kagent agents (different models) and evaluating them with tool trajectory and response match scores. |
+| [kubernetes/](./kubernetes/) | Deploy agentevals with kagent on Kubernetes using native OTLP gRPC ingestion (or optionally an OTel Collector). Includes a walkthrough for comparing two kagent agents (different models) and evaluating them with tool trajectory and response match scores. |
 
 ## Advanced: GenAI Semantic Convention Patterns
 

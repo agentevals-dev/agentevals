@@ -80,11 +80,18 @@ If you maintain an OTel-instrumented agent framework and want to align with the 
 
 ## OTLP Receiver
 
-agentevals runs an OTLP HTTP receiver on port 4318 (the standard OTLP HTTP port) that accepts:
+agentevals runs:
+
+- OTLP HTTP receiver on port 4318 (standard OTLP HTTP port)
+- OTLP gRPC receiver on port 4317 (standard OTLP gRPC port).
+
+OTLP HTTP accepts:
 
 | Endpoint | Content Types |
 |----------|--------------|
 | `/v1/traces` | `application/json`, `application/x-protobuf` |
 | `/v1/logs` | `application/json`, `application/x-protobuf` |
 
-Point your standard OTel exporters at `http://localhost:4318` and traces will stream into agentevals automatically. See [examples/README.md](../examples/README.md) for zero-code setup instructions.
+Point OTLP/HTTP exporters at `http://localhost:4318`.
+Point OTLP/gRPC exporters at `localhost:4317` with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`.
+Traces and logs stream into agentevals automatically. See [examples/README.md](../examples/README.md) for zero-code setup instructions.

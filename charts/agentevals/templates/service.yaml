@@ -16,6 +16,10 @@ spec:
       port: {{ .Values.service.otlpHttp.port }}
       targetPort: otlp-http
       protocol: TCP
+    - name: otlp-grpc
+      port: {{ .Values.service.otlpGrpc.port }}
+      targetPort: otlp-grpc
+      protocol: TCP
     - name: mcp
       port: {{ .Values.service.mcp.port }}
       targetPort: mcp

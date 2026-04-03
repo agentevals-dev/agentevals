@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 import click
 
 from . import __version__
+from .api.otlp_grpc import create_otlp_grpc_server, stop_otlp_grpc_server
 
 
 def _relative_time(iso_str: str | None) -> str:
@@ -488,38 +489,56 @@ def evaluator_config(name: str, evaluator_path: str | None, threshold: float | N
     click.echo(rendered)
 
 
-def _link_server_shutdown(*servers) -> None:
-    """Link multiple uvicorn servers so a single SIGINT shuts down all of them.
+def _install_shared_exit_handler(
+    *uvicorn_servers,
+    grpc_server,
+) -> None:
+    """Install one exit handler that coordinates uvicorn and gRPC shutdown.
 
     Uvicorn installs per-server signal handlers; the last server's handler
     overwrites earlier ones.  This replaces handle_exit on every server with
-    a shared callback that sets should_exit / force_exit on all of them.
+    a shared callback that sets should_exit / force_exit on all of them and
+    requests gRPC shutdown alongside the uvicorn servers.
     """
     import signal as _signal
 
+    loop = asyncio.get_running_loop()
+    shutdown_requested = False
+
+    def _request_grpc_shutdown(force: bool) -> None:
+        if loop.is_closed():
+            return
+        loop.create_task(stop_otlp_grpc_server(grpc_server, force=force))
+
     def _shared_exit(sig, frame):
-        force = all(s.should_exit for s in servers)
-        for s in servers:
-            if force and sig == _signal.SIGINT:
+        nonlocal shutdown_requested
+        force = shutdown_requested and sig == _signal.SIGINT
+        shutdown_requested = True
+
+        for s in uvicorn_servers:
+            if force:
                 s.force_exit = True
             else:
                 s.should_exit = True
 
-    for s in servers:
+        _request_grpc_shutdown(force)
+
+    for s in uvicorn_servers:
         s.handle_exit = _shared_exit
 
 
 async def _run_servers(
     host: str,
     port: int,
-    otlp_port: int,
+    otlp_http_port: int,
+    otlp_grpc_port: int,
     *,
     mcp_port: int | None = None,
     reload: bool = False,
     reload_dirs: list[str] | None = None,
     log_level: str = "warning",
 ) -> None:
-    """Start the main API, OTLP HTTP server, and optionally MCP (Streamable HTTP)."""
+    """Start API, OTLP HTTP+gRPC receivers, and optional MCP (Streamable HTTP)."""
     import uvicorn
 
     shared_kwargs: dict = {
@@ -530,9 +549,13 @@ async def _run_servers(
     if reload_dirs:
         shared_kwargs["reload_dirs"] = reload_dirs
 
+    # TODO #99 Create the manager and pass it into the Server constructors instead of injecting it into the app state.
+
     main_server = uvicorn.Server(uvicorn.Config("agentevals.api.app:app", port=port, **shared_kwargs))
-    otlp_server = uvicorn.Server(uvicorn.Config("agentevals.api.otlp_app:otlp_app", port=otlp_port, **shared_kwargs))
-    servers: list = [main_server, otlp_server]
+    otlp_http_server = uvicorn.Server(
+        uvicorn.Config("agentevals.api.otlp_app:otlp_app", port=otlp_http_port, **shared_kwargs)
+    )
+    uvicorn_servers: list = [main_server, otlp_http_server]
 
     if mcp_port is not None:
         from .mcp_server import create_server as create_mcp_server
@@ -546,10 +569,26 @@ async def _run_servers(
         mcp_app = mcp_instance.streamable_http_app()
         mcp_kwargs = {**shared_kwargs, "reload": False, "port": mcp_port}
         mcp_uvicorn = uvicorn.Server(uvicorn.Config(mcp_app, **mcp_kwargs))
-        servers.append(mcp_uvicorn)
+        uvicorn_servers.append(mcp_uvicorn)
 
-    _link_server_shutdown(*servers)
-    await asyncio.gather(*(s.serve() for s in servers))
+    from .api.app import app as main_app
+    from .api.dependencies import require_trace_manager_from_app
+
+    mgr = require_trace_manager_from_app(main_app)
+    otlp_grpc_server = create_otlp_grpc_server(host=host, port=otlp_grpc_port, manager=mgr)
+    await otlp_grpc_server.start()
+
+    _install_shared_exit_handler(
+        *uvicorn_servers,
+        grpc_server=otlp_grpc_server,
+    )
+
+    try:
+        await asyncio.gather(*(s.serve() for s in uvicorn_servers))
+    finally:
+        # The shared exit handler only requests gRPC shutdown on SIGINT/SIGTERM.
+        # We still await a final stop here so non-signal exits also clean up.
+        await stop_otlp_grpc_server(otlp_grpc_server)
 
 
 @main.command("serve")
@@ -570,9 +609,16 @@ async def _run_servers(
     help="Port to bind the server to.",
 )
 @click.option(
-    "--otlp-port",
+    "--otlp-http-port",
+    type=click.IntRange(min=1),
     default=4318,
     help="Port for OTLP HTTP receiver (default: 4318, standard OTLP HTTP port).",
+)
+@click.option(
+    "--otlp-grpc-port",
+    type=click.IntRange(min=1),
+    default=4317,
+    help="Port for OTLP gRPC receiver (default: 4317, standard OTLP gRPC port).",
 )
 @click.option(
     "--mcp-port",
@@ -601,7 +647,8 @@ def serve(
     dev: bool,
     host: str,
     port: int,
-    otlp_port: int,
+    otlp_http_port: int,
+    otlp_grpc_port: int,
     mcp_port: int | None,
     eval_sets: str | None,
     headless: bool,
@@ -640,7 +687,8 @@ def serve(
 
     if dev:
         click.echo("agentevals dev server starting...")
-        click.echo(f"  OTLP HTTP: http://{host}:{otlp_port}  (OTEL_EXPORTER_OTLP_ENDPOINT default)")
+        click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}  (OTEL_EXPORTER_OTLP_ENDPOINT default)")
+        click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}  (OTEL_EXPORTER_OTLP_PROTOCOL=grpc)")
         click.echo(f"  WebSocket: ws://{host}:{port}/ws/traces")
         click.echo(f"  API:       http://{host}:{port}/api")
         if mcp_port is not None:
@@ -661,7 +709,8 @@ def serve(
             _run_servers(
                 host,
                 port,
-                otlp_port,
+                otlp_http_port,
+                otlp_grpc_port,
                 mcp_port=mcp_port,
                 reload=True,
                 reload_dirs=reload_dirs,
@@ -670,20 +719,22 @@ def serve(
         )
     elif has_ui and not headless:
         click.echo(f"agentevals: http://{host}:{port}")
-        click.echo(f"  OTLP HTTP: http://{host}:{otlp_port}")
+        click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}")
+        click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}")
         if mcp_port is not None:
             click.echo(f"  MCP (Streamable HTTP): http://{host}:{mcp_port}/mcp")
         click.echo()
 
-        asyncio.run(_run_servers(host, port, otlp_port, mcp_port=mcp_port))
+        asyncio.run(_run_servers(host, port, otlp_http_port, otlp_grpc_port, mcp_port=mcp_port))
     else:
         click.echo(f"agentevals API:  http://{host}:{port}/api")
-        click.echo(f"  OTLP HTTP: http://{host}:{otlp_port}")
+        click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}")
+        click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}")
         if mcp_port is not None:
             click.echo(f"  MCP (Streamable HTTP): http://{host}:{mcp_port}/mcp")
         click.echo()
 
-        asyncio.run(_run_servers(host, port, otlp_port, mcp_port=mcp_port))
+        asyncio.run(_run_servers(host, port, otlp_http_port, otlp_grpc_port, mcp_port=mcp_port))
 
 
 @main.command("mcp")

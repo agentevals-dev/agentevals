@@ -41,7 +41,7 @@ _skip_no_google = pytest.mark.skipif(
 
 def _run_agent(
     script: str,
-    otlp_port: int,
+    otlp_http_port: int,
     session_name: str,
     eval_set_id: str = "e2e-test",
     extra_env: dict | None = None,
@@ -50,7 +50,7 @@ def _run_agent(
     """Run an example agent script as a subprocess."""
     env = {
         **os.environ,
-        "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{otlp_port}",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{otlp_http_port}",
         "OTEL_RESOURCE_ATTRIBUTES": (f"agentevals.eval_set_id={eval_set_id},agentevals.session_name={session_name}"),
         **(extra_env or {}),
     }
@@ -69,12 +69,12 @@ class TestLangchainZeroCode:
     """Run the LangChain zero-code OTLP example and verify session grouping."""
 
     def test_session_created_with_spans_and_logs(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-langchain"
 
         result = _run_agent(
             "examples/zero-code-examples/langchain/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result.returncode == 0, f"Agent failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -88,12 +88,12 @@ class TestLangchainZeroCode:
         assert len(session.logs) > 0, "LangChain uses logs for message content"
 
     def test_invocations_extracted_with_content(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-langchain-inv"
 
         result = _run_agent(
             "examples/zero-code-examples/langchain/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result.returncode == 0, f"Agent failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -107,12 +107,12 @@ class TestLangchainZeroCode:
             assert has_content, f"Invocation {inv.get('invocationId', '?')} has no content"
 
     def test_session_visible_via_api(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-langchain-api"
 
         result = _run_agent(
             "examples/zero-code-examples/langchain/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result.returncode == 0
@@ -130,12 +130,12 @@ class TestStrandsZeroCode:
     """Run the Strands zero-code OTLP example and verify session grouping."""
 
     def test_session_created_spans_only(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-strands"
 
         result = _run_agent(
             "examples/zero-code-examples/strands/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
             extra_env={
                 "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
@@ -151,12 +151,12 @@ class TestStrandsZeroCode:
         assert len(session.spans) > 0, "Expected spans from LLM calls"
 
     def test_invocations_extracted(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-strands-inv"
 
         result = _run_agent(
             "examples/zero-code-examples/strands/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
             extra_env={
                 "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
@@ -170,12 +170,12 @@ class TestStrandsZeroCode:
         assert len(session.invocations) > 0, "Expected extracted invocations"
 
     def test_session_visible_via_api(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-strands-api"
 
         result = _run_agent(
             "examples/zero-code-examples/strands/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
             extra_env={
                 "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
@@ -196,12 +196,12 @@ class TestAdkZeroCode:
     """Run the ADK zero-code OTLP example and verify session grouping."""
 
     def test_session_created_spans_only(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-adk"
 
         result = _run_agent(
             "examples/zero-code-examples/adk/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result.returncode == 0, f"Agent failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -214,12 +214,12 @@ class TestAdkZeroCode:
         assert len(session.spans) > 0, "Expected spans from ADK agent"
 
     def test_invocations_extracted(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-adk-inv"
 
         result = _run_agent(
             "examples/zero-code-examples/adk/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result.returncode == 0, f"Agent failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -230,12 +230,12 @@ class TestAdkZeroCode:
         assert len(session.invocations) > 0, "Expected extracted invocations"
 
     def test_session_visible_via_api(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-adk-api"
 
         result = _run_agent(
             "examples/zero-code-examples/adk/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result.returncode == 0
@@ -253,12 +253,12 @@ class TestOpenAIAgentsZeroCode:
     """Run the OpenAI Agents SDK zero-code OTLP example and verify session grouping."""
 
     def test_session_created_with_spans(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-openai-agents"
 
         result = _run_agent(
             "examples/zero-code-examples/openai-agents/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result.returncode == 0, f"Agent failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -271,12 +271,12 @@ class TestOpenAIAgentsZeroCode:
         assert len(session.spans) > 0, "Expected spans from LLM calls"
 
     def test_invocations_extracted(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-openai-agents-inv"
 
         result = _run_agent(
             "examples/zero-code-examples/openai-agents/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result.returncode == 0, f"Agent failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -287,12 +287,12 @@ class TestOpenAIAgentsZeroCode:
         assert len(session.invocations) > 0, "Expected extracted invocations"
 
     def test_session_visible_via_api(self, live_servers):
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-openai-agents-api"
 
         result = _run_agent(
             "examples/zero-code-examples/openai-agents/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result.returncode == 0
@@ -317,7 +317,7 @@ class TestAgentRerun:
     def test_strands_rerun_creates_separate_sessions(self, live_servers):
         """Run the Strands agent twice with the same session_name.
         Each run must produce its own session."""
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-strands-rerun"
         strands_env = {
             "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
@@ -325,7 +325,7 @@ class TestAgentRerun:
 
         result1 = _run_agent(
             "examples/zero-code-examples/strands/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
             extra_env=strands_env,
         )
@@ -334,7 +334,7 @@ class TestAgentRerun:
 
         result2 = _run_agent(
             "examples/zero-code-examples/strands/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
             extra_env=strands_env,
         )
@@ -352,12 +352,12 @@ class TestAgentRerun:
     def test_langchain_rerun_creates_separate_sessions(self, live_servers):
         """Run the LangChain agent twice with the same session_name.
         Each run must produce its own session."""
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-langchain-rerun"
 
         result1 = _run_agent(
             "examples/zero-code-examples/langchain/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result1.returncode == 0, f"Run 1 failed:\n{result1.stderr}"
@@ -365,7 +365,7 @@ class TestAgentRerun:
 
         result2 = _run_agent(
             "examples/zero-code-examples/langchain/run.py",
-            otlp_port,
+            otlp_http_port,
             session_name,
         )
         assert result2.returncode == 0, f"Run 2 failed:\n{result2.stderr}"
@@ -381,7 +381,7 @@ class TestAgentRerun:
 
     def test_rerun_sessions_visible_via_api(self, live_servers):
         """Both rerun sessions are visible in the API response."""
-        main_port, otlp_port, mgr = live_servers
+        main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-strands-rerun-api"
         strands_env = {
             "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
@@ -390,7 +390,7 @@ class TestAgentRerun:
         for run_idx in range(2):
             result = _run_agent(
                 "examples/zero-code-examples/strands/run.py",
-                otlp_port,
+                otlp_http_port,
                 session_name,
                 extra_env=strands_env,
             )

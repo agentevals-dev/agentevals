@@ -140,7 +140,14 @@ export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent"
 python your_agent.py
 ```
 
-Traces stream to the UI in real-time. Works with LangChain, Strands, Google ADK, OpenAI Agents SDK, or any framework that emits OTel spans (`http/protobuf` and `http/json` supported). Sessions are auto-created and grouped by `agentevals.session_name`. Set `agentevals.eval_set_id` to associate traces with an eval set.
+For OTLP/gRPC exporters, use:
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
+export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+```
+
+Traces stream to the UI in real-time. Works with LangChain, Strands, Google ADK, OpenAI Agents SDK, or any framework that emits OTel spans (`http/protobuf`, `http/json`, and OTLP/gRPC supported). Sessions are auto-created and grouped by `agentevals.session_name`. Set `agentevals.eval_set_id` to associate traces with an eval set.
 
 See [examples/zero-code-examples/](examples/zero-code-examples/) for working examples.
 

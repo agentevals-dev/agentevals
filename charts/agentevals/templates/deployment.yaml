@@ -79,6 +79,9 @@ spec:
             - name: otlp-http
               containerPort: {{ .Values.service.otlpHttp.containerPort }}
               protocol: TCP
+            - name: otlp-grpc
+              containerPort: {{ .Values.service.otlpGrpc.containerPort }}
+              protocol: TCP
             - name: mcp
               containerPort: {{ .Values.service.mcp.containerPort }}
               protocol: TCP

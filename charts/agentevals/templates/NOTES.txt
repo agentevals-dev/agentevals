@@ -1,8 +1,9 @@
 1. UI and API are available at port {{ .Values.service.http.port }} (Service port name: http).
 2. OTLP HTTP receiver: port {{ .Values.service.otlpHttp.port }} (OTEL_EXPORTER_OTLP_ENDPOINT=http://<service>:{{ .Values.service.otlpHttp.port }}).
-3. MCP (Streamable HTTP): port {{ .Values.service.mcp.port }}, path /mcp (e.g. http://<service>:{{ .Values.service.mcp.port }}/mcp).
+3. OTLP gRPC receiver: port {{ .Values.service.otlpGrpc.port }} (OTEL_EXPORTER_OTLP_ENDPOINT=<service>:{{ .Values.service.otlpGrpc.port }}, OTEL_EXPORTER_OTLP_PROTOCOL=grpc).
+4. MCP (Streamable HTTP): port {{ .Values.service.mcp.port }}, path /mcp (e.g. http://<service>:{{ .Values.service.mcp.port }}/mcp).
 {{- if .Values.ephemeralVolume.enabled }}
-4. An emptyDir is mounted at /tmp with HOME=/tmp/agentevals-home (ephemeral; lost on pod restart). Set ephemeralVolume.enabled=false and readOnlyRootFilesystem=false if you need a writable root without this mount.
+5. An emptyDir is mounted at /tmp with HOME=/tmp/agentevals-home (ephemeral; lost on pod restart). Set ephemeralVolume.enabled=false and readOnlyRootFilesystem=false if you need a writable root without this mount.
 {{- end }}
 
 Get the Service URL:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, Request
 
@@ -15,9 +15,22 @@ def get_trace_manager(request: Request) -> StreamingTraceManager | None:
     return getattr(request.app.state, "trace_manager", None)
 
 
+def get_trace_manager_from_app(app: Any) -> StreamingTraceManager | None:
+    """Return the StreamingTraceManager from an app object or None."""
+    return getattr(app.state, "trace_manager", None)
+
+
 def require_trace_manager(request: Request) -> StreamingTraceManager:
     """Return the StreamingTraceManager, raising 503 if live mode is off."""
-    mgr = getattr(request.app.state, "trace_manager", None)
+    mgr = get_trace_manager_from_app(request.app)
     if mgr is None:
         raise HTTPException(status_code=503, detail="Live mode not enabled")
+    return mgr
+
+
+def require_trace_manager_from_app(app: Any) -> StreamingTraceManager:
+    """Return the StreamingTraceManager from app, raising RuntimeError if missing."""
+    mgr = get_trace_manager_from_app(app)
+    if mgr is None:
+        raise RuntimeError("Live mode not enabled")
     return mgr

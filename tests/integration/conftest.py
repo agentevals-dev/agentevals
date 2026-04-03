@@ -39,9 +39,9 @@ async def trace_manager():
 @pytest.fixture
 async def otlp_client(trace_manager):
     """httpx client → OTLP app via ASGI transport (no real server)."""
-    from agentevals.api.otlp_routes import otlp_router
-
     from fastapi import FastAPI
+
+    from agentevals.api.otlp_routes import otlp_router
 
     test_app = FastAPI()
     test_app.state.trace_manager = trace_manager
@@ -55,9 +55,9 @@ async def otlp_client(trace_manager):
 @pytest.fixture
 async def api_client(trace_manager):
     """httpx client → main app streaming routes via ASGI transport."""
-    from agentevals.api.streaming_routes import streaming_router
-
     from fastapi import FastAPI
+
+    from agentevals.api.streaming_routes import streaming_router
 
     test_app = FastAPI()
     test_app.state.trace_manager = trace_manager
@@ -83,7 +83,7 @@ def _find_free_port() -> int:
 def live_servers():
     """Start real uvicorn on ephemeral ports in a background thread.
 
-    Returns (main_port, otlp_port, trace_manager).
+    Returns (main_port, otlp_http_port, trace_manager).
 
     Servers run in their own event loop on a daemon thread so they can
     process HTTP requests independently of the test's event loop.
@@ -92,7 +92,7 @@ def live_servers():
     import time
 
     main_port = _find_free_port()
-    otlp_port = _find_free_port()
+    otlp_http_port = _find_free_port()
 
     saved_env = {
         "AGENTEVALS_LIVE": os.environ.get("AGENTEVALS_LIVE"),
@@ -115,7 +115,7 @@ def live_servers():
         otlp_app.state.trace_manager = mgr
 
     main_config = uvicorn.Config(app, host="127.0.0.1", port=main_port, log_level="warning")
-    otlp_config = uvicorn.Config(otlp_app, host="127.0.0.1", port=otlp_port, log_level="warning")
+    otlp_config = uvicorn.Config(otlp_app, host="127.0.0.1", port=otlp_http_port, log_level="warning")
     main_server = uvicorn.Server(main_config)
     otlp_server = uvicorn.Server(otlp_config)
 
@@ -133,7 +133,7 @@ def live_servers():
 
     import httpx as _httpx
 
-    for port in (main_port, otlp_port):
+    for port in (main_port, otlp_http_port):
         reachable = False
         for _ in range(50):
             try:
@@ -145,7 +145,7 @@ def live_servers():
         if not reachable:
             raise RuntimeError(f"Server on port {port} did not become reachable")
 
-    yield main_port, otlp_port, mgr
+    yield main_port, otlp_http_port, mgr
 
     main_server.should_exit = True
     otlp_server.should_exit = True
