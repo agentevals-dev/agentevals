@@ -1,25 +1,27 @@
 """Minimal FastAPI app for the OTLP HTTP receiver on port 4318.
 
-Shares the StreamingTraceManager with the main app (port 8001).
 Mounts only the /v1/traces and /v1/logs endpoints.
 """
 
-from contextlib import asynccontextmanager
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
 from .otlp_routes import otlp_router
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    from .app import app as main_app
-
-    mgr = getattr(main_app.state, "trace_manager", None)
-    if mgr:
-        app.state.trace_manager = mgr
-    yield
+if TYPE_CHECKING:
+    from ..streaming.ws_server import StreamingTraceManager
 
 
-otlp_app = FastAPI(title="agentevals OTLP receiver", lifespan=lifespan)
-otlp_app.include_router(otlp_router)
+def create_otlp_app(*, trace_manager: StreamingTraceManager | None = None) -> FastAPI:
+    """Create the OTLP HTTP receiver app."""
+    app = FastAPI(title="agentevals OTLP receiver")
+    if trace_manager is not None:
+        app.state.trace_manager = trace_manager
+    app.include_router(otlp_router)
+    return app
+
+
+otlp_app = create_otlp_app()

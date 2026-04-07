@@ -534,27 +534,26 @@ async def _run_servers(
     otlp_grpc_port: int,
     *,
     mcp_port: int | None = None,
-    reload: bool = False,
-    reload_dirs: list[str] | None = None,
     log_level: str = "warning",
 ) -> None:
     """Start API, OTLP HTTP+gRPC receivers, and optional MCP (Streamable HTTP)."""
     import uvicorn
 
+    from .api.app import create_app
+    from .api.otlp_app import create_otlp_app
+    from .streaming.ws_server import StreamingTraceManager
+
     shared_kwargs: dict = {
         "host": host,
-        "reload": reload,
         "log_level": log_level,
     }
-    if reload_dirs:
-        shared_kwargs["reload_dirs"] = reload_dirs
 
-    # TODO #99 Create the manager and pass it into the Server constructors instead of injecting it into the app state.
+    mgr = StreamingTraceManager()
+    main_app = create_app(trace_manager=mgr, enable_streaming=True)
+    otlp_app = create_otlp_app(trace_manager=mgr)
 
-    main_server = uvicorn.Server(uvicorn.Config("agentevals.api.app:app", port=port, **shared_kwargs))
-    otlp_http_server = uvicorn.Server(
-        uvicorn.Config("agentevals.api.otlp_app:otlp_app", port=otlp_http_port, **shared_kwargs)
-    )
+    main_server = uvicorn.Server(uvicorn.Config(main_app, port=port, **shared_kwargs))
+    otlp_http_server = uvicorn.Server(uvicorn.Config(otlp_app, port=otlp_http_port, **shared_kwargs))
     uvicorn_servers: list = [main_server, otlp_http_server]
 
     if mcp_port is not None:
@@ -571,10 +570,6 @@ async def _run_servers(
         mcp_uvicorn = uvicorn.Server(uvicorn.Config(mcp_app, **mcp_kwargs))
         uvicorn_servers.append(mcp_uvicorn)
 
-    from .api.app import app as main_app
-    from .api.dependencies import require_trace_manager_from_app
-
-    mgr = require_trace_manager_from_app(main_app)
     otlp_grpc_server = create_otlp_grpc_server(host=host, port=otlp_grpc_port, manager=mgr)
     await otlp_grpc_server.start()
 
@@ -703,8 +698,6 @@ def serve(
         click.echo("Waiting for agent connections...")
         click.echo()
 
-        src_path = Path(__file__).parent.parent
-        reload_dirs = [str(src_path)]
         asyncio.run(
             _run_servers(
                 host,
@@ -712,8 +705,6 @@ def serve(
                 otlp_http_port,
                 otlp_grpc_port,
                 mcp_port=mcp_port,
-                reload=True,
-                reload_dirs=reload_dirs,
                 log_level="info",
             )
         )

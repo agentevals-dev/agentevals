@@ -26,11 +26,3 @@ def require_trace_manager(request: Request) -> StreamingTraceManager:
     if mgr is None:
         raise HTTPException(status_code=503, detail="Live mode not enabled")
     return mgr
-
-
-def require_trace_manager_from_app(app: Any) -> StreamingTraceManager:
-    """Return the StreamingTraceManager from app, raising RuntimeError if missing."""
-    mgr = get_trace_manager_from_app(app)
-    if mgr is None:
-        raise RuntimeError("Live mode not enabled")
-    return mgr

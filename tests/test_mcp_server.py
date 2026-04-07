@@ -19,7 +19,6 @@ from agentevals.mcp_server import (
 )
 from agentevals.runner import MetricResult, RunResult, TraceResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

@@ -101,18 +101,12 @@ def live_servers():
     os.environ["AGENTEVALS_LIVE"] = "1"
     os.environ["AGENTEVALS_HEADLESS"] = "1"
 
-    import importlib
+    from agentevals.api.app import create_app
+    from agentevals.api.otlp_app import create_otlp_app
 
-    from agentevals.api import app as app_module
-
-    importlib.reload(app_module)
-
-    from agentevals.api.app import app
-    from agentevals.api.otlp_app import otlp_app
-
-    mgr = getattr(app.state, "trace_manager", None)
-    if mgr:
-        otlp_app.state.trace_manager = mgr
+    mgr = StreamingTraceManager()
+    app = create_app(trace_manager=mgr, enable_streaming=True)
+    otlp_app = create_otlp_app(trace_manager=mgr)
 
     main_config = uvicorn.Config(app, host="127.0.0.1", port=main_port, log_level="warning")
     otlp_config = uvicorn.Config(otlp_app, host="127.0.0.1", port=otlp_http_port, log_level="warning")
