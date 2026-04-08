@@ -69,14 +69,15 @@
           agentevals-cli = pythonSet."agentevals-cli";
         };
 
-        apps.default = {
-          type = "app";
-          program = "${venv}/bin/agentevals";
+        apps.default = flake-utils.lib.mkApp {
+          drv = venv;
+          name = "agentevals";
         };
 
         formatter = pkgs.nixfmt-rfc-style;
 
         devShells.default = pkgs.mkShell {
+          inputsFrom = [ venv ];
           packages = [
             # Base
             pkgs.envsubst
@@ -84,7 +85,6 @@
 
             # Python
             pkgs.uv
-            venv
             pkgs.poetry
 
             # NodeJS
