@@ -1,0 +1,9 @@
+llama-index-core>=0.12.0
+llama-index-llms-openai>=0.3.0
+llama-index-agent-openai>=0.4.0
+
+openinference-instrumentation-llama-index>=3.0.0
+
+opentelemetry-sdk>=1.36.0
+opentelemetry-exporter-otlp-proto-http>=1.36.0
+python-dotenv>=1.0.0
