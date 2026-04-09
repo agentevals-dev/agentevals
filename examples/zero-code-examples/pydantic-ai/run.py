@@ -4,8 +4,9 @@ Demonstrates zero-code integration: any OTel-instrumented agent streams
 traces to agentevals by pointing the OTLP exporter at the receiver.
 
 Pydantic AI uses logfire for instrumentation. Configuring logfire with
-send_to_logfire=False and a custom OTLP exporter lets us forward all
-spans to any standard OTLP receiver, including agentevals.
+send_to_logfire=False while OTEL_EXPORTER_OTLP_ENDPOINT is set lets
+logfire forward all spans to any standard OTLP receiver, including
+agentevals, without any manual TracerProvider setup.
 
 Prerequisites:
     1. pip install -r requirements.txt
@@ -22,11 +23,8 @@ import random
 
 import logfire
 from dotenv import load_dotenv
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.openai import OpenAIModel
+from opentelemetry import trace
+from pydantic_ai import Agent
 
 load_dotenv(override=True)
 
@@ -66,15 +64,7 @@ async def main():
         "agentevals.eval_set_id=pydantic_ai_eval,agentevals.session_name=pydantic-ai-zero-code",
     )
 
-    resource = Resource.create()
-    exporter = OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")
-    processor = BatchSpanProcessor(exporter, schedule_delay_millis=1000)
-
-    logfire.configure(
-        send_to_logfire=False,
-        additional_span_processors=[processor],
-        resource_attributes=resource.attributes,
-    )
+    logfire.configure(send_to_logfire=False)
     logfire.instrument_pydantic_ai()
 
     test_queries = [
@@ -84,14 +74,18 @@ async def main():
     ]
 
     history = []
-    for i, query in enumerate(test_queries, 1):
-        print(f"\n[{i}/{len(test_queries)}] User: {query}")
-        result = await agent.run(query, message_history=history)
-        history = result.all_messages()
-        print(f"     Agent: {result.output}")
-
-    print()
-    print("All traces flushed to OTLP receiver.")
+    try:
+        for i, query in enumerate(test_queries, 1):
+            print(f"\n[{i}/{len(test_queries)}] User: {query}")
+            result = await agent.run(query, message_history=history)
+            history = result.all_messages()
+            print(f"     Agent: {result.output}")
+    finally:
+        print()
+        tracer_provider = trace.get_tracer_provider()
+        if hasattr(tracer_provider, "force_flush"):
+            tracer_provider.force_flush()
+        print("All traces flushed to OTLP receiver.")
 
 
 if __name__ == "__main__":
