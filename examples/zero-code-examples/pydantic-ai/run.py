@@ -56,8 +56,8 @@ async def main():
         print("OPENAI_API_KEY not set.")
         return
 
-    endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
-    print(f"OTLP endpoint: {endpoint}")
+    os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+    print(f"OTLP endpoint: {os.environ['OTEL_EXPORTER_OTLP_ENDPOINT']}")
 
     os.environ.setdefault(
         "OTEL_RESOURCE_ATTRIBUTES",
