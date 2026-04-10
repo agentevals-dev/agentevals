@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -91,7 +91,6 @@ def create_app(
         if trace_manager is None:
             raise ValueError("enable_streaming requires a trace_manager")
 
-        from fastapi import Request as _Request
         from fastapi import WebSocket
 
         from .streaming_routes import streaming_router
@@ -103,7 +102,7 @@ def create_app(
             await websocket.app.state.trace_manager.handle_connection(websocket)
 
         @app.get("/stream/ui-updates")
-        async def ui_updates_stream(request: _Request):
+        async def ui_updates_stream(request: Request):
             mgr = request.app.state.trace_manager
 
             async def event_generator():
