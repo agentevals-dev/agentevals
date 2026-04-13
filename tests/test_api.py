@@ -1023,3 +1023,51 @@ class TestDebugLoad:
         assert body["data"]["count"] == 1
         assert "sess1" in body["data"]["loadedSessions"]
         _assert_all_keys_camel(body)
+
+
+# ---------------------------------------------------------------------------
+# GET /stream/ui-updates (SSE)
+# ---------------------------------------------------------------------------
+
+
+class TestUIUpdatesSSE:
+    """Regression test for the _Request alias bug.
+
+    With ``from __future__ import annotations`` active, importing
+    ``Request as _Request`` inside the ``enable_streaming`` block caused
+    FastAPI to treat ``request`` as a required query parameter, returning
+    422 on every SSE connection attempt.  The fix moves the import to
+    module level without an alias.
+    """
+
+    def _make_streaming_app(self):
+        import asyncio
+
+        from agentevals.api.app import create_app
+        from agentevals.streaming.ws_server import StreamingTraceManager
+
+        mgr = StreamingTraceManager()
+        # Replace register_sse_client so the queue immediately closes (None sentinel)
+        # so the streaming response can be read synchronously in tests.
+        q: asyncio.Queue = asyncio.Queue()
+        q.put_nowait(None)
+        mgr.register_sse_client = MagicMock(return_value=q)
+        mgr.unregister_sse_client = MagicMock()
+        return create_app(enable_streaming=True, trace_manager=mgr)
+
+    def test_sse_endpoint_returns_200_not_422(self):
+        """GET /stream/ui-updates must return 200, not 422."""
+        app = self._make_streaming_app()
+        client = TestClient(app)
+        resp = client.get("/stream/ui-updates")
+        assert resp.status_code == 200, (
+            f"Expected 200 but got {resp.status_code}. "
+            "A 422 indicates the Request type annotation was not resolved correctly."
+        )
+
+    def test_sse_endpoint_content_type(self):
+        """The response must use the text/event-stream media type."""
+        app = self._make_streaming_app()
+        client = TestClient(app)
+        resp = client.get("/stream/ui-updates")
+        assert resp.headers["content-type"].startswith("text/event-stream")
