@@ -1058,7 +1058,7 @@ class TestUIUpdatesSSE:
     def test_sse_endpoint_returns_200_not_422(self):
         """GET /stream/ui-updates must return 200, not 422."""
         app = self._make_streaming_app()
-        client = TestClient(app, raise_server_exceptions=False)
+        client = TestClient(app)
         resp = client.get("/stream/ui-updates")
         assert resp.status_code == 200, (
             f"Expected 200 but got {resp.status_code}. "
@@ -1068,6 +1068,6 @@ class TestUIUpdatesSSE:
     def test_sse_endpoint_content_type(self):
         """The response must use the text/event-stream media type."""
         app = self._make_streaming_app()
-        client = TestClient(app, raise_server_exceptions=False)
+        client = TestClient(app)
         resp = client.get("/stream/ui-updates")
         assert resp.headers["content-type"].startswith("text/event-stream")

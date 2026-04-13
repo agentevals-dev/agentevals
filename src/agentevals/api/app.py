@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, Request
+from fastapi import WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -90,8 +91,6 @@ def create_app(
     if enable_streaming:
         if trace_manager is None:
             raise ValueError("enable_streaming requires a trace_manager")
-
-        from fastapi import WebSocket
 
         from .streaming_routes import streaming_router
 
