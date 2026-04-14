@@ -23,7 +23,7 @@ from .converter import ConversionResult, convert_traces
 from .loader.base import TraceLoader
 from .loader.jaeger import JaegerJsonLoader
 from .loader.otlp import OtlpJsonLoader
-from .trace_metrics import extract_performance_metrics
+from .trace_metrics import _calc_percentiles, extract_performance_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +164,13 @@ async def run_evaluation(
         await progress_callback("Evaluation complete")
 
     if result.trace_results:
-        all_tokens = {"prompt": [], "output": [], "total": []}
+        all_tokens: dict[str, list[int]] = {"prompt": [], "output": [], "total": []}
+        all_overall_latencies: list[float] = []
+        total_llm_calls = 0
+        total_tool_calls = 0
+        all_models: set[str] = set()
+        total_cache_creation = 0
+        total_cache_read = 0
 
         for tr in result.trace_results:
             if tr.performance_metrics:
@@ -173,7 +179,22 @@ async def run_evaluation(
                 all_tokens["output"].append(perf["tokens"]["total_output"])
                 all_tokens["total"].append(perf["tokens"]["total"])
 
+                overall_lat = perf["latency"]["overall"]
+                if overall_lat.get("count", 0) > 0:
+                    all_overall_latencies.append(overall_lat["median"])
+
+                counts = perf.get("counts", {})
+                total_llm_calls += counts.get("llm_calls", 0)
+                total_tool_calls += counts.get("tool_calls", 0)
+
+                for m in perf.get("models", []):
+                    all_models.add(m)
+
+                total_cache_creation += perf["tokens"].get("cache_creation_tokens", 0)
+                total_cache_read += perf["tokens"].get("cache_read_tokens", 0)
+
         if all_tokens["total"]:
+            trace_count = len(result.trace_results)
             result.performance_metrics = {
                 "tokens": {
                     "total_prompt": sum(all_tokens["prompt"]),
@@ -183,8 +204,23 @@ async def run_evaluation(
                         "prompt": sum(all_tokens["prompt"]) / len(all_tokens["prompt"]),
                         "output": sum(all_tokens["output"]) / len(all_tokens["output"]),
                     },
+                    "cache_creation_tokens": total_cache_creation,
+                    "cache_read_tokens": total_cache_read,
                 },
-                "trace_count": len(result.trace_results),
+                "latency": {
+                    "overall_per_trace": _calc_percentiles(all_overall_latencies),
+                }
+                if all_overall_latencies
+                else {},
+                "counts": {
+                    "traces": trace_count,
+                    "total_llm_calls": total_llm_calls,
+                    "total_tool_calls": total_tool_calls,
+                    "avg_llm_calls_per_trace": total_llm_calls / trace_count,
+                    "avg_tool_calls_per_trace": total_tool_calls / trace_count,
+                },
+                "models": sorted(all_models) if all_models else [],
+                "trace_count": trace_count,
             }
 
     return result

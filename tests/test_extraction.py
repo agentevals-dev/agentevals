@@ -396,8 +396,8 @@ class TestSpanClassifiers:
     def test_is_llm_span_by_model(self):
         assert is_llm_span(_span(tags={OTEL_GENAI_REQUEST_MODEL: "gpt-4"}))
 
-    def test_is_llm_span_by_input_messages(self):
-        assert is_llm_span(_span(tags={OTEL_GENAI_INPUT_MESSAGES: "[]"}))
+    def test_is_llm_span_by_input_messages_alone_is_not_enough(self):
+        assert not is_llm_span(_span(tags={OTEL_GENAI_INPUT_MESSAGES: "[]"}))
 
     def test_is_llm_span_empty(self):
         assert not is_llm_span(_span())

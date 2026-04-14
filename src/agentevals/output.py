@@ -92,36 +92,94 @@ def _format_table(run_result: RunResult) -> str:
             perf = trace_result.performance_metrics
             lines.append("\n  Performance Metrics:")
 
+            models = perf.get("models", [])
+            if models:
+                lines.append(f"    Model: {', '.join(models)}")
+
+            counts = perf.get("counts", {})
+            count_parts = []
+            if counts.get("llm_calls"):
+                count_parts.append(f"{counts['llm_calls']} LLM calls")
+            if counts.get("tool_calls"):
+                count_parts.append(f"{counts['tool_calls']} tool calls")
+            if counts.get("invocations"):
+                count_parts.append(f"{counts['invocations']} invocations")
+            if count_parts:
+                lines.append(f"    Counts: {', '.join(count_parts)}")
+
             lat = perf["latency"]
-            lines.append(
-                f"    Overall Latency: p50={lat['overall']['p50']:.0f}ms, p95={lat['overall']['p95']:.0f}ms, p99={lat['overall']['p99']:.0f}ms"
-            )
-            lines.append(
-                f"    LLM Latency:     p50={lat['llm_calls']['p50']:.0f}ms, p95={lat['llm_calls']['p95']:.0f}ms, p99={lat['llm_calls']['p99']:.0f}ms"
-            )
-            lines.append(
-                f"    Tool Latency:    p50={lat['tool_executions']['p50']:.0f}ms, p95={lat['tool_executions']['p95']:.0f}ms, p99={lat['tool_executions']['p99']:.0f}ms"
-            )
+            if lat["overall"].get("count", 0) > 0:
+                lines.append(
+                    f"    Overall Latency: min={_format_duration(lat['overall']['min'])}"
+                    f", median={_format_duration(lat['overall']['median'])}"
+                    f", max={_format_duration(lat['overall']['max'])}"
+                )
+            if lat["llm_calls"].get("count", 0) > 0:
+                lines.append(
+                    f"    LLM Latency:     min={_format_duration(lat['llm_calls']['min'])}"
+                    f", median={_format_duration(lat['llm_calls']['median'])}"
+                    f", max={_format_duration(lat['llm_calls']['max'])}"
+                )
+            if lat["tool_executions"].get("count", 0) > 0:
+                lines.append(
+                    f"    Tool Latency:    min={_format_duration(lat['tool_executions']['min'])}"
+                    f", median={_format_duration(lat['tool_executions']['median'])}"
+                    f", max={_format_duration(lat['tool_executions']['max'])}"
+                )
 
             tok = perf["tokens"]
-            lines.append(
+            token_line = (
                 f"    Tokens: {tok['total']} total ({tok['total_prompt']} prompt + {tok['total_output']} output)"
             )
-            lines.append(
-                f"    Per LLM Call:    p50={tok['per_llm_call']['p50']:.0f}, p95={tok['per_llm_call']['p95']:.0f}, p99={tok['per_llm_call']['p99']:.0f}"
-            )
+            cache_parts = []
+            if tok.get("cache_read_tokens"):
+                cache_parts.append(f"{tok['cache_read_tokens']} cache read")
+            if tok.get("cache_creation_tokens"):
+                cache_parts.append(f"{tok['cache_creation_tokens']} cache write")
+            if cache_parts:
+                token_line += f" [{', '.join(cache_parts)}]"
+            lines.append(token_line)
 
         lines.append("")
 
     if run_result.performance_metrics:
         lines.append("Overall Performance:")
         perf = run_result.performance_metrics
-        lines.append(
-            f"  Total Tokens: {perf['tokens']['total']} ({perf['tokens']['total_prompt']} prompt + {perf['tokens']['total_output']} output)"
-        )
-        lines.append(
-            f"  Avg per Trace: {perf['tokens']['avg_per_trace']['prompt']:.0f} prompt, {perf['tokens']['avg_per_trace']['output']:.0f} output"
-        )
+
+        counts = perf.get("counts", {})
+        if counts:
+            lines.append(
+                f"  Traces: {counts.get('traces', 0)}"
+                f", LLM Calls: {counts.get('total_llm_calls', 0)}"
+                f", Tool Calls: {counts.get('total_tool_calls', 0)}"
+            )
+
+        models = perf.get("models", [])
+        if models:
+            lines.append(f"  Models: {', '.join(models)}")
+
+        lat = perf.get("latency", {})
+        overall_lat = lat.get("overall_per_trace", {})
+        if overall_lat and overall_lat.get("p50", 0) > 0:
+            lines.append(
+                f"  Latency per Trace: p50={_format_duration(overall_lat['p50'])}"
+                f", p95={_format_duration(overall_lat['p95'])}"
+                f", p99={_format_duration(overall_lat['p99'])}"
+            )
+
+        tok = perf["tokens"]
+        lines.append(f"  Total Tokens: {tok['total']} ({tok['total_prompt']} prompt + {tok['total_output']} output)")
+        avg = tok.get("avg_per_trace", {})
+        if avg:
+            lines.append(f"  Avg per Trace: {avg['prompt']:.0f} prompt, {avg['output']:.0f} output")
+        cache_parts = []
+        if tok.get("cache_read_tokens"):
+            cache_parts.append(f"{tok['cache_read_tokens']} cache read")
+        if tok.get("cache_creation_tokens"):
+            cache_parts.append(f"{tok['cache_creation_tokens']} cache write")
+        if cache_parts:
+            lines.append(f"  Cache Tokens: {', '.join(cache_parts)}")
+
         lines.append("")
 
     return "\n".join(lines)
