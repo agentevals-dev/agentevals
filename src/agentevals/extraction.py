@@ -349,7 +349,7 @@ def is_adk_scope(span: Span) -> bool:
 
 
 def is_llm_span(span: Span) -> bool:
-    return span.get_tag(OTEL_GENAI_REQUEST_MODEL) is not None or span.get_tag(OTEL_GENAI_INPUT_MESSAGES) is not None
+    return span.get_tag(OTEL_GENAI_REQUEST_MODEL) is not None
 
 
 def is_tool_span(span: Span) -> bool:
@@ -496,10 +496,10 @@ class GenAIExtractor:
     def classify_span(self, span: Span) -> str | None:
         if is_invocation_span(span):
             return "invocation"
-        if is_llm_span(span):
-            return "llm"
         if is_tool_span(span):
             return "tool"
+        if is_llm_span(span):
+            return "llm"
         return None
 
     @staticmethod

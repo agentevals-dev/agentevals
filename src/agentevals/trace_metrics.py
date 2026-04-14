@@ -15,6 +15,7 @@ from .trace_attrs import (
     OTEL_GENAI_AGENT_ID,
     OTEL_GENAI_AGENT_NAME,
     OTEL_GENAI_REQUEST_MODEL,
+    OTEL_GENAI_TOOL_NAME,
 )
 
 
@@ -38,16 +39,38 @@ def _calc_percentiles(values: list[float]) -> dict[str, float]:
     }
 
 
+def _calc_summary_stats(values: list[float]) -> dict[str, float | int]:
+    """Return min/median/max/count plus legacy p50/p95/p99 keys."""
+    if not values:
+        return {"min": 0.0, "median": 0.0, "max": 0.0, "count": 0, "p50": 0.0, "p95": 0.0, "p99": 0.0}
+    import statistics
+
+    sorted_values = sorted(values)
+    n = len(sorted_values)
+    med = statistics.median(sorted_values)
+    return {
+        "min": sorted_values[0],
+        "median": med,
+        "max": sorted_values[-1],
+        "count": n,
+        "p50": med,
+        "p95": sorted_values[int(n * 0.95)] if n > 1 else sorted_values[0],
+        "p99": sorted_values[int(n * 0.99)] if n > 1 else sorted_values[0],
+    }
+
+
 def extract_performance_metrics(trace, extractor=None) -> dict[str, Any]:
     """Extract latency and token usage metrics from trace spans."""
-    agent_latencies = []
-    llm_latencies = []
-    tool_latencies = []
-    prompt_tokens = []
-    output_tokens = []
-    total_tokens = []
+    agent_latencies: list[float] = []
+    llm_latencies: list[float] = []
+    tool_latencies: list[float] = []
+    prompt_tokens: list[int] = []
+    output_tokens: list[int] = []
+    total_tokens: list[int] = []
     cache_creation_tokens_total = 0
     cache_read_tokens_total = 0
+    models: set[str] = set()
+    tool_names: list[str] = []
 
     if extractor is None:
         extractor = get_extractor(trace)
@@ -74,27 +97,50 @@ def extract_performance_metrics(trace, extractor=None) -> dict[str, Any]:
             ext = extract_extended_model_info_from_attrs(span.tags)
             cache_creation_tokens_total += ext["cache_creation_tokens"]
             cache_read_tokens_total += ext["cache_read_tokens"]
+            model = span.get_tag(OTEL_GENAI_REQUEST_MODEL)
+            if model:
+                models.add(model)
         elif role == "tool":
             tool_latencies.append(duration_ms)
+            tn = span.get_tag(OTEL_GENAI_TOOL_NAME)
+            if not tn and span.operation_name.startswith("execute_tool "):
+                tn = span.operation_name[len("execute_tool ") :]
+            if tn:
+                tool_names.append(tn)
+
+    empty_stats: dict[str, float | int] = {
+        "min": 0.0,
+        "median": 0.0,
+        "max": 0.0,
+        "count": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+    }
 
     tokens_info: dict[str, Any] = {
         "total_prompt": sum(prompt_tokens) if prompt_tokens else 0,
         "total_output": sum(output_tokens) if output_tokens else 0,
         "total": sum(total_tokens) if total_tokens else 0,
-        "per_llm_call": _calc_percentiles(total_tokens) if total_tokens else {"p50": 0.0, "p95": 0.0, "p99": 0.0},
+        "per_llm_call": _calc_summary_stats(total_tokens) if total_tokens else dict(empty_stats),
+        "cache_creation_tokens": cache_creation_tokens_total,
+        "cache_read_tokens": cache_read_tokens_total,
     }
-    if cache_creation_tokens_total > 0:
-        tokens_info["cache_creation_tokens"] = cache_creation_tokens_total
-    if cache_read_tokens_total > 0:
-        tokens_info["cache_read_tokens"] = cache_read_tokens_total
 
     return {
         "latency": {
-            "overall": _calc_percentiles(agent_latencies),
-            "llm_calls": _calc_percentiles(llm_latencies),
-            "tool_executions": _calc_percentiles(tool_latencies),
+            "overall": _calc_summary_stats(agent_latencies) if agent_latencies else dict(empty_stats),
+            "llm_calls": _calc_summary_stats(llm_latencies) if llm_latencies else dict(empty_stats),
+            "tool_executions": _calc_summary_stats(tool_latencies) if tool_latencies else dict(empty_stats),
         },
         "tokens": tokens_info,
+        "counts": {
+            "llm_calls": len(llm_latencies),
+            "tool_calls": len(tool_latencies),
+            "invocations": len(invocation_spans) if invocation_spans else len(trace.root_spans),
+        },
+        "models": sorted(models) if models else [],
+        "tool_names": sorted(set(tool_names)) if tool_names else [],
     }
 
 
