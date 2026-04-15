@@ -115,6 +115,9 @@ async def list_metrics():
         "hallucinations_v1": "safety",
         "safety_v1": "safety",
         "per_turn_user_simulator_quality_v1": "simulation",
+        "multi_turn_task_success_v1": "multi-turn",
+        "multi_turn_trajectory_quality_v1": "multi-turn",
+        "multi_turn_tool_use_quality_v1": "multi-turn",
     }
 
     try:
@@ -225,6 +228,36 @@ async def list_metrics():
                 requires_rubrics=True,
                 working=False,
                 description="Rubric-based assessment of tool usage quality (requires rubrics config)",
+            ),
+            MetricInfo(
+                name="multi_turn_task_success_v1",
+                category="multi-turn",
+                requires_eval_set=False,
+                requires_llm=False,
+                requires_gcp=True,
+                requires_rubrics=False,
+                working=True,
+                description="Evaluates if the agent achieved the goal(s) of the multi-turn conversation (Vertex AI)",
+            ),
+            MetricInfo(
+                name="multi_turn_trajectory_quality_v1",
+                category="multi-turn",
+                requires_eval_set=False,
+                requires_llm=False,
+                requires_gcp=True,
+                requires_rubrics=False,
+                working=True,
+                description="Evaluates the overall trajectory the agent took across the conversation (Vertex AI)",
+            ),
+            MetricInfo(
+                name="multi_turn_tool_use_quality_v1",
+                category="multi-turn",
+                requires_eval_set=False,
+                requires_llm=False,
+                requires_gcp=True,
+                requires_rubrics=False,
+                working=True,
+                description="Evaluates function calls made during a multi-turn conversation (Vertex AI)",
             ),
         ]
         return StandardResponse(data=fallback)

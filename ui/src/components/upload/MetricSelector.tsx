@@ -39,16 +39,21 @@ const selectorStyle = css`
 
   .metric-list {
     display: flex;
-    flex-wrap: wrap;
-    gap: 16px 24px;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .metric-item {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    min-width: 200px;
-    flex: 0 0 auto;
+    gap: 2px;
+  }
+
+  .metric-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
   }
 
   .metric-name {
@@ -62,19 +67,27 @@ const selectorStyle = css`
     font-size: 11px;
     margin-left: 24px;
     line-height: 1.3;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .metric-badges {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
-    margin-left: 24px;
+    flex-shrink: 0;
   }
 
   .metric-badge {
-    font-size: 9px;
-    padding: 2px 5px;
+    font-size: 10px;
+    padding: 2px 6px;
     border-radius: 3px;
     font-weight: 500;
+    line-height: 1.4;
   }
 
   .badge-eval-set {
@@ -184,30 +197,32 @@ export const MetricSelector: React.FC<MetricSelectorProps> = ({
             <div className="metric-list">
               {metrics.map((metric) => (
                 <div key={metric.name} className="metric-item">
-                  <Checkbox
-                    checked={selectedMetrics.includes(metric.name)}
-                    onChange={() => onToggleMetric(metric.name)}
-                  >
-                    <span className="metric-name">{metric.name}</span>
-                  </Checkbox>
-                  <div className="metric-description">{metric.description}</div>
-                  <div className="metric-badges">
-                    {metric.requiresEvalSet && (
-                      <span className="metric-badge badge-eval-set">Requires Eval Set</span>
-                    )}
-                    {metric.requiresLLM && (
-                      <span className="metric-badge badge-llm">Uses LLM</span>
-                    )}
-                    {metric.requiresGCP && (
-                      <span className="metric-badge badge-gcp">Requires GCP</span>
-                    )}
-                    {metric.requiresRubrics && (
-                      <span className="metric-badge badge-rubrics">Requires Rubrics</span>
-                    )}
-                    {metric.working === false && (
-                      <span className="metric-badge badge-incomplete">Incomplete</span>
-                    )}
+                  <div className="metric-row">
+                    <Checkbox
+                      checked={selectedMetrics.includes(metric.name)}
+                      onChange={() => onToggleMetric(metric.name)}
+                    >
+                      <span className="metric-name">{metric.name}</span>
+                    </Checkbox>
+                    <div className="metric-badges">
+                      {metric.requiresEvalSet && (
+                        <span className="metric-badge badge-eval-set">Requires Eval Set</span>
+                      )}
+                      {metric.requiresLLM && (
+                        <span className="metric-badge badge-llm">Uses LLM</span>
+                      )}
+                      {metric.requiresGCP && (
+                        <span className="metric-badge badge-gcp">Requires GCP</span>
+                      )}
+                      {metric.requiresRubrics && (
+                        <span className="metric-badge badge-rubrics">Requires Rubrics</span>
+                      )}
+                      {metric.working === false && (
+                        <span className="metric-badge badge-incomplete">Incomplete</span>
+                      )}
+                    </div>
                   </div>
+                  <div className="metric-description" title={metric.description}>{metric.description}</div>
                 </div>
               ))}
             </div>

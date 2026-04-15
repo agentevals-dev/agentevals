@@ -330,6 +330,37 @@ export const AVAILABLE_METRICS: MetricMetadata[] = [
     requiresRubrics: false,
     working: true,
     description: 'Safety and security assessment using Vertex AI'
+  },
+  // Multi-turn metrics (Vertex AI Gen AI Eval SDK)
+  {
+    name: 'multi_turn_task_success_v1',
+    category: 'multi-turn',
+    requiresEvalSet: false,
+    requiresLLM: false,
+    requiresGCP: true,
+    requiresRubrics: false,
+    working: true,
+    description: 'Evaluates if the agent achieved the goal(s) of the multi-turn conversation (Vertex AI)'
+  },
+  {
+    name: 'multi_turn_trajectory_quality_v1',
+    category: 'multi-turn',
+    requiresEvalSet: false,
+    requiresLLM: false,
+    requiresGCP: true,
+    requiresRubrics: false,
+    working: true,
+    description: 'Evaluates the overall trajectory the agent took across the conversation (Vertex AI)'
+  },
+  {
+    name: 'multi_turn_tool_use_quality_v1',
+    category: 'multi-turn',
+    requiresEvalSet: false,
+    requiresLLM: false,
+    requiresGCP: true,
+    requiresRubrics: false,
+    working: true,
+    description: 'Evaluates function calls made during a multi-turn conversation (Vertex AI)'
   }
 ];
 

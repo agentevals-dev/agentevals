@@ -386,7 +386,7 @@ class TestMetricsEndpoint:
     def test_metrics_fallback(self):
         with patch.dict("sys.modules", {"google.adk.evaluation.metric_evaluator_registry": None}):
             body = _assert_envelope(self.client.get("/api/metrics"))
-        assert len(body["data"]) == 8
+        assert len(body["data"]) == 11
 
     def test_metrics_envelope(self):
         body = _assert_envelope(self.client.get("/api/metrics"))

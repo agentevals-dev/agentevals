@@ -77,18 +77,14 @@ def _to_invocation_events(inv: Invocation) -> Invocation:
         return inv
 
     id_: IntermediateData = inv.intermediate_data
-    response_by_id: dict[str, genai_types.FunctionResponse] = {
-        tr.id: tr for tr in id_.tool_responses if tr.id
-    }
+    response_by_id: dict[str, genai_types.FunctionResponse] = {tr.id: tr for tr in id_.tool_responses if tr.id}
 
     events: list[InvocationEvent] = []
     for i, tool_call in enumerate(id_.tool_uses):
         events.append(
             InvocationEvent(
                 author="agent",
-                content=genai_types.Content(
-                    role="model", parts=[genai_types.Part(function_call=tool_call)]
-                ),
+                content=genai_types.Content(role="model", parts=[genai_types.Part(function_call=tool_call)]),
             )
         )
 
@@ -104,9 +100,7 @@ def _to_invocation_events(inv: Invocation) -> Invocation:
             events.append(
                 InvocationEvent(
                     author="agent",
-                    content=genai_types.Content(
-                        role="user", parts=[genai_types.Part(function_response=match)]
-                    ),
+                    content=genai_types.Content(role="user", parts=[genai_types.Part(function_response=match)]),
                 )
             )
 
@@ -333,13 +327,9 @@ async def evaluate_builtin_metric(
         evaluator: Evaluator = get_evaluator(eval_metric)
 
         if metric_name in _METRICS_NEEDING_INVOCATION_EVENTS:
-            actual_invocations = _enrich_app_details(
-                [_to_invocation_events(inv) for inv in actual_invocations]
-            )
+            actual_invocations = _enrich_app_details([_to_invocation_events(inv) for inv in actual_invocations])
             if expected_invocations is not None:
-                expected_invocations = _enrich_app_details(
-                    [_to_invocation_events(inv) for inv in expected_invocations]
-                )
+                expected_invocations = _enrich_app_details([_to_invocation_events(inv) for inv in expected_invocations])
 
         if inspect.iscoroutinefunction(evaluator.evaluate_invocations):
             eval_result: EvaluationResult = await evaluator.evaluate_invocations(
