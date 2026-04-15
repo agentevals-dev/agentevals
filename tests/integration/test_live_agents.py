@@ -306,6 +306,66 @@ class TestOpenAIAgentsZeroCode:
 
 
 @_skip_no_openai
+class TestPydanticAIZeroCode:
+    """Run the Pydantic AI zero-code OTLP example and verify session grouping."""
+
+    def test_session_created_with_spans(self, live_servers):
+        main_port, otlp_http_port, mgr = live_servers
+        session_name = "e2e-pydantic-ai"
+
+        result = _run_agent(
+            "examples/zero-code-examples/pydantic-ai/run.py",
+            otlp_http_port,
+            session_name,
+        )
+        assert result.returncode == 0, f"Agent failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+
+        wait_for_session_complete_sync(mgr, session_name, timeout=30)
+        session = mgr.sessions[session_name]
+
+        assert session.is_complete
+        assert session.source == "otlp"
+        assert len(session.spans) > 0, "Expected spans from LLM calls"
+
+    def test_invocations_extracted_with_content(self, live_servers):
+        main_port, otlp_http_port, mgr = live_servers
+        session_name = "e2e-pydantic-ai-inv"
+
+        result = _run_agent(
+            "examples/zero-code-examples/pydantic-ai/run.py",
+            otlp_http_port,
+            session_name,
+        )
+        assert result.returncode == 0, f"Agent failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+
+        wait_for_session_complete_sync(mgr, session_name, timeout=30)
+        session = mgr.sessions[session_name]
+
+        assert len(session.invocations) > 0, "Expected extracted invocations"
+        for inv in session.invocations:
+            has_content = inv.get("userText") or inv.get("agentResponse")
+            assert has_content, f"Invocation {inv.get('invocationId', '?')} has no content"
+
+    def test_session_visible_via_api(self, live_servers):
+        main_port, otlp_http_port, mgr = live_servers
+        session_name = "e2e-pydantic-ai-api"
+
+        result = _run_agent(
+            "examples/zero-code-examples/pydantic-ai/run.py",
+            otlp_http_port,
+            session_name,
+        )
+        assert result.returncode == 0
+
+        wait_for_session_complete_sync(mgr, session_name, timeout=30)
+
+        resp = httpx.get(f"http://127.0.0.1:{main_port}/api/streaming/sessions")
+        assert resp.status_code == 200
+        session_ids = [s["sessionId"] for s in resp.json()["data"]]
+        assert session_name in session_ids
+
+
+@_skip_no_openai
 class TestAgentRerun:
     """Verify that re-running an agent with the same session_name creates
     separate sessions, not merging them into one.
