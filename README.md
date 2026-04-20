@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-color-on-transparent.svg">
-    <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo-dark-on-transparent.svg">
-    <img src="docs/assets/logo-color-on-transparent.svg" alt="agentevals" width="420" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/agentevals-dev/agentevals/main/docs/assets/logo-color-on-transparent.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/agentevals-dev/agentevals/main/docs/assets/logo-dark-on-transparent.svg">
+    <img src="https://raw.githubusercontent.com/agentevals-dev/agentevals/main/docs/assets/logo-color-on-transparent.svg" alt="agentevals" width="420" />
   </picture>
 </p>
 
