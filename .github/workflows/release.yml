@@ -94,6 +94,7 @@ jobs:
           rm -rf src/agentevals/_static
 
   push-docker:
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
