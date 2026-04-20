@@ -2,5 +2,5 @@ apiVersion: v2
 name: agentevals
 description: agentevals web UI, OTLP HTTP+gRPC receivers, and MCP (Streamable HTTP)
 type: application
-version: 0.1.0
-appVersion: "0.5.2"
+version: 0.7.1
+appVersion: "0.7.1"

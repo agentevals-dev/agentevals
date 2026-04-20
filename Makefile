@@ -9,7 +9,13 @@ DOCKER_IMAGE_REF := $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY:%/=%)/$(DOCKER_IMA
 # Multi-arch build (requires docker buildx). Manifest lists must be pushed — use build-docker-local for a single-arch --load.
 PLATFORMS ?= linux/amd64,linux/arm64
 
-.PHONY: build build-bundle build-docker build-ui release clean dev-backend dev-frontend dev-bundle test test-unit test-integration test-e2e
+HELM_REPO ?= oci://ghcr.io/agentevals-dev/agentevals
+HELM_DIST_FOLDER ?= dist/helm
+HELM_CHART_DIR ?= charts/agentevals
+HELM_CHART_OCI_URL ?= $(HELM_REPO)/helm
+HELM_CHART_VERSION ?= $(VERSION)
+
+.PHONY: build build-bundle build-docker build-ui release clean dev-backend dev-frontend dev-bundle test test-unit test-integration test-e2e helm-lint helm-template helm-test helm-cleanup helm-package helm-publish
 
 build:
 	uv build
@@ -70,3 +76,31 @@ test-e2e:
 clean:
 	rm -rf dist/ build/ src/agentevals/_static/ ui/dist/
 	find . -name '*.egg-info' -type d -exec rm -rf {} + 2>/dev/null || true
+
+.PHONY: helm-lint
+helm-lint:
+	helm lint "$(HELM_CHART_DIR)"
+
+# Render templates to catch YAML/Helm errors (default values + ephemeralVolume disabled path).
+.PHONY: helm-template
+helm-template:
+	helm template agentevals "$(HELM_CHART_DIR)" --namespace agentevals >/dev/null
+	helm template agentevals "$(HELM_CHART_DIR)" --namespace agentevals \
+		--set ephemeralVolume.enabled=false >/dev/null
+
+.PHONY: helm-test
+helm-test: helm-lint helm-template
+
+.PHONY: helm-cleanup
+helm-cleanup:
+	rm -f $(HELM_DIST_FOLDER)/agentevals-*.tgz
+
+.PHONY: helm-package
+helm-package: helm-cleanup
+	mkdir -p $(HELM_DIST_FOLDER)
+	helm package "$(HELM_CHART_DIR)" -d "$(HELM_DIST_FOLDER)" \
+		--version "$(HELM_CHART_VERSION)" --app-version "$(HELM_CHART_VERSION)"
+
+.PHONY: helm-publish
+helm-publish: helm-package
+	helm push "$(HELM_DIST_FOLDER)/agentevals-$(HELM_CHART_VERSION).tgz" "$(HELM_CHART_OCI_URL)"
