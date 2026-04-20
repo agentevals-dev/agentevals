@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -50,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -106,7 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
@@ -139,7 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
