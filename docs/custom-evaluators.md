@@ -104,7 +104,7 @@ Each evaluator entry in the `evaluators` list uses the following fields. The `ty
 |---|---|---|---|
 | `name` | yes | | Unique name for the evaluator (used in output) |
 | `type` | yes | | `openai_eval` for OpenAI Evals API graders |
-| `threshold` | no | `0.5` | Maps to `pass_threshold` in the OpenAI grader |
+| `threshold` | no | `0.5` | Maps to `pass_threshold` in the OpenAI grader (not applicable for `string_check`) |
 | `timeout` | no | `120` | Max seconds to wait for the OpenAI eval run |
 | `grader` | yes | | OpenAI grader config (see [OpenAI Evals Graders](#openai-evals-api-graders)) |
 
@@ -317,9 +317,32 @@ The `grader.evaluation_metric` field selects the similarity algorithm:
 | `rouge_1` through `rouge_5` | Unigram through 5-gram overlap (F-measure) |
 | `rouge_l` | Longest common subsequence overlap (F-measure) |
 
+### String Check Grader
+
+Checks the agent's response against a fixed reference string using comparison operations. Does **not** require an eval set — the reference value is specified directly in the grader config. The `threshold` field is not applicable to this grader (string_check always returns 0 or 1).
+
+```yaml
+evaluators:
+  - name: city_name_check
+    type: openai_eval
+    grader:
+      type: string_check
+      operation: eq
+      reference: "Paris"
+```
+
+The `grader.operation` field selects the comparison:
+
+| Operation | Description |
+|---|---|
+| `eq` | Exact equality |
+| `ne` | Not equal |
+| `like` | Pattern match (case-sensitive) |
+| `ilike` | Pattern match (case-insensitive) |
+
 ### How it works
 
-Under the hood, agentevals creates an ephemeral eval on OpenAI, submits the actual and expected responses as JSONL items, polls for results, and cleans up. The agent's response and the golden reference are both placed in the `item` namespace (with `include_sample_schema: false`), so OpenAI only grades the provided text without generating any model outputs.
+Under the hood, agentevals creates an ephemeral eval on OpenAI, submits invocations as JSONL items, polls for results, and cleans up. For `text_similarity` graders, each item contains both the actual and expected responses; for `string_check` graders, each item contains only the actual response (the reference is supplied statically in the grader config). Items are placed in the `item` namespace (with `include_sample_schema: false`), so OpenAI only grades the provided text without generating any model outputs.
 
 ### Configuring the GitHub source
 

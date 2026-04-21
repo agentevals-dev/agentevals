@@ -70,6 +70,18 @@ _VALID_SIMILARITY_METRICS = frozenset(
     }
 )
 
+_VALID_STRING_CHECK_OPERATIONS = frozenset(
+    {
+        "eq",
+        "ne",
+        "like",
+        "ilike",
+    }
+)
+
+# All supported grader types — used in error messages and type checks.
+_SUPPORTED_GRADER_TYPES = frozenset({"text_similarity", "string_check"})
+
 
 class OpenAIEvalDef(BaseModel):
     """An evaluator that delegates grading to the OpenAI Evals API."""
@@ -84,13 +96,31 @@ class OpenAIEvalDef(BaseModel):
     @classmethod
     def _validate_grader(cls, v: dict[str, Any]) -> dict[str, Any]:
         grader_type = v.get("type")
-        if grader_type != "text_similarity":
-            raise ValueError(f"Only 'text_similarity' grader type is currently supported, got '{grader_type}'")
-        metric = v.get("evaluation_metric")
-        if not metric:
-            raise ValueError("'evaluation_metric' is required for text_similarity grader")
-        if metric not in _VALID_SIMILARITY_METRICS:
-            raise ValueError(f"Unknown evaluation_metric '{metric}'. Valid: {sorted(_VALID_SIMILARITY_METRICS)}")
+
+        if grader_type == "text_similarity":
+            metric = v.get("evaluation_metric")
+            if not metric:
+                raise ValueError("'evaluation_metric' is required for text_similarity grader")
+            if metric not in _VALID_SIMILARITY_METRICS:
+                raise ValueError(
+                    f"Unknown evaluation_metric '{metric}'. Valid: {sorted(_VALID_SIMILARITY_METRICS)}"
+                )
+        elif grader_type == "string_check":
+            operation = v.get("operation")
+            if not operation:
+                raise ValueError("'operation' is required for string_check grader")
+            if operation not in _VALID_STRING_CHECK_OPERATIONS:
+                raise ValueError(
+                    f"Unknown operation '{operation}'. Valid: {sorted(_VALID_STRING_CHECK_OPERATIONS)}"
+                )
+            if not v.get("reference"):
+                raise ValueError("'reference' is required for string_check grader")
+        else:
+            raise ValueError(
+                f"Unsupported grader type '{grader_type}'. "
+                f"Supported: {sorted(_SUPPORTED_GRADER_TYPES)}"
+            )
+
         return v
 
 
