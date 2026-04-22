@@ -1,7 +1,7 @@
 """Unit tests for the OpenAI Evals backend — covers both text_similarity and string_check graders."""
 
 import asyncio
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -14,7 +14,6 @@ from agentevals.openai_eval_backend import (
     _get_item_schema,
     evaluate_openai_eval,
 )
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -241,7 +240,7 @@ class TestEvaluateOpenAIEval:
 
         # evals.runs.output_items.list
         output_items = []
-        for s in (scores or []):
+        for s in scores or []:
             item = MagicMock()
             result = MagicMock()
             result.score = s
