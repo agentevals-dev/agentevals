@@ -47,13 +47,24 @@ interface OtlpAttribute {
   };
 }
 
+// OTLP/JSON encodes int64 values as strings to preserve precision past
+// Number.MAX_SAFE_INTEGER (2^53 - 1). Convert only when the value still
+// fits a JavaScript safe integer; otherwise keep the original string so
+// large IDs/counters/timestamps round-trip without silent corruption.
+function parseOtlpIntValue(value: number | string): number | string {
+  if (typeof value === 'number') return value;
+  if (!/^-?\d+$/.test(value)) return value;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : value;
+}
+
 function extractOtlpAttributes(attrs: OtlpAttribute[] | undefined): Record<string, any> {
   const tags: Record<string, any> = {};
   for (const attr of attrs || []) {
     const v = attr.value;
     if (!v) continue;
     if (v.stringValue !== undefined) tags[attr.key] = v.stringValue;
-    else if (v.intValue !== undefined) tags[attr.key] = typeof v.intValue === 'string' ? parseInt(v.intValue) : v.intValue;
+    else if (v.intValue !== undefined) tags[attr.key] = parseOtlpIntValue(v.intValue);
     else if (v.doubleValue !== undefined) tags[attr.key] = v.doubleValue;
     else if (v.boolValue !== undefined) tags[attr.key] = v.boolValue;
   }

@@ -148,6 +148,12 @@ class TestDetectFormat:
     def test_missing_file_returns_none(self):
         assert detect_format("/nonexistent/path/that/should/not/exist.json") is None
 
+    def test_missing_jsonl_file_returns_none(self):
+        # The ``.jsonl`` shortcut must not bypass the existence check;
+        # otherwise a missing file would lie about its format and confuse
+        # downstream loaders with a worse error message.
+        assert detect_format("/nonexistent/path/that/should/not/exist.jsonl") is None
+
     def test_unrecognized_shape_returns_none(self):
         path = _write_tmp(json.dumps({"foo": "bar"}))
         try:

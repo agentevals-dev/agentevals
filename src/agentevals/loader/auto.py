@@ -40,19 +40,20 @@ def detect_format(path: str) -> str | None:
     """Return the format name for ``path`` (``"jaeger-json"`` or ``"otlp-json"``).
 
     Order:
-    1. ``.jsonl`` extension implies OTLP (one span per line).
-    2. Otherwise read and inspect top-level keys:
+    1. The file must exist and be readable. Missing/unreadable files always
+       return ``None`` regardless of extension.
+    2. ``.jsonl`` extension implies OTLP (one span per line).
+    3. Otherwise read and inspect top-level keys:
        - ``resourceSpans`` / ``batches`` / wrapped ``trace.{...}``  → OTLP
        - ``data``                                                    → Jaeger
-    Returns ``None`` if the file isn't valid JSON or the shape isn't
-    recognized; callers that still want to attempt a load can fall back
-    to a default.
+    Returns ``None`` when the file is missing, unreadable, not valid JSON,
+    or the shape isn't recognized; callers that still want to attempt a
+    load can fall back to a default.
     """
-    if path.lower().endswith(".jsonl"):
-        return OTLP_JSON
-
     try:
         with open(path) as f:
+            if path.lower().endswith(".jsonl"):
+                return OTLP_JSON
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
