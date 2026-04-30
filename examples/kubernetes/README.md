@@ -25,8 +25,7 @@ kagent (gRPC :4317) --> OTel Collector( optional ) --> agentevals (gRPC :4317 / 
 ### 1. agentevals
 
 ```bash
-helm install agentevals ./charts/agentevals \
-  --set tag=0.6.3
+helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals
 ```
 
 This creates a single pod exposing:

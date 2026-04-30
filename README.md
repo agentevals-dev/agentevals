@@ -274,11 +274,15 @@ docker run -p 8001:8001 -p 4317:4317 -p 4318:4318 agentevals
 
 ### Helm
 
-A Helm chart is available in [`charts/agentevals/`](charts/agentevals/):
+The Helm chart is published as an OCI artifact to GitHub Container Registry:
 
 ```bash
-helm install agentevals ./charts/agentevals
+helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals
 ```
+
+Pass `--version <x.y.z>` to pin to a specific release. Available versions are listed under [packages](https://github.com/agentevals-dev/agentevals/pkgs/container/agentevals%2Fhelm%2Fagentevals).
+
+The source for the chart lives in [`charts/agentevals/`](charts/agentevals/) if you want to install from a local checkout instead.
 
 See the [Kubernetes example](examples/kubernetes/README.md) for an end-to-end walkthrough deploying agentevals alongside kagent and an OTel Collector on Kubernetes.
 
