@@ -93,8 +93,9 @@ def main(verbose: int) -> None:
     "--format",
     "-f",
     "trace_format",
-    default="jaeger-json",
-    help="Trace file format.",
+    default=None,
+    type=click.Choice(["jaeger-json", "otlp-json"], case_sensitive=False),
+    help="Override the trace file format. Auto-detected from file contents when omitted.",
 )
 @click.option(
     "--judge-model",
@@ -134,7 +135,7 @@ def run(
     trace_files: tuple[str, ...],
     eval_set: str | None,
     metric: tuple[str, ...] | None,
-    trace_format: str,
+    trace_format: str | None,
     judge_model: str | None,
     threshold: float | None,
     trajectory_match_type: str | None,

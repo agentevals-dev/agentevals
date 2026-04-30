@@ -24,6 +24,8 @@ from .extraction import (
     extract_tool_result_from_span,
     extract_user_text_from_attrs,
     get_extractor,
+    has_adk_descendant,
+    is_adk_scope,
     parse_json,
 )
 from .loader.base import Span, Trace
@@ -31,9 +33,7 @@ from .trace_attrs import (
     ADK_INVOCATION_ID,
     ADK_LLM_REQUEST,
     ADK_LLM_RESPONSE,
-    ADK_SCOPE_VALUE,
     OTEL_GENAI_AGENT_NAME,
-    OTEL_SCOPE,
 )
 
 logger = logging.getLogger(__name__)
@@ -101,13 +101,26 @@ def convert_traces(traces: list[Trace]) -> list[ConversionResult]:
 
 
 def _find_adk_spans(trace: Trace, operation: str) -> list[Span]:
-    """Find spans with ``otel.scope.name == "gcp.vertex.agent"`` matching an operation prefix."""
+    """Find ADK-instrumented spans matching an operation prefix.
+
+    Detection delegates to ``is_adk_scope``, which accepts either the OTel
+    scope marker, the ``gen_ai.system`` semconv attribute, or any
+    ``gcp.vertex.agent.*`` custom attribute. The fallbacks matter for
+    Tempo-exported traces where scope info gets lost during compaction.
+
+    For ``invoke_agent`` we additionally accept spans whose subtree is ADK
+    instrumented even when the parent itself lost its markers — Tempo's
+    compactor can strip scope info on the parent while children retain
+    their ``gcp.vertex.agent.*`` attributes.
+    """
     matches = []
     for span in trace.all_spans:
-        if span.get_tag(OTEL_SCOPE) != ADK_SCOPE_VALUE:
+        if not span.operation_name.startswith(operation):
             continue
-        # operationName is e.g. "invoke_agent helm_agent" or "call_llm"
-        if span.operation_name.startswith(operation):
+        if is_adk_scope(span):
+            matches.append(span)
+            continue
+        if operation == "invoke_agent" and has_adk_descendant(span):
             matches.append(span)
     matches.sort(key=lambda s: s.start_time)
     return matches

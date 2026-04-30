@@ -11,12 +11,9 @@ async function unwrap<T>(response: Response): Promise<T> {
   return json.data;
 }
 
-export async function convertTraces(traceFiles: File[], traceFormat?: string): Promise<ConvertTracesResponse> {
+export async function convertTraces(traceFiles: File[]): Promise<ConvertTracesResponse> {
   const formData = new FormData();
   traceFiles.forEach(file => formData.append('trace_files', file));
-  if (traceFormat) {
-    formData.append('trace_format', traceFormat);
-  }
 
   const response = await fetch(`${API_BASE_URL}/convert`, {
     method: 'POST',

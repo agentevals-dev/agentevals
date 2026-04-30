@@ -536,9 +536,9 @@ class TestEvaluateStream:
         cls.client = TestClient(_make_app())
 
     @patch("agentevals.api.routes.run_evaluation", new_callable=AsyncMock)
-    @patch("agentevals.api.routes.get_loader")
-    def test_stream_content_type(self, mock_loader, mock_eval):
-        mock_loader.return_value.load.return_value = []
+    @patch("agentevals.api.routes.load_traces")
+    def test_stream_content_type(self, mock_load_traces, mock_eval):
+        mock_load_traces.return_value = []
         mock_eval.return_value = _make_run_result()
         resp = self.client.post(
             "/api/evaluate/stream",
@@ -569,9 +569,9 @@ class TestEvaluateStream:
         assert "Invalid file extension" in body
 
     @patch("agentevals.api.routes.run_evaluation", new_callable=AsyncMock)
-    @patch("agentevals.api.routes.get_loader")
-    def test_stream_done_event(self, mock_loader, mock_eval):
-        mock_loader.return_value.load.return_value = []
+    @patch("agentevals.api.routes.load_traces")
+    def test_stream_done_event(self, mock_load_traces, mock_eval):
+        mock_load_traces.return_value = []
         mock_eval.return_value = _make_run_result()
         resp = self.client.post(
             "/api/evaluate/stream",
@@ -1333,3 +1333,47 @@ class TestUIUpdatesSSE:
         client = TestClient(app)
         resp = client.get("/stream/ui-updates")
         assert resp.headers["content-type"].startswith("text/event-stream")
+
+
+# ---------------------------------------------------------------------------
+# POST /api/convert — content-based format detection (issue #127)
+# ---------------------------------------------------------------------------
+
+
+class TestConvertAutoDetect:
+    """The /convert endpoint must auto-detect Tempo/OTLP exports without a
+    ``trace_format`` form field. Pre-fix, a Tempo ``.json`` upload was
+    misclassified as Jaeger and rejected with a 400 'expected top-level
+    data key' error.
+    """
+
+    @classmethod
+    def setup_class(cls):
+        cls.client = TestClient(_make_app())
+
+    @staticmethod
+    def _tempo_fixture_bytes() -> bytes:
+        path = os.path.join(os.path.dirname(__file__), "..", "samples", "tempo_export_with_batches.json")
+        with open(path, "rb") as f:
+            return f.read()
+
+    def test_tempo_json_upload_auto_detected(self):
+        body = _assert_envelope(
+            self.client.post(
+                "/api/convert",
+                files={"trace_files": ("trace.json", io.BytesIO(self._tempo_fixture_bytes()))},
+            )
+        )
+        traces = body["data"]["traces"]
+        assert len(traces) == 1
+        assert traces[0]["traceId"] == "dd547580319ab0312cee07f1def50dad"
+        assert len(traces[0]["invocations"]) == 1
+
+    def test_unknown_shape_returns_load_warning(self):
+        unknown = json.dumps({"some_other_shape": []}).encode()
+        resp = self.client.post(
+            "/api/convert",
+            files={"trace_files": ("trace.json", io.BytesIO(unknown))},
+        )
+        assert resp.status_code == 400
+        assert "Could not detect trace format" in resp.json()["detail"]

@@ -160,16 +160,19 @@ class EvalParams(BaseModel):
 class EvalRunConfig(EvalParams):
     """Full configuration for file-based evaluation runs."""
 
-    trace_files: list[str] = Field(description="Paths to trace files (Jaeger JSON or OTLP JSON).")
+    trace_files: list[str] = Field(description="Paths to trace files (Jaeger or OTLP JSON, .json or .jsonl).")
 
     eval_set_file: str | None = Field(
         default=None,
         description="Path to a golden eval set JSON file (ADK EvalSet format).",
     )
 
-    trace_format: str = Field(
-        default="jaeger-json",
-        description="Format of the trace files (jaeger-json or otlp-json).",
+    trace_format: str | None = Field(
+        default=None,
+        description=(
+            "Optional explicit trace format override ('jaeger-json' or 'otlp-json'). "
+            "Leave unset to auto-detect from file contents."
+        ),
     )
 
     output_format: str = Field(

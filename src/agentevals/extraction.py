@@ -344,8 +344,52 @@ def extract_tool_result_from_span(span: Span) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 
+_ADK_ATTR_MARKERS = (
+    ADK_LLM_REQUEST,
+    ADK_LLM_RESPONSE,
+    ADK_TOOL_CALL_ARGS,
+    ADK_TOOL_RESPONSE,
+    "gcp.vertex.agent.invocation_id",
+    "gcp.vertex.agent.session_id",
+    "gcp.vertex.agent.event_id",
+)
+
+
+def has_adk_descendant(span: Span) -> bool:
+    """Return True if any descendant of ``span`` is ADK-instrumented.
+
+    Used to recover ADK invocation parents when round-tripped exports
+    (Tempo, etc.) drop scope info on the parent but retain ADK custom
+    attributes on the LLM/tool child spans.
+    """
+    for child in span.children:
+        if is_adk_scope(child):
+            return True
+        if has_adk_descendant(child):
+            return True
+    return False
+
+
 def is_adk_scope(span: Span) -> bool:
-    return span.get_tag(OTEL_SCOPE) == ADK_SCOPE_VALUE
+    """Return True for spans emitted by Google ADK instrumentation.
+
+    Recognized signals (any one is sufficient):
+    1. ``otel.scope.name == "gcp.vertex.agent"`` — the canonical OTel scope.
+    2. ``gen_ai.system == "gcp.vertex.agent"`` — the per-span semconv marker.
+       Tempo's compactor sometimes drops/merges scope info, so this fallback
+       is required for round-tripped Tempo exports.
+    3. Any ``gcp.vertex.agent.*`` custom attribute (llm_request, llm_response,
+       tool_call_args, tool_response, invocation_id, session_id, event_id).
+       These are unambiguous ADK markers.
+    """
+    if span.get_tag(OTEL_SCOPE) == ADK_SCOPE_VALUE:
+        return True
+    if span.get_tag(OTEL_GENAI_SYSTEM) == ADK_SCOPE_VALUE:
+        return True
+    for marker in _ADK_ATTR_MARKERS:
+        if span.get_tag(marker) is not None:
+            return True
+    return False
 
 
 def is_llm_span(span: Span) -> bool:
@@ -423,7 +467,12 @@ class AdkExtractor:
         return "adk"
 
     def find_invocation_spans(self, trace: Trace) -> list[Span]:
-        matches = [s for s in trace.all_spans if is_adk_scope(s) and s.operation_name.startswith("invoke_agent")]
+        matches: list[Span] = []
+        for s in trace.all_spans:
+            if not s.operation_name.startswith("invoke_agent"):
+                continue
+            if is_adk_scope(s) or has_adk_descendant(s):
+                matches.append(s)
         matches.sort(key=lambda s: s.start_time)
         return matches
 

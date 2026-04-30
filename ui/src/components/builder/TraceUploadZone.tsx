@@ -79,7 +79,7 @@ export const TraceUploadZone: React.FC = () => {
             <p>or click to browse</p>
             <div css={supportedFormatsStyle}>
               <Upload size={16} />
-              <span>Supports Jaeger JSON format (.json)</span>
+              <span>Supports trace files (.json or .jsonl)</span>
             </div>
           </label>
         </div>

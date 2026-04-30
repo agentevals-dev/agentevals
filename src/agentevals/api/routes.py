@@ -27,10 +27,10 @@ from ..config import (
 )
 from ..converter import convert_traces
 from ..extraction import get_extractor
+from ..loader import load_traces
 from ..loader.otlp import OtlpJsonLoader
 from ..runner import (
     RunResult,
-    get_loader,
     load_eval_set,
     load_eval_set_from_dict,
     run_evaluation,
@@ -331,17 +331,10 @@ def _serialize_invocation(inv) -> dict[str, Any]:
     return _camel_keys(inv_dict)
 
 
-def _get_format_for_file(path: str, explicit_format: str) -> str:
-    """Return the loader format for a single file, auto-detecting from extension."""
-    if explicit_format:
-        return explicit_format
-    return "otlp-json" if path.lower().endswith(".jsonl") else "jaeger-json"
-
-
 @router.post("/convert", response_model=StandardResponse[ConvertTracesData])
 async def convert_trace_files(
     trace_files: list[UploadFile] = File(...),
-    trace_format: str = Form(""),
+    trace_format: str | None = Form(None),
 ):
     """Convert trace files to invocations and metadata without running evaluation."""
     temp_dir = tempfile.mkdtemp()
@@ -380,10 +373,8 @@ async def convert_trace_files(
         trace_to_filename: dict[str, str] = {}
         load_warnings: list[str] = []
         for path, original in saved_files:
-            fmt = _get_format_for_file(path, trace_format)
-            loader = get_loader(fmt)
             try:
-                traces = loader.load(path)
+                traces = load_traces(path, format=trace_format or None)
                 for t in traces:
                     trace_to_filename[t.trace_id] = original
                 all_traces.extend(traces)
@@ -496,12 +487,6 @@ async def evaluate_traces(
             )
 
         trace_format = config_dict.get("trace_format")
-        if not trace_format:
-            first_file = trace_paths[0]
-            if first_file.endswith(".jsonl"):
-                trace_format = "otlp-json"
-            else:
-                trace_format = "jaeger-json"
 
         eval_set_path = None
         if eval_set_file and eval_set_file.filename:
@@ -612,12 +597,6 @@ async def evaluate_traces_stream(
                 return
 
             trace_format = config_dict.get("trace_format")
-            if not trace_format:
-                first_file = trace_paths[0]
-                if first_file.endswith(".jsonl"):
-                    trace_format = "otlp-json"
-                else:
-                    trace_format = "jaeger-json"
 
             eval_set_path = None
             if eval_set_file and eval_set_file.filename:
@@ -663,10 +642,9 @@ async def evaluate_traces_stream(
                 trajectory_match_type=config_dict.get("trajectoryMatchType"),
             )
 
-            loader = get_loader(eval_config.trace_format)
             for trace_file_path in trace_paths:
                 try:
-                    traces = loader.load(trace_file_path)
+                    traces = load_traces(trace_file_path, format=eval_config.trace_format)
                     for trace in traces:
                         extractor = get_extractor(trace)
                         perf_metrics = _camel_keys(extract_performance_metrics(trace, extractor))

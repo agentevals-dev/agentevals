@@ -21,9 +21,8 @@ from .config import (
     EvalRunConfig,
 )
 from .converter import ConversionResult, convert_traces
-from .loader.base import Trace, TraceLoader
-from .loader.jaeger import JaegerJsonLoader
-from .loader.otlp import OtlpJsonLoader
+from .loader import load_traces
+from .loader.base import Trace
 from .trace_metrics import _calc_percentiles, extract_performance_metrics
 
 logger = logging.getLogger(__name__)
@@ -60,16 +59,6 @@ class RunResult(BaseModel):
     trace_results: list[TraceResult] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     performance_metrics: dict[str, Any] | None = None
-
-
-def get_loader(format_name: str) -> TraceLoader:
-    loaders: dict[str, type[TraceLoader]] = {
-        "jaeger-json": JaegerJsonLoader,
-        "otlp-json": OtlpJsonLoader,
-    }
-    if format_name not in loaders:
-        raise ValueError(f"Unknown trace format '{format_name}'. Available: {list(loaders.keys())}")
-    return loaders[format_name]()
 
 
 def load_eval_set(path: str) -> EvalSet:
@@ -223,11 +212,10 @@ async def run_evaluation(
     """Load traces from files, then evaluate. Delegates to ``run_evaluation_from_traces``."""
     load_errors: list[str] = []
 
-    loader = get_loader(config.trace_format)
     all_traces: list[Trace] = []
     for trace_file in config.trace_files:
         try:
-            all_traces.extend(loader.load(trace_file))
+            all_traces.extend(load_traces(trace_file, format=config.trace_format))
         except Exception as exc:
             msg = f"Failed to load trace file '{trace_file}': {exc}"
             logger.error(msg)

@@ -6,7 +6,7 @@ import { useTraceContext } from '../../context/TraceContext';
 import { InvocationEditor } from '../builder/InvocationEditor';
 import { RawJsonPreview } from './RawJsonPreview';
 import { readFileAsText } from '../../lib/utils';
-import { loadJaegerTraces } from '../../lib/trace-loader';
+import { loadTraces } from '../../lib/trace-loader';
 import { convertTraces } from '../../api/client';
 import { parseTraceFileForEditing, buildEditMappings, applyEditsAndSerialize } from '../../lib/trace-patcher';
 import type { Invocation, ParsedTraceFile, SpanEditMapping } from '../../lib/types';
@@ -44,7 +44,7 @@ export const TraceEditorDrawer: React.FC<TraceEditorDrawerProps> = ({ file, file
         const parsed = parseTraceFileForEditing(content, file.name);
         setParsedFile(parsed);
 
-        const traces = await loadJaegerTraces(content);
+        const traces = await loadTraces(content);
         const mappings = buildEditMappings(traces, parsed);
         setEditMappings(mappings);
       }),

@@ -332,8 +332,9 @@ export const UploadView: React.FC = () => {
               <div className="section-title">Trace Files</div>
               <FileDropZone
                 title="Drop trace files here"
-                description="Upload one or more Jaeger JSON trace files"
+                description="Upload one or more trace files (.json or .jsonl)"
                 multiple
+                accept=".json,.jsonl"
                 onChange={actions.setTraceFiles}
               />
               {state.traceFiles.length > 0 && (

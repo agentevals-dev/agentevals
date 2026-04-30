@@ -140,7 +140,7 @@ def merge_configs(file_config: EvalRunConfig, cli_config: EvalRunConfig) -> Eval
         merged.threshold = cli_config.threshold
     if cli_config.trajectory_match_type is not None:
         merged.trajectory_match_type = cli_config.trajectory_match_type
-    if cli_config.trace_format != "jaeger-json":
+    if cli_config.trace_format is not None:
         merged.trace_format = cli_config.trace_format
     if cli_config.output_format != "table":
         merged.output_format = cli_config.output_format
