@@ -401,3 +401,36 @@ class TestConverter:
 
         assert len(result.warnings) > 0
         assert "no invoke_agent spans found" in result.warnings[0]
+
+
+class TestTempoExportEndToEnd:
+    """Integration test through the real Tempo fixture from issue #127.
+
+    The fixture is a Tempo export of a kagent helm_agent run. The parent
+    ``invoke_agent helm_agent`` span lost its ADK scope during compaction,
+    while child ``call_llm`` spans retain ``gcp.vertex.agent.llm_request``
+    and friends. A clean run of detection + load + convert is the single
+    integration check that would have caught the original bug.
+    """
+
+    def test_tempo_export_loads_and_converts(self):
+        from agentevals.loader import load_traces
+
+        fixture = os.path.join(SAMPLES_DIR, "tempo_export_with_batches.json")
+        traces = load_traces(fixture)
+
+        assert len(traces) == 1
+        assert traces[0].trace_id == "dd547580319ab0312cee07f1def50dad"
+
+        results = convert_traces(traces)
+        assert len(results) == 1
+        assert results[0].warnings == []
+        assert len(results[0].invocations) == 1
+
+        inv = results[0].invocations[0]
+        assert inv.user_content is not None
+        assert "list all helm releases" in inv.user_content.parts[0].text.lower()
+        assert inv.final_response is not None
+        assert inv.intermediate_data is not None
+        tool_names = [t.name for t in inv.intermediate_data.tool_uses]
+        assert tool_names == ["helm_list_releases"]

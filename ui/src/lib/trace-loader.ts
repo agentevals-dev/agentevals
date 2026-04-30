@@ -37,57 +37,64 @@ interface JaegerData {
   data: JaegerTrace[];
 }
 
-/**
- * Load traces from OTLP JSONL file (one span per line)
- */
-function loadOtlpJsonlTraces(fileContent: string): Trace[] {
-  const lines = fileContent.trim().split('\n');
+interface OtlpAttribute {
+  key: string;
+  value?: {
+    stringValue?: string;
+    intValue?: number | string;
+    doubleValue?: number;
+    boolValue?: boolean;
+  };
+}
+
+function extractOtlpAttributes(attrs: OtlpAttribute[] | undefined): Record<string, any> {
+  const tags: Record<string, any> = {};
+  for (const attr of attrs || []) {
+    const v = attr.value;
+    if (!v) continue;
+    if (v.stringValue !== undefined) tags[attr.key] = v.stringValue;
+    else if (v.intValue !== undefined) tags[attr.key] = typeof v.intValue === 'string' ? parseInt(v.intValue) : v.intValue;
+    else if (v.doubleValue !== undefined) tags[attr.key] = v.doubleValue;
+    else if (v.boolValue !== undefined) tags[attr.key] = v.boolValue;
+  }
+  return tags;
+}
+
+function buildOtlpSpan(otlpSpan: any, extraTags: Record<string, any> = {}): Span {
+  const tags = { ...extraTags, ...extractOtlpAttributes(otlpSpan.attributes) };
+
+  const startTimeNs = parseInt(otlpSpan.startTimeUnixNano || '0');
+  const endTimeNs = parseInt(otlpSpan.endTimeUnixNano || '0');
+  const startTimeUs = Math.floor(startTimeNs / 1000);
+  const durationUs = Math.floor((endTimeNs - startTimeNs) / 1000);
+
+  return {
+    traceId: otlpSpan.traceId,
+    spanId: otlpSpan.spanId,
+    parentSpanId: otlpSpan.parentSpanId || null,
+    operationName: otlpSpan.name,
+    startTime: startTimeUs,
+    duration: durationUs,
+    tags,
+    logs: [],
+    children: [],
+  };
+}
+
+function buildTracesFromSpans(spans: Span[]): Trace[] {
   const spansByTrace = new Map<string, Span[]>();
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    const otlpSpan = JSON.parse(line);
-    const traceId = otlpSpan.traceId;
-
-    const tags: Record<string, any> = {};
-    for (const attr of otlpSpan.attributes || []) {
-      const value = attr.value?.stringValue || attr.value?.intValue || attr.value?.doubleValue || attr.value?.boolValue;
-      if (value !== undefined) {
-        tags[attr.key] = value;
-      }
-    }
-
-    const startTimeNs = parseInt(otlpSpan.startTimeUnixNano || '0');
-    const endTimeNs = parseInt(otlpSpan.endTimeUnixNano || '0');
-    const startTimeUs = Math.floor(startTimeNs / 1000);
-    const durationUs = Math.floor((endTimeNs - startTimeNs) / 1000);
-
-    const span: Span = {
-      traceId,
-      spanId: otlpSpan.spanId,
-      parentSpanId: otlpSpan.parentSpanId || null,
-      operationName: otlpSpan.name,
-      startTime: startTimeUs,
-      duration: durationUs,
-      tags,
-      logs: [],
-      children: [],
-    };
-
-    if (!spansByTrace.has(traceId)) {
-      spansByTrace.set(traceId, []);
-    }
-    spansByTrace.get(traceId)!.push(span);
+  for (const span of spans) {
+    if (!spansByTrace.has(span.traceId)) spansByTrace.set(span.traceId, []);
+    spansByTrace.get(span.traceId)!.push(span);
   }
 
   const traces: Trace[] = [];
-  for (const [traceId, spans] of spansByTrace.entries()) {
+  for (const [traceId, traceSpans] of spansByTrace.entries()) {
     const spanMap = new Map<string, Span>();
-    spans.forEach(span => spanMap.set(span.spanId, span));
+    traceSpans.forEach(span => spanMap.set(span.spanId, span));
 
     const rootSpans: Span[] = [];
-    for (const span of spans) {
+    for (const span of traceSpans) {
       if (span.parentSpanId) {
         const parent = spanMap.get(span.parentSpanId);
         if (parent) {
@@ -100,45 +107,61 @@ function loadOtlpJsonlTraces(fileContent: string): Trace[] {
       }
     }
 
-    const sortSpans = (spans: Span[]) => {
-      spans.sort((a, b) => a.startTime - b.startTime);
-      spans.forEach((span) => sortSpans(span.children));
+    const sortSpans = (s: Span[]) => {
+      s.sort((a, b) => a.startTime - b.startTime);
+      s.forEach((span) => sortSpans(span.children));
     };
-
     sortSpans(rootSpans);
 
     traces.push({
       traceId,
       rootSpans,
-      allSpans: spans.sort((a, b) => a.startTime - b.startTime),
+      allSpans: traceSpans.sort((a, b) => a.startTime - b.startTime),
     });
   }
-
   return traces;
 }
 
 /**
- * Load traces from Jaeger JSON file
+ * Load traces from OTLP JSONL file (one span per line)
  */
-export async function loadJaegerTraces(fileContent: string): Promise<Trace[]> {
-  const trimmedContent = fileContent.trim();
+function loadOtlpJsonlTraces(fileContent: string): Trace[] {
+  const lines = fileContent.trim().split('\n');
+  const spans: Span[] = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    spans.push(buildOtlpSpan(JSON.parse(line)));
+  }
+  return buildTracesFromSpans(spans);
+}
 
-  if (trimmedContent.includes('\n') && !trimmedContent.startsWith('[')) {
-    try {
-      const firstLine = trimmedContent.split('\n')[0].trim();
-      const parsed = JSON.parse(firstLine);
-      if (!('data' in parsed)) {
-        return loadOtlpJsonlTraces(fileContent);
+/**
+ * Load traces from a parsed full OTLP export object (resourceSpans, legacy
+ * batches, or Tempo v2 ``trace`` wrapper). The object should already be
+ * unwrapped from any ``trace`` envelope.
+ */
+function loadOtlpDocTraces(doc: any): Trace[] {
+  const resourceSpans: any[] = doc.resourceSpans || doc.batches || [];
+  const spans: Span[] = [];
+
+  for (const rs of resourceSpans) {
+    const resourceTags = extractOtlpAttributes(rs.resource?.attributes);
+    const scopeSpans: any[] = rs.scopeSpans || rs.instrumentationLibrarySpans || [];
+    for (const ss of scopeSpans) {
+      const scope = ss.scope || ss.instrumentationLibrary || {};
+      const scopeTags: Record<string, any> = { ...resourceTags };
+      if (scope.name) scopeTags['otel.scope.name'] = scope.name;
+      if (scope.version) scopeTags['otel.scope.version'] = scope.version;
+      for (const otlpSpan of ss.spans || []) {
+        spans.push(buildOtlpSpan(otlpSpan, scopeTags));
       }
-    } catch {
-      // Not valid JSONL, fall through to Jaeger parsing
     }
   }
+  return buildTracesFromSpans(spans);
+}
 
-  const jaegerData: JaegerData = JSON.parse(fileContent);
-
+function parseJaegerData(jaegerData: JaegerData): Trace[] {
   return jaegerData.data.map((jTrace) => {
-    // Parse all spans first
     const spanMap = new Map<string, Span>();
 
     for (const jSpan of jTrace.spans) {
@@ -157,16 +180,13 @@ export async function loadJaegerTraces(fileContent: string): Promise<Trace[]> {
       spanMap.set(span.spanId, span);
     }
 
-    // Build parent-child relationships
     const rootSpans: Span[] = [];
-
     for (const span of spanMap.values()) {
       if (span.parentSpanId) {
         const parent = spanMap.get(span.parentSpanId);
         if (parent) {
           parent.children.push(span);
         } else {
-          // Parent not found, treat as root
           rootSpans.push(span);
         }
       } else {
@@ -174,12 +194,10 @@ export async function loadJaegerTraces(fileContent: string): Promise<Trace[]> {
       }
     }
 
-    // Sort children by start time
     const sortSpans = (spans: Span[]) => {
       spans.sort((a, b) => a.startTime - b.startTime);
       spans.forEach((span) => sortSpans(span.children));
     };
-
     sortSpans(rootSpans);
 
     return {
@@ -188,6 +206,48 @@ export async function loadJaegerTraces(fileContent: string): Promise<Trace[]> {
       allSpans: Array.from(spanMap.values()).sort((a, b) => a.startTime - b.startTime),
     };
   });
+}
+
+/**
+ * Load traces from a trace file. Auto-detects between Jaeger JSON
+ * (top-level ``data``), full OTLP JSON (top-level ``resourceSpans``),
+ * legacy/Tempo v1 OTLP (top-level ``batches``), Tempo v2 wrapped
+ * (``{"trace": {...}}``), and OTLP JSONL (one span per line).
+ */
+export async function loadTraces(fileContent: string): Promise<Trace[]> {
+  const trimmed = fileContent.trim();
+  if (!trimmed) return [];
+
+  let singleDoc: any = null;
+  try {
+    singleDoc = JSON.parse(trimmed);
+  } catch {
+    if (trimmed.includes('\n')) {
+      return loadOtlpJsonlTraces(fileContent);
+    }
+    throw new Error('Invalid trace file: not valid JSON or JSONL.');
+  }
+
+  if (singleDoc && typeof singleDoc === 'object' && !Array.isArray(singleDoc)) {
+    let doc = singleDoc;
+    if (doc.trace && typeof doc.trace === 'object' &&
+        ('resourceSpans' in doc.trace || 'batches' in doc.trace)) {
+      doc = doc.trace;
+    }
+
+    if ('resourceSpans' in doc || 'batches' in doc) {
+      return loadOtlpDocTraces(doc);
+    }
+    if (Array.isArray(doc.data)) {
+      return parseJaegerData(doc as JaegerData);
+    }
+  }
+
+  throw new Error(
+    'Unrecognized trace file format. Expected one of: Jaeger JSON ' +
+    '({"data": [...]}), OTLP JSON ({"resourceSpans": [...]} or {"batches": [...]}), ' +
+    'or OTLP JSONL (one span per line).'
+  );
 }
 
 /**

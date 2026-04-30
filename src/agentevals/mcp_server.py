@@ -213,7 +213,7 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
     async def evaluate_traces(
         trace_files: list[str],
         metrics: list[str] | None = None,
-        trace_format: str = "jaeger-json",
+        trace_format: str | None = None,
         eval_set_file: str | None = None,
         judge_model: str | None = None,
         threshold: float | None = None,
@@ -233,13 +233,12 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
 
         Args:
             trace_files: Absolute paths to trace files on disk. Supports Jaeger
-                JSON (.json) and OTLP JSON/JSONL (.jsonl) formats. Each file may
-                contain one or more traces.
+                JSON and OTLP JSON/JSONL (including Tempo exports). Each file
+                may contain one or more traces.
             metrics: Metric names to evaluate (from list_metrics). Defaults to
                 ["tool_trajectory_avg_score"] if not specified.
-            trace_format: Format of the trace files. Either "jaeger-json"
-                (default) or "otlp-json". Use "otlp-json" for .jsonl files
-                exported by OpenTelemetry.
+            trace_format: Optional explicit format override ("jaeger-json" or
+                "otlp-json"). Auto-detected from file contents when omitted.
             eval_set_file: Absolute path to a golden eval set JSON file (ADK
                 EvalSet format). Required by comparison metrics such as
                 "tool_trajectory_avg_score" and "response_match_score".

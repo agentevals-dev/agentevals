@@ -66,12 +66,17 @@ See [examples/README.md](../examples/README.md) for details on supported instrum
 
 ### OTLP/JSON Support
 
-Native OpenTelemetry format — no conversion to Jaeger needed:
+Native OpenTelemetry format. The CLI auto-detects Jaeger vs OTLP from
+file contents, so `.json` and `.jsonl` exports from Tempo, Jaeger, or
+the OTel collector all work without a `--format` flag:
 
 ```bash
-# Load OTLP files directly
-agentevals run trace.otlp.json --format otlp-json --eval-set eval.json
+# Load any trace file directly; format is auto-detected
+agentevals run trace.otlp.json --eval-set eval.json
 ```
+
+Pass `--format otlp-json` (or `jaeger-json`) only as an override when
+auto-detection fails on a non-standard export.
 
 ### Real-time Span Streaming
 
@@ -311,6 +316,7 @@ This installs `opentelemetry-sdk>=1.20.0`. Agent code also needs `websockets` fo
 ## Compatibility
 
 All existing workflows continue to work:
-- Jaeger JSON files still supported: `agentevals run trace.json --eval-set ...`
-- OTLP/JSON files: `agentevals run trace.otlp.json --format otlp-json --eval-set ...`
-- Web UI upload flow unchanged
+- Trace files (Jaeger or OTLP, including Tempo exports) auto-detect by
+  content: `agentevals run trace.json --eval-set ...`
+- Pass `--format` only to override detection on non-standard exports.
+- Web UI upload flow unchanged.

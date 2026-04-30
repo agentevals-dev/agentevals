@@ -1,6 +1,7 @@
 """Tests for OTLP/JSON trace loader."""
 
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -452,3 +453,127 @@ class TestNestedDictAttributes:
         span = traces[0].all_spans[0]
         assert span.tags["simple_key"] == "simple_value"
         assert span.tags["nested.deep.key"] == 42
+
+
+def _tempo_v1_export(span_overrides=None) -> dict:
+    """Build a Tempo v1-style export with batches + instrumentationLibrarySpans.
+
+    Tempo v1 (and many older OTLP exporters) use ``batches`` instead of
+    ``resourceSpans`` and ``instrumentationLibrarySpans`` instead of
+    ``scopeSpans``. The ``instrumentationLibrary`` field replaces ``scope``.
+    """
+    span = {
+        "traceId": "tempo-trace",
+        "spanId": "tempo-span",
+        "name": "invoke_agent helm_agent",
+        "startTimeUnixNano": "1000000000",
+        "endTimeUnixNano": "2000000000",
+        "attributes": [
+            {"key": "gen_ai.operation.name", "value": {"stringValue": "invoke_agent"}},
+        ],
+    }
+    if span_overrides:
+        span.update(span_overrides)
+
+    return {
+        "batches": [
+            {
+                "resource": {
+                    "attributes": [
+                        {"key": "service.name", "value": {"stringValue": "helm_agent"}},
+                    ]
+                },
+                "instrumentationLibrarySpans": [
+                    {
+                        "instrumentationLibrary": {
+                            "name": "opentelemetry.instrumentation.httpx",
+                            "version": "0.59b0",
+                        },
+                        "spans": [span],
+                    }
+                ],
+            }
+        ]
+    }
+
+
+class TestTempoShapeSupport:
+    """Regression tests for the loader accepting Tempo-flavored OTLP exports.
+
+    These shapes appeared after Tempo round-tripping and were the original
+    cause of the offline-eval crash reported in issue #127.
+    """
+
+    def test_load_tempo_v1_batches(self):
+        loader = OtlpJsonLoader()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(_tempo_v1_export(), f)
+            path = f.name
+        try:
+            traces = loader.load(path)
+            assert len(traces) == 1
+            assert traces[0].trace_id == "tempo-trace"
+            assert len(traces[0].all_spans) == 1
+        finally:
+            Path(path).unlink()
+
+    def test_tempo_v1_resource_attrs_propagate_to_spans(self):
+        loader = OtlpJsonLoader()
+        traces = loader.load_from_dict(_tempo_v1_export())
+        span = traces[0].all_spans[0]
+        assert span.tags["service.name"] == "helm_agent"
+
+    def test_tempo_v1_instrumentation_library_maps_to_scope(self):
+        loader = OtlpJsonLoader()
+        traces = loader.load_from_dict(_tempo_v1_export())
+        span = traces[0].all_spans[0]
+        assert span.tags["otel.scope.name"] == "opentelemetry.instrumentation.httpx"
+        assert span.tags["otel.scope.version"] == "0.59b0"
+
+    def test_tempo_v2_trace_wrapper_unwrapped(self):
+        loader = OtlpJsonLoader()
+        wrapped = {"trace": _tempo_v1_export()}
+        traces = loader.load_from_dict(wrapped)
+        assert len(traces) == 1
+        assert traces[0].trace_id == "tempo-trace"
+
+    def test_tempo_v2_wrapper_around_resource_spans(self):
+        loader = OtlpJsonLoader()
+        inner = {
+            "resourceSpans": [
+                {
+                    "resource": {"attributes": []},
+                    "scopeSpans": [
+                        {
+                            "scope": {"name": "test"},
+                            "spans": [
+                                {
+                                    "traceId": "wrapped-trace",
+                                    "spanId": "wrapped-span",
+                                    "name": "op",
+                                    "startTimeUnixNano": "0",
+                                    "endTimeUnixNano": "1000",
+                                    "attributes": [],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+        traces = loader.load_from_dict({"trace": inner})
+        assert len(traces) == 1
+        assert traces[0].trace_id == "wrapped-trace"
+
+    def test_load_from_dict_rejects_unknown_shape(self):
+        loader = OtlpJsonLoader()
+        with pytest.raises(ValueError, match="resourceSpans"):
+            loader.load_from_dict({"unrecognized": True})
+
+    def test_real_tempo_fixture_loads_with_expected_span_count(self):
+        loader = OtlpJsonLoader()
+        fixture = os.path.join(os.path.dirname(__file__), "..", "samples", "tempo_export_with_batches.json")
+        traces = loader.load(fixture)
+        assert len(traces) == 1
+        assert traces[0].trace_id == "dd547580319ab0312cee07f1def50dad"
+        assert len(traces[0].all_spans) == 86

@@ -199,7 +199,25 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
             },
             (result) => {
               setState((prev) => {
-                const resultsWithSessionId = result.traceResults.map(tr => ({
+                const rawTraceResults = Array.isArray(result?.traceResults)
+                  ? result.traceResults
+                  : Array.isArray((result as unknown as { trace_results?: unknown }).trace_results)
+                    ? ((result as unknown as { trace_results: typeof result.traceResults }).trace_results)
+                    : null;
+
+                if (rawTraceResults === null) {
+                  return {
+                    ...prev,
+                    isEvaluating: false,
+                    progressMessage: '',
+                    errors: [
+                      ...(Array.isArray(result?.errors) ? result.errors : []),
+                      'Evaluation completed without trace results. The server response was malformed.',
+                    ],
+                  };
+                }
+
+                const resultsWithSessionId = rawTraceResults.map(tr => ({
                   ...tr,
                   sessionId: prev.traceMetadata.get(tr.traceId)?.sessionId,
                 }));
@@ -219,7 +237,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
                   isEvaluating: false,
                   progressMessage: '',
                   results: resultsWithSessionId,
-                  errors: result.errors,
+                  errors: Array.isArray(result?.errors) ? result.errors : [],
                   tableRows: mergedRows,
                   pendingAnnotations: new Map(),
                 };

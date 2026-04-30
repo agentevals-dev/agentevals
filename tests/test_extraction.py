@@ -16,6 +16,7 @@ from agentevals.extraction import (
     extract_user_text_from_attrs,
     flatten_otlp_attributes,
     get_extractor,
+    has_adk_descendant,
     is_adk_scope,
     is_invocation_span,
     is_llm_span,
@@ -393,6 +394,24 @@ class TestSpanClassifiers:
         assert is_adk_scope(_span(tags={OTEL_SCOPE: ADK_SCOPE_VALUE}))
         assert not is_adk_scope(_span(tags={}))
 
+    def test_is_adk_scope_via_gen_ai_system(self):
+        # Tempo round-tripping can drop the OTel scope, but per-span
+        # gen_ai.system survives. That's still a valid ADK marker.
+        assert is_adk_scope(_span(tags={OTEL_GENAI_SYSTEM: ADK_SCOPE_VALUE}))
+
+    def test_is_adk_scope_via_custom_attr_marker(self):
+        for marker in (
+            ADK_LLM_REQUEST,
+            ADK_LLM_RESPONSE,
+            ADK_TOOL_CALL_ARGS,
+            "gcp.vertex.agent.invocation_id",
+            "gcp.vertex.agent.session_id",
+        ):
+            assert is_adk_scope(_span(tags={marker: "anything"})), f"failed for {marker}"
+
+    def test_is_adk_scope_unrelated_gen_ai_system_does_not_match(self):
+        assert not is_adk_scope(_span(tags={OTEL_GENAI_SYSTEM: "openai"}))
+
     def test_is_llm_span_by_model(self):
         assert is_llm_span(_span(tags={OTEL_GENAI_REQUEST_MODEL: "gpt-4"}))
 
@@ -513,6 +532,61 @@ class TestAdkExtractorSpanFinding:
         assert ext.classify_span(_span(op="call_llm", tags={OTEL_SCOPE: ADK_SCOPE_VALUE})) == "llm"
         assert ext.classify_span(_span(op="execute_tool x", tags={OTEL_SCOPE: ADK_SCOPE_VALUE})) == "tool"
         assert ext.classify_span(_span(op="random")) is None
+
+
+class TestAdkSubtreeRecovery:
+    """Recover ADK invocation parents whose markers were dropped on export.
+
+    Tempo's compactor frequently flattens scope info onto a single
+    instrumentation library per batch, leaving the parent ``invoke_agent``
+    span without ADK markers while its ``call_llm`` children retain
+    ``gcp.vertex.agent.*`` custom attributes.
+    """
+
+    def test_has_adk_descendant_finds_marked_child(self):
+        child = _span(op="call_llm", tags={ADK_LLM_REQUEST: "{}"}, span_id="c1")
+        parent = _span(op="invoke_agent helm", children=[child], span_id="p1")
+        assert has_adk_descendant(parent)
+
+    def test_has_adk_descendant_finds_marked_grandchild(self):
+        grandchild = _span(op="call_llm", tags={ADK_LLM_REQUEST: "{}"}, span_id="g1")
+        child = _span(op="middle", children=[grandchild], span_id="c1")
+        parent = _span(op="invoke_agent helm", children=[child], span_id="p1")
+        assert has_adk_descendant(parent)
+
+    def test_has_adk_descendant_returns_false_for_pure_genai_subtree(self):
+        child = _span(op="call_llm", tags={OTEL_GENAI_REQUEST_MODEL: "gpt-4"}, span_id="c1")
+        parent = _span(op="invoke_agent helm", children=[child], span_id="p1")
+        assert not has_adk_descendant(parent)
+
+    def test_adk_extractor_finds_invocation_via_subtree(self):
+        # The reported-bug scenario: parent invoke_agent span has no ADK
+        # markers (Tempo lost them); child call_llm has gcp.vertex.agent.*.
+        child = _span(
+            op="call_llm",
+            tags={ADK_LLM_REQUEST: "{}"},
+            span_id="c1",
+        )
+        parent = _span(
+            op="invoke_agent helm_agent",
+            tags={OTEL_GENAI_OP: "invoke_agent"},  # only GenAI semconv on parent
+            children=[child],
+            span_id="p1",
+        )
+        trace = _trace([parent, child], root_spans=[parent])
+        ext = AdkExtractor()
+        invocations = ext.find_invocation_spans(trace)
+        assert len(invocations) == 1
+        assert invocations[0].span_id == "p1"
+
+    def test_adk_extractor_skips_invoke_agent_without_any_markers(self):
+        # An invoke_agent span with no ADK markers anywhere in its subtree
+        # should not be picked up by the ADK extractor.
+        child = _span(op="some_child", tags={}, span_id="c1")
+        parent = _span(op="invoke_agent x", children=[child], span_id="p1")
+        trace = _trace([parent, child], root_spans=[parent])
+        ext = AdkExtractor()
+        assert ext.find_invocation_spans(trace) == []
 
 
 class TestGenAIExtractorSpanFinding:

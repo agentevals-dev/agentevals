@@ -19,9 +19,12 @@ logger = logging.getLogger(__name__)
 class OtlpJsonLoader(TraceLoader):
     """Loads traces from OTLP/JSON format (native OpenTelemetry format).
 
-    Supports two formats:
-    1. Full OTLP export with resourceSpans structure
-    2. JSONL format - one span per line (for streaming use cases)
+    Supports several shapes:
+    1. Standard OTLP export: ``{"resourceSpans": [...]}``
+    2. Legacy/Tempo v1 export: ``{"batches": [...]}`` with
+       ``instrumentationLibrarySpans`` instead of ``scopeSpans``
+    3. Tempo v2 wrapper: ``{"trace": {"resourceSpans": [...]}}``
+    4. JSONL: one span per line (for streaming use cases)
 
     OTLP uses nanosecond timestamps - these are converted to microseconds
     to match the internal Span representation.
@@ -42,7 +45,7 @@ class OtlpJsonLoader(TraceLoader):
         if content.startswith("{"):
             try:
                 data = json.loads(content)
-                if "resourceSpans" in data:
+                if self._is_otlp_export(data):
                     traces = self._parse_otlp_export(data)
                 else:
                     raise ValueError("Not a full OTLP export, trying JSONL")
@@ -57,19 +60,42 @@ class OtlpJsonLoader(TraceLoader):
         return traces
 
     def load_from_dict(self, data: dict) -> list[Trace]:
-        """Load traces from an OTLP JSON dict (resourceSpans structure)."""
-        if "resourceSpans" not in data:
-            raise ValueError("Expected OTLP JSON with 'resourceSpans' key")
+        """Load traces from an OTLP JSON dict.
+
+        Accepts ``resourceSpans``, legacy ``batches``, and Tempo v2's
+        ``{"trace": {...}}`` wrapper.
+        """
+        if not self._is_otlp_export(data):
+            raise ValueError("Expected OTLP JSON with 'resourceSpans' or 'batches' key (or wrapped under 'trace')")
         return self._parse_otlp_export(data)
 
-    def _parse_otlp_export(self, data: dict) -> list[Trace]:
-        """Parse full OTLP export structure with resourceSpans."""
-        all_spans = []
+    @staticmethod
+    def _is_otlp_export(data: dict) -> bool:
+        """Return True if ``data`` looks like a full OTLP export in any of the
+        supported shapes (resourceSpans, batches, or Tempo v2 trace wrapper)."""
+        if "resourceSpans" in data or "batches" in data:
+            return True
+        inner = data.get("trace")
+        if isinstance(inner, dict) and ("resourceSpans" in inner or "batches" in inner):
+            return True
+        return False
 
-        for resource_span in data.get("resourceSpans", []):
+    def _parse_otlp_export(self, data: dict) -> list[Trace]:
+        """Parse full OTLP export structure (resourceSpans / batches / Tempo wrapper)."""
+        # Tempo v2 wraps OTLP under {"trace": {...}}; unwrap before parsing.
+        inner = data.get("trace")
+        if isinstance(inner, dict) and ("resourceSpans" in inner or "batches" in inner):
+            data = inner
+
+        # Older OTLP/Tempo exports use "batches" instead of "resourceSpans".
+        resource_spans = data.get("resourceSpans") or data.get("batches", [])
+
+        all_spans = []
+        for resource_span in resource_spans:
             resource_attrs = self._extract_attributes(resource_span.get("resource", {}).get("attributes", []))
-            for scope_span in resource_span.get("scopeSpans", []):
-                scope = scope_span.get("scope", {})
+            scope_spans = resource_span.get("scopeSpans") or resource_span.get("instrumentationLibrarySpans", [])
+            for scope_span in scope_spans:
+                scope = scope_span.get("scope") or scope_span.get("instrumentationLibrary") or {}
                 scope_name = scope.get("name", "")
                 scope_version = scope.get("version", "")
 
