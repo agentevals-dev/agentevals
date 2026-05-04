@@ -25,4 +25,4 @@ spec:
       targetPort: mcp
       protocol: TCP
   selector:
-    {{- include "agentevals.selectorLabels" . | nindent 4 }}
+    {{- include "agentevals.app.selectorLabels" . | nindent 4 }}

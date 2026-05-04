@@ -729,6 +729,147 @@ def serve(
         asyncio.run(_run_servers(host, port, otlp_http_port, otlp_grpc_port, mcp_port=mcp_port))
 
 
+# ---------------------------------------------------------------------------
+# agentevals migrate ...
+# ---------------------------------------------------------------------------
+
+
+@main.group("migrate")
+def migrate_group() -> None:
+    """Manage the Postgres schema for AGENTEVALS_STORAGE_BACKEND=postgres."""
+
+
+def _migrator_or_die() -> "object":
+    from pydantic import ValidationError
+
+    from .storage.config import StorageSettings
+    from .storage.postgres.migrator import Migrator
+
+    try:
+        settings = StorageSettings.from_env()
+    except ValidationError as exc:
+        # Extract the first inner message so CLI users see "AGENTEVALS_..." rather
+        # than the multi-line Pydantic dump.
+        first = exc.errors()[0] if exc.errors() else {"msg": str(exc)}
+        raise click.ClickException(first.get("msg", str(exc))) from exc
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not settings.database_url:
+        raise click.ClickException("AGENTEVALS_DATABASE_URL is required for migrations")
+    return Migrator(
+        dsn=settings.database_url,
+        schema=settings.schema_name,
+        lock_timeout_s=settings.migrate_lock_timeout_s,
+    )
+
+
+@migrate_group.command("up")
+@click.option("--dry-run", is_flag=True, help="Print which migrations would apply without executing.")
+def migrate_up(dry_run: bool) -> None:
+    """Apply all pending migrations."""
+    migrator = _migrator_or_die()
+    try:
+        applied = asyncio.run(migrator.up(dry_run=dry_run))
+    except Exception as exc:
+        raise click.ClickException(f"migration failed: {exc}") from exc
+    if not applied:
+        click.echo("Nothing to apply.")
+    else:
+        verb = "Would apply" if dry_run else "Applied"
+        for v in applied:
+            click.echo(f"{verb} {v:06d}")
+
+
+@migrate_group.command("down")
+@click.option("--steps", type=int, required=True, help="Number of migrations to roll back (>= 1).")
+@click.confirmation_option(
+    prompt="Rolling back migrations is destructive and may delete data. Continue?",
+)
+def migrate_down(steps: int) -> None:
+    """Roll back the last N migrations. Prints SQL for each step before executing."""
+    migrator = _migrator_or_die()
+    try:
+        rolled = asyncio.run(migrator.down(steps=steps))
+    except Exception as exc:
+        raise click.ClickException(f"rollback failed: {exc}") from exc
+    if not rolled:
+        click.echo("Nothing to roll back.")
+    else:
+        for version, name in rolled:
+            click.echo(f"Rolled back {version:06d}_{name}")
+
+
+@migrate_group.command("version")
+def migrate_version() -> None:
+    """Print the current schema version and the dirty flag."""
+    migrator = _migrator_or_die()
+    status = asyncio.run(migrator.status())
+    if status.version is None:
+        click.echo("schema not initialized (no migrations applied)")
+    else:
+        click.echo(f"version={status.version:06d} dirty={status.dirty}")
+
+
+@migrate_group.command("force")
+@click.argument("version", type=int)
+def migrate_force(version: int) -> None:
+    """Set the schema version and clear the dirty flag. Recovery only.
+
+    Use after fixing a partially-applied migration manually. Does not run any
+    SQL; only updates the schema_migrations row.
+    """
+    migrator = _migrator_or_die()
+    asyncio.run(migrator.force(version))
+    click.echo(f"forced version={version:06d} dirty=False")
+
+
+@migrate_group.command("create")
+@click.argument("name")
+@click.option(
+    "--output-dir",
+    "-o",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Where to write the new files (defaults to the in-tree migrations directory).",
+)
+def migrate_create(name: str, output_dir: str | None) -> None:
+    """Generate an empty NNNNNN_<name>.up.sql + .down.sql pair."""
+    import re as _re
+    from pathlib import Path as _Path
+
+    if not _re.match(r"^[a-z0-9_]+$", name):
+        raise click.ClickException("name must match [a-z0-9_]+")
+
+    from .storage.postgres.migrator import discover_migrations
+
+    if output_dir is None:
+        repo_path = _Path(__file__).resolve().parent / "storage" / "postgres" / "migrations"
+        if not repo_path.is_dir():
+            raise click.ClickException(
+                f"migrations dir not found at {repo_path} (run 'create' from a checkout, not an installed wheel)"
+            )
+        target = repo_path
+    else:
+        target = _Path(output_dir)
+        target.mkdir(parents=True, exist_ok=True)
+
+    existing = discover_migrations()
+    next_version = (max((m.version for m in existing), default=0) + 1) if existing else 1
+    up_path = target / f"{next_version:06d}_{name}.up.sql"
+    down_path = target / f"{next_version:06d}_{name}.down.sql"
+    if up_path.exists() or down_path.exists():
+        raise click.ClickException(f"{up_path.name} or {down_path.name} already exists")
+
+    header = (
+        f"-- Migration {next_version:06d}: {name}\n"
+        "-- Once tagged in a release this file is immutable. Fix bugs by adding a NEW migration.\n\n"
+    )
+    up_path.write_text(header)
+    down_path.write_text(header)
+    click.echo(f"Created {up_path}")
+    click.echo(f"Created {down_path}")
+
+
 @main.command("mcp")
 @click.option(
     "--server-url",

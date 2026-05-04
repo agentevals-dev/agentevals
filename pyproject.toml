@@ -33,6 +33,9 @@ streaming = [
 openai = [
     "openai>=2.0",
 ]
+postgres = [
+    "asyncpg>=0.30.0",
+]
 
 [project.scripts]
 agentevals = "agentevals.cli:main"
@@ -42,6 +45,9 @@ artifacts = ["src/agentevals/_static/**"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentevals"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/agentevals/storage/postgres/migrations" = "agentevals/storage/postgres/migrations"
 
 [tool.uv.workspace]
 members = ["packages/evaluator-sdk-py"]

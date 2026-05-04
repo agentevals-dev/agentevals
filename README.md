@@ -286,6 +286,24 @@ The source for the chart lives in [`charts/agentevals/`](charts/agentevals/) if 
 
 See the [Kubernetes example](examples/kubernetes/README.md) for an end-to-end walkthrough deploying agentevals alongside kagent and an OTel Collector on Kubernetes.
 
+#### Postgres backend (`/api/runs`)
+
+By default the chart deploys agentevals with an in-memory backend; runs and results are not persisted. To enable the async `POST /api/runs` pipeline with durable Postgres-backed state:
+
+```bash
+# Bundled Postgres (dev / evaluation only):
+helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals \
+    --set storage.backend=postgres \
+    --set database.postgres.bundled.enabled=true
+
+# Or supply an external Postgres DSN:
+helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals \
+    --set storage.backend=postgres \
+    --set database.postgres.url='postgresql://user:pass@host:5432/dbname'
+```
+
+When `storage.backend=postgres` the app applies any pending schema migrations on startup (advisory-lock protected, safe across replicas) and starts an in-process worker that processes the run queue. Without `storage.backend=postgres` the `/api/runs` endpoints return 503 with a hint pointing at the env var.
+
 ## MCP Server
 
 Exposes evaluation tools to MCP clients. A `.mcp.json` at the project root lets Claude Code pick it up automatically.

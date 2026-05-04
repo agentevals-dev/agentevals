@@ -24,7 +24,7 @@ COPY src ./src
 
 COPY --from=ui /build/ui/dist ./src/agentevals/_static
 
-RUN uv sync --frozen --no-dev --extra live \
+RUN uv sync --frozen --no-dev --extra live --extra postgres \
     && groupadd --gid 1000 app \
     && useradd --uid 1000 --gid app --home-dir /app --no-log-init app \
     && chown -R app:app /app

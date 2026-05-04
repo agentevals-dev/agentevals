@@ -48,6 +48,17 @@ app.kubernetes.io/name: {{ include "agentevals.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- /*
+Selector labels scoped to the main app Pod and its Service. Carries the
+``app.kubernetes.io/component: agentevals`` discriminator so the agentevals
+Service does not also match the bundled Postgres Pod (which carries
+``app.kubernetes.io/component: database`` instead).
+*/ -}}
+{{- define "agentevals.app.selectorLabels" -}}
+{{ include "agentevals.selectorLabels" . }}
+app.kubernetes.io/component: agentevals
+{{- end }}
+
 {{- define "agentevals.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
 {{- default (include "agentevals.fullname" .) .Values.serviceAccount.name }}
@@ -55,3 +66,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Service name for the bundled Postgres instance.
+*/}}
+{{- define "agentevals.postgresqlServiceName" -}}
+{{- printf "%s-postgresql" (include "agentevals.fullname" .) -}}
+{{- end -}}
+
+{{/*
+Bundled Postgres image reference (registry/repository/name:tag).
+*/}}
+{{- define "agentevals.postgresql.image" -}}
+{{- $pg := .Values.database.postgres.bundled -}}
+{{- printf "%s/%s/%s:%s" $pg.image.registry $pg.image.repository $pg.image.name $pg.image.tag -}}
+{{- end -}}
+
+{{/*
+Secret name holding POSTGRES_PASSWORD for the bundled Postgres instance.
+*/}}
+{{- define "agentevals.passwordSecretName" -}}
+{{- printf "%s-postgresql" (include "agentevals.fullname" .) -}}
+{{- end -}}

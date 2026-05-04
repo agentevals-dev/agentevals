@@ -2,7 +2,10 @@
 # Global
 # ==============================================================================
 
-# -- Number of replicas. Only 1 is supported (no shared job state across pods).
+# -- Number of replicas. The default in-memory backend has no shared state, so
+# scale beyond 1 only when storage.backend is "postgres" (durable runs/results
+# in Postgres are safe to share across replicas via SELECT FOR UPDATE SKIP
+# LOCKED claim semantics).
 replicaCount: 1
 
 # -- Global container image registry (prepended to image.repository)
@@ -155,3 +158,67 @@ env: []
 
 # -- Extra envFrom sources (ConfigMapRef, SecretRef)
 envFrom: []
+
+# ==============================================================================
+# STORAGE
+# ==============================================================================
+
+storage:
+  # -- Storage backend. "memory" (default) keeps the developer experience
+  # zero-config: nothing persisted, restarts lose in-flight state. "postgres"
+  # enables /api/runs and persists runs + results in Postgres.
+  backend: memory
+
+# ==============================================================================
+# DATABASE CONFIGURATION
+# ==============================================================================
+# Used only when storage.backend is "postgres". Priority order (first match wins):
+#   1. database.postgres.urlFile  -- file-based DSN (workload identity friendly)
+#   2. database.postgres.url      -- literal DSN
+#   3. database.postgres.bundled  -- chart-bundled Postgres (dev/eval only)
+# If none is configured the chart fails to render.
+
+database:
+  postgres:
+    # -- External Postgres connection string.
+    # When set, takes precedence over the bundled instance regardless of
+    # database.postgres.bundled.enabled.
+    url: ""
+    # -- Path to a file containing the connection string. Takes precedence
+    # over url when set. Useful for projected workload-identity tokens.
+    urlFile: ""
+    # -- Postgres schema to use for agentevals tables.
+    schema: agentevals
+    # -- Bundled Postgres instance for development and evaluation only.
+    # Not suitable for production. Deployed when enabled is true and url /
+    # urlFile are not set.
+    bundled:
+      # -- Set to true to deploy a chart-managed Postgres alongside the app.
+      # Off by default so the zero-config install stays in-memory.
+      enabled: false
+      image:
+        # -- Bundled Postgres image registry
+        registry: docker.io
+        # -- Bundled Postgres image repository (org/namespace)
+        repository: library
+        # -- Bundled Postgres image name
+        name: postgres
+        # -- Bundled Postgres image tag
+        tag: "17"
+        # -- Bundled Postgres image pull policy
+        pullPolicy: IfNotPresent
+      # -- PersistentVolumeClaim size for the bundled Postgres data
+      storage: 1Gi
+      # -- StorageClass for the PVC. Defaults to the cluster default when empty.
+      storageClassName: ""
+      # The database name, user, and password are hardcoded for the bundled
+      # instance (all: "agentevals"). This is intentional for a dev/eval
+      # setup. Switch to an external database for production.
+      # -- Resource requests/limits for the bundled Postgres container
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi

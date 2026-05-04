@@ -15,7 +15,14 @@ HELM_CHART_DIR ?= charts/agentevals
 HELM_CHART_OCI_URL ?= $(HELM_REPO)/helm
 HELM_CHART_VERSION ?= $(VERSION)
 
-.PHONY: build build-bundle build-docker build-ui release clean dev-backend dev-frontend dev-bundle test test-unit test-integration test-e2e helm-lint helm-template helm-test helm-cleanup helm-package helm-publish
+.PHONY: build build-bundle build-docker build-ui release clean dev-backend dev-backend-pg dev-frontend dev-bundle pg-up pg-down migrate test test-unit test-integration test-e2e helm-lint helm-template helm-test helm-cleanup helm-package helm-publish
+
+PG_CONTAINER ?= agentevals-pg
+PG_PORT      ?= 5432
+PG_USER      ?= agentevals
+PG_PASSWORD  ?= agentevals
+PG_DATABASE  ?= agentevals
+PG_DSN       ?= postgresql://$(PG_USER):$(PG_PASSWORD)@localhost:$(PG_PORT)/$(PG_DATABASE)
 
 build:
 	uv build
@@ -51,6 +58,30 @@ release: clean build-ui
 	@echo "  bundle: dist/bundle/$(BUNDLE_WHEEL_NAME)"
 
 dev-backend:
+	uv run agentevals serve --dev
+
+pg-up:
+	@if [ -z "$$(docker ps -q -f name=^/$(PG_CONTAINER)$$)" ]; then \
+		docker run -d --rm --name $(PG_CONTAINER) \
+			-e POSTGRES_USER=$(PG_USER) \
+			-e POSTGRES_PASSWORD=$(PG_PASSWORD) \
+			-e POSTGRES_DB=$(PG_DATABASE) \
+			-p $(PG_PORT):5432 postgres:17-alpine; \
+	else \
+		echo "container $(PG_CONTAINER) already running"; \
+	fi
+	@until docker exec $(PG_CONTAINER) pg_isready -U $(PG_USER) >/dev/null 2>&1; do sleep 1; done
+	@echo "Postgres ready at $(PG_DSN)"
+
+pg-down:
+	-docker stop $(PG_CONTAINER)
+
+migrate:
+	AGENTEVALS_DATABASE_URL=$(PG_DSN) uv run agentevals migrate up
+
+dev-backend-pg: pg-up migrate
+	AGENTEVALS_STORAGE_BACKEND=postgres \
+	AGENTEVALS_DATABASE_URL=$(PG_DSN) \
 	uv run agentevals serve --dev
 
 dev-frontend:

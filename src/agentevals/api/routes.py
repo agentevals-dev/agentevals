@@ -22,6 +22,7 @@ from ..config import (
     BuiltinMetricDef,
     CodeEvaluatorDef,
     CustomEvaluatorDef,
+    EvalParams,
     EvalRunConfig,
     OpenAIEvalDef,
 )
@@ -66,6 +67,71 @@ def _camel_keys(obj: Any) -> Any:
     if isinstance(obj, list):
         return [_camel_keys(item) for item in obj]
     return obj
+
+
+def _load_eval_set_dict(path: str | None) -> dict | None:
+    """Read the uploaded eval set file back into a dict for persistence.
+
+    The on-disk file gets cleaned up with the temp dir; capturing the dict
+    here lets us store it on the run row so a future ``GET /api/runs/{id}``
+    can show what was evaluated against without re-uploading the file.
+    """
+    if not path:
+        return None
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        logger.warning("could not re-read eval_set file at %s for persistence", path)
+        return None
+
+
+async def _maybe_persist_evaluate_run(
+    request: Request,
+    *,
+    params: "EvalParams",
+    eval_set_dict: dict | None,
+    trace_format: str | None,
+    upload_filenames: list[str] | None,
+    run_result: "RunResult",
+) -> str | None:
+    """Persist a synchronously-completed eval as a Run + Result rows when
+    ``app.state.run_service`` is configured (i.e. ``backend=postgres``).
+
+    Returns the synthesized ``run_id`` so the caller can attach it to the
+    response (UI / SSE clients can then ``GET /api/runs/{id}/results`` to
+    pull historical context). Returns None on the memory backend so callers
+    keep their existing zero-config behavior. Errors are logged but never
+    propagated; if persistence fails the eval result is still returned to
+    the caller.
+    """
+    service = getattr(request.app.state, "run_service", None)
+    if service is None:
+        return None
+    try:
+        from ..run.service import RunService
+        from ..storage.models import RunSpec, TraceTarget
+
+        filenames = list(upload_filenames or [])
+        target = TraceTarget(
+            kind="uploaded",
+            trace_format=trace_format if trace_format in ("jaeger-json", "otlp-json") else None,
+            trace_count=len(filenames),
+            trace_files=filenames,
+        )
+        spec_payload = params.model_dump(by_alias=False)
+        spec = RunSpec(
+            approach="trace_replay",
+            target=target,
+            eval_config=spec_payload,
+            eval_set=eval_set_dict,
+        )
+        assert isinstance(service, RunService)
+        run = await service.record_completed_eval(spec=spec, params=params, run_result=run_result)
+        return str(run.run_id)
+    except Exception:
+        logger.exception("failed to persist /api/evaluate run; eval result still returned to caller")
+        return None
 
 
 router = APIRouter()
@@ -434,6 +500,7 @@ async def convert_trace_files(
 
 @router.post("/evaluate", response_model=StandardResponse[RunResult])
 async def evaluate_traces(
+    request: Request,
     trace_files: list[UploadFile] = File(...),
     config: str = Form(...),
     eval_set_file: UploadFile | None = File(None),
@@ -542,6 +609,17 @@ async def evaluate_traces(
         logger.info(f"Evaluating {len(trace_paths)} trace file(s) with metrics: {metrics}")
         result = await run_evaluation(eval_config)
 
+        run_id = await _maybe_persist_evaluate_run(
+            request,
+            params=eval_config,
+            eval_set_dict=_load_eval_set_dict(eval_set_path),
+            trace_format=eval_config.trace_format,
+            upload_filenames=[tf.filename for tf in trace_files if tf.filename],
+            run_result=result,
+        )
+        if run_id:
+            result.run_id = run_id
+
         result_dict = _camel_keys(result.model_dump(by_alias=True))
         return StandardResponse(data=result_dict)
 
@@ -557,12 +635,14 @@ async def evaluate_traces(
 
 @router.post("/evaluate/stream")
 async def evaluate_traces_stream(
+    request: Request,
     trace_files: list[UploadFile] = File(...),
     config: str = Form(...),
     eval_set_file: UploadFile | None = File(None),
 ):
     """Evaluate traces with real-time progress via SSE."""
     temp_dir = tempfile.mkdtemp()
+    upload_filenames = [tf.filename for tf in trace_files if tf.filename]
 
     async def event_generator():
         try:
@@ -678,6 +758,16 @@ async def evaluate_traces_stream(
                     tag, payload = msg
 
                     if tag == "done":
+                        run_id = await _maybe_persist_evaluate_run(
+                            request,
+                            params=eval_config,
+                            eval_set_dict=_load_eval_set_dict(eval_set_path),
+                            trace_format=eval_config.trace_format,
+                            upload_filenames=upload_filenames,
+                            run_result=payload,
+                        )
+                        if run_id:
+                            payload.run_id = run_id
                         evt = SSEDoneEvent(
                             result=_camel_keys(payload.model_dump(by_alias=True)),
                         )
@@ -768,6 +858,16 @@ async def evaluate_traces_json(request: EvaluateJsonRequest, raw_request: Reques
             config=request.config,
             eval_set=eval_set,
         )
+        run_id = await _maybe_persist_evaluate_run(
+            raw_request,
+            params=request.config,
+            eval_set_dict=request.eval_set,
+            trace_format=None,
+            upload_filenames=None,
+            run_result=result,
+        )
+        if run_id:
+            result.run_id = run_id
         return StandardResponse(data=_camel_keys(result.model_dump(by_alias=True)))
     except Exception as exc:
         logger.exception("JSON evaluation failed")
@@ -827,6 +927,16 @@ async def evaluate_traces_json_stream(request: EvaluateJsonRequest, raw_request:
                     tag, payload = msg
 
                     if tag == "done":
+                        run_id = await _maybe_persist_evaluate_run(
+                            raw_request,
+                            params=request.config,
+                            eval_set_dict=request.eval_set,
+                            trace_format=None,
+                            upload_filenames=None,
+                            run_result=payload,
+                        )
+                        if run_id:
+                            payload.run_id = run_id
                         evt = SSEDoneEvent(
                             result=_camel_keys(payload.model_dump(by_alias=True)),
                         )

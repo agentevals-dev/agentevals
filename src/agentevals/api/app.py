@@ -16,12 +16,19 @@ from fastapi.responses import StreamingResponse
 
 from agentevals import __version__
 
+from ..run.service import RunService
+from ..run.worker import AsyncRunWorker
+from ..storage import StorageSettings, build_repos
+from ..storage.postgres.migrator import Migrator
 from ..utils.log_buffer import log_buffer
 from .debug_routes import debug_router
 from .routes import router
+from .runs_routes import runs_router
 
 if TYPE_CHECKING:
     from ..streaming.ws_server import StreamingTraceManager
+
+logger = logging.getLogger(__name__)
 
 try:
     from dotenv import load_dotenv
@@ -51,7 +58,39 @@ def _build_lifespan():
         mgr = getattr(app.state, "trace_manager", None)
         if mgr:
             mgr.start_cleanup_task()
+
+        storage_settings: StorageSettings | None = None
+        worker: AsyncRunWorker | None = None
+        try:
+            storage_settings = StorageSettings.from_env()
+        except Exception as exc:
+            logger.error("Storage configuration invalid; /api/runs will not be available: %s", exc)
+
+        if storage_settings is not None and storage_settings.backend == "postgres":
+            logger.info("Applying any pending migrations to schema '%s'", storage_settings.schema_name)
+            migrator = Migrator(
+                dsn=storage_settings.database_url or "",
+                schema=storage_settings.schema_name,
+                lock_timeout_s=storage_settings.migrate_lock_timeout_s,
+            )
+            await migrator.up()
+
+            repos = await build_repos(storage_settings)
+            app.state.storage_settings = storage_settings
+            app.state.repos = repos
+            app.state.run_service = RunService(repos.runs, repos.results)
+
+            worker = AsyncRunWorker(runs=repos.runs, results=repos.results, settings=storage_settings)
+            await worker.start()
+            app.state.run_worker = worker
+
         yield
+
+        if worker is not None:
+            await worker.stop()
+        repos = getattr(app.state, "repos", None)
+        if repos is not None:
+            await repos.close()
         if mgr:
             await mgr.shutdown()
         ae_logger.removeHandler(log_buffer)
@@ -83,6 +122,7 @@ def create_app(
 
     app.include_router(router, prefix="/api")
     app.include_router(debug_router, prefix="/api/debug")
+    app.include_router(runs_router, prefix="/api")
 
     if trace_manager is not None:
         app.state.trace_manager = trace_manager

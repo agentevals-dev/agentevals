@@ -9,7 +9,7 @@ spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "agentevals.selectorLabels" . | nindent 6 }}
+      {{- include "agentevals.app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -17,7 +17,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "agentevals.selectorLabels" . | nindent 8 }}
+        {{- include "agentevals.app.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -64,6 +64,29 @@ spec:
               value: "/tmp"
             - name: HOME
               value: "/tmp/agentevals-home"
+            {{- end }}
+            {{- if eq .Values.storage.backend "postgres" }}
+            - name: AGENTEVALS_STORAGE_BACKEND
+              value: "postgres"
+            - name: AGENTEVALS_DATABASE_SCHEMA
+              value: {{ .Values.database.postgres.schema | quote }}
+            {{- if .Values.database.postgres.urlFile }}
+            - name: AGENTEVALS_DATABASE_URL_FILE
+              value: {{ .Values.database.postgres.urlFile | quote }}
+            {{- else if .Values.database.postgres.url }}
+            - name: AGENTEVALS_DATABASE_URL
+              value: {{ .Values.database.postgres.url | quote }}
+            {{- else if .Values.database.postgres.bundled.enabled }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "agentevals.passwordSecretName" . }}
+                  key: POSTGRES_PASSWORD
+            - name: AGENTEVALS_DATABASE_URL
+              value: {{ printf "postgresql://agentevals:$(POSTGRES_PASSWORD)@%s.%s.svc.cluster.local:5432/agentevals?sslmode=disable" (include "agentevals.postgresqlServiceName" .) (include "agentevals.namespace" .) | quote }}
+            {{- else }}
+            {{ fail "storage.backend=postgres requires database.postgres.url, database.postgres.urlFile, or database.postgres.bundled.enabled=true" }}
+            {{- end }}
             {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}

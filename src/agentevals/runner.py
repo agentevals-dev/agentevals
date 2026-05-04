@@ -59,6 +59,7 @@ class RunResult(BaseModel):
     trace_results: list[TraceResult] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     performance_metrics: dict[str, Any] | None = None
+    run_id: str | None = None
 
 
 def load_eval_set(path: str) -> EvalSet:

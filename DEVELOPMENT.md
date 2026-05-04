@@ -23,9 +23,32 @@ make dev-frontend      # start Vite dev server (port 5173) with HMR
 make dev-bundle        # build UI, serve full bundled experience at port 8001 via uv run
 ```
 
-Standard development uses `dev-backend` + `dev-frontend` in separate terminals. The Vite dev server proxies nothing — the frontend calls the backend at `http://localhost:8001` directly via CORS.
+Standard development uses `dev-backend` + `dev-frontend` in separate terminals. The Vite dev server proxies nothing; the frontend calls the backend at `http://localhost:8001` directly via CORS.
 
 `dev-bundle` is useful for testing the bundled UI experience without building a wheel. It copies `ui/dist` into the source tree temporarily and cleans up when the server exits.
+
+### Postgres backend (optional, for `/api/runs`)
+
+The default in-memory backend keeps `make dev-backend` zero-config. To exercise the async run pipeline locally, bring up a Postgres alongside the app:
+
+```bash
+make pg-up             # start postgres:17-alpine in a docker container (port 5432, ephemeral via --rm)
+make migrate           # apply the agentevals schema
+make dev-backend-pg    # pg-up + migrate + serve --dev with backend=postgres wired up
+make pg-down           # stop the container; data is discarded with --rm
+```
+
+Override the defaults via `PG_PORT=5433 make pg-up` etc. The `migrate` target is idempotent (a second invocation is a no-op).
+
+Once running, submit a run with:
+
+```bash
+curl -X POST http://localhost:8001/api/runs \
+    -H 'content-type: application/json' \
+    -d '{"spec": {"approach": "trace_replay", "target": {"kind": "inline", "inline": {...}}, "evalConfig": {"metrics": ["tool_trajectory_avg_score"]}}}'
+```
+
+Then poll `GET /api/runs/{runId}` and `GET /api/runs/{runId}/results`. Without `storage.backend=postgres`, the `/api/runs` endpoints return 503 with a hint pointing at the env var.
 
 ### Building
 
