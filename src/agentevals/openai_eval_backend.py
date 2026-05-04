@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_SECONDS = 2
 
+# Schema for graders that compare actual vs expected (e.g. text_similarity).
 _TEXT_PAIR_SCHEMA = {
     "type": "object",
     "properties": {
@@ -30,6 +31,22 @@ _TEXT_PAIR_SCHEMA = {
     },
     "required": ["actual_response", "expected_response"],
 }
+
+# Schema for graders that only need the actual response (e.g. string_check).
+_ACTUAL_ONLY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "actual_response": {"type": "string"},
+    },
+    "required": ["actual_response"],
+}
+
+
+def _get_item_schema(grader_type: str) -> dict[str, Any]:
+    """Return the appropriate item schema for the given grader type."""
+    if grader_type == "string_check":
+        return _ACTUAL_ONLY_SCHEMA
+    return _TEXT_PAIR_SCHEMA
 
 
 def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
@@ -51,28 +68,41 @@ def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
             "pass_threshold": evaluator_def.threshold,
         }
 
+    if grader_type == "string_check":
+        return {
+            "type": "string_check",
+            "name": evaluator_def.name,
+            "input": "{{ item.actual_response }}",
+            "reference": grader["reference"],
+            "operation": grader["operation"],
+        }
+
     raise ValueError(f"Unsupported grader type: {grader_type}")
 
 
 def _build_jsonl_items(
     actual_invocations: list[Invocation],
     expected_invocations: list[Invocation],
+    grader_type: str = "",
 ) -> list[dict[str, Any]]:
+    """Build JSONL items matching the grader-aware item schema.
+
+    string_check graders use a static reference from config and only need
+    ``actual_response`` in each item.  All other graders (e.g. text_similarity)
+    also require ``expected_response``.
+    """
+    include_expected = grader_type != "string_check"
     items = []
     for i, actual_inv in enumerate(actual_invocations):
         actual_text = _content_to_text(actual_inv.final_response)
-        if i < len(expected_invocations):
-            expected_text = _content_to_text(expected_invocations[i].final_response)
-        else:
-            expected_text = ""
-        items.append(
-            {
-                "item": {
-                    "actual_response": actual_text,
-                    "expected_response": expected_text,
-                }
-            }
-        )
+        item: dict[str, Any] = {"actual_response": actual_text}
+        if include_expected:
+            if i < len(expected_invocations):
+                expected_text = _content_to_text(expected_invocations[i].final_response)
+            else:
+                expected_text = ""
+            item["expected_response"] = expected_text
+        items.append({"item": item})
     return items
 
 
@@ -111,13 +141,21 @@ async def evaluate_openai_eval(
             error="OPENAI_API_KEY environment variable is not set.",
         )
 
-    if expected_invocations is None:
+    grader_type = evaluator_def.grader.get("type", "")
+
+    # string_check graders use a static reference from config and don't need
+    # expected_invocations — only text_similarity requires a golden eval set.
+    if grader_type != "string_check" and expected_invocations is None:
         return MetricResult(
             metric_name=evaluator_def.name,
-            error="OpenAI text_similarity grader requires expected invocations (golden eval set).",
+            error=f"OpenAI {grader_type} grader requires expected invocations (golden eval set).",
         )
 
-    items = _build_jsonl_items(actual_invocations, expected_invocations)
+    items = _build_jsonl_items(
+        actual_invocations,
+        expected_invocations if expected_invocations is not None else [],
+        grader_type=grader_type,
+    )
     if not items:
         return MetricResult(
             metric_name=evaluator_def.name,
@@ -135,7 +173,7 @@ async def evaluate_openai_eval(
             name=f"agentevals-{evaluator_def.name}",
             data_source_config={
                 "type": "custom",
-                "item_schema": _TEXT_PAIR_SCHEMA,
+                "item_schema": _get_item_schema(grader_type),
                 "include_sample_schema": False,
             },
             testing_criteria=[testing_criteria],
@@ -225,10 +263,18 @@ async def _collect_results(client: Any, eval_id: str, run_id: str, run: Any, eva
     total = result_counts.total if result_counts else 0
     eval_status = "PASSED" if failed == 0 and total > 0 else "FAILED"
 
+    grader_type = evaluator_def.grader.get("type", "")
+    # Include the grader-relevant key depending on type
+    # (evaluation_metric for text_similarity, operation for string_check)
+    if grader_type == "string_check":
+        grader_detail_key = "operation"
+    else:
+        grader_detail_key = "evaluation_metric"
+
     details: dict[str, Any] = {
         "openai_eval_id": eval_id,
         "openai_run_id": run_id,
-        "evaluation_metric": evaluator_def.grader.get("evaluation_metric"),
+        grader_detail_key: evaluator_def.grader.get(grader_detail_key),
         "result_counts": {"passed": passed, "failed": failed, "total": total},
     }
     per_criteria = getattr(run, "per_testing_criteria_results", None)

@@ -240,7 +240,7 @@ evaluators:
     threshold: 0.7
 ```
 
-Evaluators with a `requirements.txt` get automatic virtual environment management. You can also use `type: remote` for community evaluators from GitHub, or `type: openai_eval` to delegate grading to the [OpenAI Evals API](https://developers.openai.com/api/reference/resources/evals/methods/create) (requires `pip install "agentevals-cli[openai]"`).
+Evaluators with a `requirements.txt` get automatic virtual environment management. You can also use `type: remote` for community evaluators from GitHub, or `type: openai_eval` to delegate grading to the [OpenAI Evals API](https://developers.openai.com/api/reference/resources/evals/methods/create) (requires `pip install "agentevals-cli[openai]"`). Two OpenAI grader types are supported: `text_similarity` for comparing responses against a golden reference, and `string_check` for exact or pattern-based matching against a fixed value.
 
 See the [Custom Evaluators guide](docs/custom-evaluators.md) for the full protocol reference, SDK helpers, and how to contribute evaluators.
 

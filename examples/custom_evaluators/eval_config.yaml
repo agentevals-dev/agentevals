@@ -32,3 +32,18 @@ evaluators:
     ref: evaluators/random_evaluator/random_evaluator.py
     threshold: 0.110
     executor: local
+
+  # OpenAI Evals API graders (requires OPENAI_API_KEY)
+  - name: response_similarity
+    type: openai_eval
+    threshold: 0.8
+    grader:
+      type: text_similarity
+      evaluation_metric: fuzzy_match
+
+  - name: city_name_check
+    type: openai_eval
+    grader:
+      type: string_check
+      operation: eq
+      reference: "{{ item.expected_response }}"
