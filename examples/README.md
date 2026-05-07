@@ -119,6 +119,13 @@ The zero-code and SDK examples implement the same toy agent (dice rolling + prim
 |---------|-------------|
 | [kubernetes/](./kubernetes/) | Deploy agentevals with kagent on Kubernetes using native OTLP gRPC ingestion (or optionally an OTel Collector). Includes a walkthrough for comparing two kagent agents (different models) and evaluating them with tool trajectory and response match scores. |
 
+## Custom Evaluators
+
+| Example | Description |
+|---------|-------------|
+| [custom_evaluators/aana_action_gate.py](./custom_evaluators/aana_action_gate.py) | Dependency-free AANA-style action gate that scores agent tool calls for private-data, irreversible-effect, and ambiguous high-risk action patterns before deployment gating. |
+| [custom_evaluators/aana_eval_config.yaml](./custom_evaluators/aana_eval_config.yaml) | Example config that runs the AANA-style gate alongside `tool_trajectory_avg_score` on the bundled Helm/Kubernetes traces. |
+
 ## Advanced: GenAI Semantic Convention Patterns
 
 > [!TIP]

@@ -1,0 +1,27 @@
+# Example eval config using an AANA-style action gate alongside built-in metrics.
+#
+# Safe Helm list trace:
+#   agentevals run samples/helm.json \
+#     --config examples/custom_evaluators/aana_eval_config.yaml \
+#     --eval-set samples/eval_set_helm.json
+#
+# Mismatched Kubernetes trace:
+#   agentevals run samples/k8s.json \
+#     --config examples/custom_evaluators/aana_eval_config.yaml \
+#     --eval-set samples/eval_set_helm.json
+
+evaluators:
+  - name: tool_trajectory_avg_score
+    type: builtin
+
+  - name: aana_action_gate
+    type: code
+    path: ./examples/custom_evaluators/aana_action_gate.py
+    threshold: 1.0
+    config:
+      allow_no_tool_calls: true
+      allowed_tools:
+        - helm_list_releases
+        - kubectl_get
+        - kubectl_describe
+      reviewed_tools: []
