@@ -58,6 +58,43 @@ logger = logging.getLogger(__name__)
 
 FORMAT_DETECTION_SPAN_LIMIT = 10
 
+
+def _parse_legacy_indexed_attrs(attrs: dict[str, Any], prefix: str) -> list[dict]:
+    """Parse flat gen_ai.{prefix}.N.* attributes into a message list."""
+    messages: dict[int, dict] = {}
+    for key, value in attrs.items():
+        if not key.startswith(prefix):
+            continue
+        rest = key[len(prefix):]
+        parts = rest.split(".", 1)
+        if not parts[0].isdigit():
+            continue
+        idx = int(parts[0])
+        msg = messages.setdefault(idx, {})
+        if len(parts) < 2:
+            continue
+        field = parts[1]
+        if field == "role":
+            msg["role"] = value
+        elif field == "content":
+            msg["content"] = value
+        elif field.startswith("tool_calls."):
+            tc_rest = field[len("tool_calls."):]
+            tc_parts = tc_rest.split(".", 1)
+            if not tc_parts[0].isdigit() or len(tc_parts) < 2:
+                continue
+            tc_map = msg.setdefault("_tc", {})
+            tc_map.setdefault(int(tc_parts[0]), {})[tc_parts[1]] = value
+    result = []
+    for idx in sorted(messages):
+        msg = messages[idx].copy()
+        tc_map = msg.pop("_tc", {})
+        if tc_map:
+            msg["tool_calls"] = [tc_map[i] for i in sorted(tc_map)]
+        result.append(msg)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Pure extraction functions (operate on flat attribute dicts)
 # ---------------------------------------------------------------------------
@@ -92,6 +129,12 @@ def extract_user_text_from_attrs(attrs: dict[str, Any]) -> str | None:
                     if text:
                         return text
 
+    for msg in reversed(_parse_legacy_indexed_attrs(attrs, "gen_ai.prompt.")):
+        if msg.get("role") in USER_ROLES:
+            text = extract_text_from_message(msg)
+            if text:
+                return text
+
     return None
 
 
@@ -117,6 +160,12 @@ def extract_agent_response_from_attrs(attrs: dict[str, Any]) -> str | None:
                     text = extract_text_from_message(msg)
                     if text:
                         return text
+
+    for msg in reversed(_parse_legacy_indexed_attrs(attrs, "gen_ai.completion.")):
+        if msg.get("role") in ASSISTANT_ROLES:
+            text = extract_text_from_message(msg)
+            if text:
+                return text
 
     return None
 

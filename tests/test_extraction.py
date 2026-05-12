@@ -802,3 +802,48 @@ class TestExtractToolCallTypeAndDescription:
         result = extract_tool_call_from_attrs(attrs)
         assert "type" not in result
         assert "description" not in result
+
+
+class TestLegacyGenAIAttributes:
+    def test_user_text_from_legacy_prompt(self):
+        attrs = {
+            "gen_ai.prompt.0.role": "user",
+            "gen_ai.prompt.0.content": "Hi! Can you help me?",
+            "gen_ai.request.model": "llama3.2:3b",
+        }
+        assert extract_user_text_from_attrs(attrs) == "Hi! Can you help me?"
+
+    def test_user_text_prefers_last_user_in_legacy_prompt(self):
+        attrs = {
+            "gen_ai.prompt.0.role": "user",
+            "gen_ai.prompt.0.content": "First message",
+            "gen_ai.prompt.1.role": "assistant",
+            "gen_ai.prompt.1.content": "Response",
+            "gen_ai.prompt.2.role": "user",
+            "gen_ai.prompt.2.content": "Follow-up",
+        }
+        assert extract_user_text_from_attrs(attrs) == "Follow-up"
+
+    def test_agent_response_from_legacy_completion(self):
+        attrs = {
+            "gen_ai.completion.0.role": "assistant",
+            "gen_ai.completion.0.content": "You rolled a 4 on a 6-sided die.",
+            "gen_ai.request.model": "llama3.2:3b",
+        }
+        assert extract_agent_response_from_attrs(attrs) == "You rolled a 4 on a 6-sided die."
+
+    def test_legacy_prompt_ignored_when_standard_attr_present(self):
+        attrs = {
+            OTEL_GENAI_INPUT_MESSAGES: json.dumps([{"role": "user", "content": "Standard wins"}]),
+            "gen_ai.prompt.0.role": "user",
+            "gen_ai.prompt.0.content": "Legacy loses",
+        }
+        assert extract_user_text_from_attrs(attrs) == "Standard wins"
+
+    def test_legacy_completion_ignored_when_standard_attr_present(self):
+        attrs = {
+            OTEL_GENAI_OUTPUT_MESSAGES: json.dumps([{"role": "assistant", "content": "Standard wins"}]),
+            "gen_ai.completion.0.role": "assistant",
+            "gen_ai.completion.0.content": "Legacy loses",
+        }
+        assert extract_agent_response_from_attrs(attrs) == "Standard wins"
