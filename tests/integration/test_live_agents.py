@@ -15,10 +15,12 @@ Tests are synchronous because:
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import os
 import subprocess
 import sys
+import time
 
 import httpx
 import pytest
@@ -45,6 +47,7 @@ _skip_no_pydantic_ai = pytest.mark.skipif(
 )
 
 
+
 def _run_agent(
     script: str,
     otlp_http_port: int,
@@ -68,6 +71,41 @@ def _run_agent(
         timeout=timeout,
         cwd=REPO_ROOT,
     )
+
+
+_AGENTCORE_ENV = {"OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental"}
+_AGENTCORE_SCRIPT = "examples/zero-code-examples/agentcore/run.py"
+_AGENTCORE_PORT = int(os.environ.get("AGENTCORE_PORT", "8080"))
+
+
+@contextlib.contextmanager
+def _agentcore_server(otlp_http_port: int, session_name: str, extra_env: dict | None = None):
+    env = {**os.environ,
+           "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{otlp_http_port}",
+           "OTEL_RESOURCE_ATTRIBUTES": f"agentevals.eval_set_id=e2e-test,agentevals.session_name={session_name}",
+           **(extra_env or {})}
+    proc = subprocess.Popen([sys.executable, os.path.join(REPO_ROOT, _AGENTCORE_SCRIPT)], env=env, cwd=REPO_ROOT)
+    try:
+        for _ in range(20):
+            if proc.poll() is not None:
+                raise RuntimeError(f"agentcore server exited early (code {proc.returncode})")
+            try:
+                httpx.get(f"http://127.0.0.1:{_AGENTCORE_PORT}/ping", timeout=1)
+                break
+            except Exception:
+                time.sleep(0.5)
+        else:
+            proc.kill()
+            raise RuntimeError("agentcore server did not start within 10s")
+        yield proc
+    finally:
+        time.sleep(2)
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
 
 
 @_skip_no_openai
@@ -370,6 +408,37 @@ class TestPydanticAIZeroCode:
         assert resp.status_code == 200
         session_ids = [s["sessionId"] for s in resp.json()["data"]]
         assert session_name in session_ids
+
+
+class TestAgentCoreZeroCode:
+    def test_session_created_spans_only(self, live_servers):
+        main_port, otlp_http_port, mgr = live_servers
+        session_name = "e2e-agentcore"
+        with _agentcore_server(otlp_http_port, session_name, extra_env=_AGENTCORE_ENV):
+            r = httpx.post(f"http://127.0.0.1:{_AGENTCORE_PORT}/invocations", json={"prompt": "Roll a 20-sided die"}, timeout=60)
+            assert r.status_code == 200
+        wait_for_session_complete_sync(mgr, session_name, timeout=60)
+        s = mgr.sessions[session_name]
+        assert s.is_complete and s.source == "otlp" and len(s.spans) > 0
+
+    def test_invocations_extracted(self, live_servers):
+        main_port, otlp_http_port, mgr = live_servers
+        session_name = "e2e-agentcore-inv"
+        with _agentcore_server(otlp_http_port, session_name, extra_env=_AGENTCORE_ENV):
+            r = httpx.post(f"http://127.0.0.1:{_AGENTCORE_PORT}/invocations", json={"prompt": "Is 17 prime?"}, timeout=60)
+            assert r.status_code == 200
+        wait_for_session_complete_sync(mgr, session_name, timeout=60)
+        assert len(mgr.sessions[session_name].invocations) > 0
+
+    def test_session_visible_via_api(self, live_servers):
+        main_port, otlp_http_port, mgr = live_servers
+        session_name = "e2e-agentcore-api"
+        with _agentcore_server(otlp_http_port, session_name, extra_env=_AGENTCORE_ENV):
+            r = httpx.post(f"http://127.0.0.1:{_AGENTCORE_PORT}/invocations", json={"prompt": "Hello!"}, timeout=60)
+            assert r.status_code == 200
+        wait_for_session_complete_sync(mgr, session_name, timeout=60)
+        data = httpx.get(f"http://127.0.0.1:{main_port}/api/streaming/sessions").json()["data"]
+        assert session_name in [s["sessionId"] for s in data]
 
 
 @_skip_no_openai
