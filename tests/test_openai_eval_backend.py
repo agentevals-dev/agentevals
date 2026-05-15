@@ -123,7 +123,6 @@ class TestBuildJsonlItems:
         assert items[0]["item"]["expected_response"] == ""
 
 
-
 class TestEvaluateOpenAIEval:
     async def test_no_api_key_returns_error(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
