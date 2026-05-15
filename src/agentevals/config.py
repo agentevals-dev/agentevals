@@ -70,6 +70,10 @@ class RemoteEvaluatorDef(BaseEvaluatorDef):
     ref: str = Field(description="Source-specific reference (e.g. path within the repo).")
 
 
+_VALID_STRING_CHECK_OPERATIONS = frozenset({"eq", "ne", "like", "ilike"})
+
+_SUPPORTED_GRADER_TYPES = frozenset({"string_check", "text_similarity", "label_model"})
+
 _VALID_SIMILARITY_METRICS = frozenset(
     {
         "fuzzy_match",
@@ -113,8 +117,15 @@ class OpenAIEvalDef(BaseModel):
             invalid = [lbl for lbl in v["passing_labels"] if lbl not in v["labels"]]
             if invalid:
                 raise ValueError(f"passing_labels contains labels not declared in labels: {invalid}")
+        elif grader_type == "string_check":
+            for field in ("reference", "operation"):
+                if not v.get(field):
+                    raise ValueError(f"'{field}' is required for string_check grader")
+            op = v["operation"]
+            if op not in _VALID_STRING_CHECK_OPERATIONS:
+                raise ValueError(f"Invalid operation '{op}'. Valid: {sorted(_VALID_STRING_CHECK_OPERATIONS)}")
         else:
-            raise ValueError(f"Unsupported grader type: '{grader_type}'. Supported: label_model, text_similarity")
+            raise ValueError(f"Unsupported grader type: '{grader_type}'. Supported: {sorted(_SUPPORTED_GRADER_TYPES)}")
         return v
 
 
