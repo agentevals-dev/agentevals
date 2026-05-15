@@ -25,18 +25,6 @@ evaluators:
     config:
       min_response_length: 20
 
-  # OpenAI score_model grader (no golden set needed)
-  - name: quality_score
-    type: openai_eval
-    threshold: 0.7
-    grader:
-      type: score_model
-      model: gpt-4o-mini
-      input:
-        - role: user
-          content: "Rate the quality of this response from 0 to 1: {{ item.actual_response }}"
-      range: [0, 1]
-
   # Reference an evaluator from Github
   - name: random_evaluator
     type: remote
