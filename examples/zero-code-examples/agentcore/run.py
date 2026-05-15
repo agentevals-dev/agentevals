@@ -33,8 +33,9 @@ from strands.telemetry import StrandsTelemetry
 
 load_dotenv(override=True)
 os.environ.setdefault("OTEL_SEMCONV_STABILITY_OPT_IN", "gen_ai_latest_experimental")
-os.environ.setdefault("OTEL_RESOURCE_ATTRIBUTES",
-    "agentevals.eval_set_id=agentcore_eval,agentevals.session_name=agentcore-zero-code")
+os.environ.setdefault(
+    "OTEL_RESOURCE_ATTRIBUTES", "agentevals.eval_set_id=agentcore_eval,agentevals.session_name=agentcore-zero-code"
+)
 
 _telemetry = StrandsTelemetry()
 _telemetry.tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(), schedule_delay_millis=1000))
@@ -60,7 +61,7 @@ async def handler(payload):
     agent = Agent(
         model=BedrockModel(model_id="us.amazon.nova-pro-v1:0"),
         tools=[roll_die, check_prime],
-        system_prompt="Use roll_die when asked to roll dice. Use check_prime when asked about prime numbers.",
+        system_prompt="You are a helpful assistant. You can roll dice and check if numbers are prime.",
     )
     async for event in agent.stream_async(prompt):
         yield event
