@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from agentevals.config import OpenAIEvalDef
 from agentevals.openai_eval_backend import (
