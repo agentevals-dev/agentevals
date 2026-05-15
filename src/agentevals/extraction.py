@@ -65,7 +65,7 @@ def _parse_legacy_indexed_attrs(attrs: dict[str, Any], prefix: str) -> list[dict
     for key, value in attrs.items():
         if not key.startswith(prefix):
             continue
-        rest = key[len(prefix):]
+        rest = key[len(prefix) :]
         parts = rest.split(".", 1)
         if not parts[0].isdigit():
             continue
@@ -79,7 +79,7 @@ def _parse_legacy_indexed_attrs(attrs: dict[str, Any], prefix: str) -> list[dict
         elif field == "content":
             msg["content"] = value
         elif field.startswith("tool_calls."):
-            tc_rest = field[len("tool_calls."):]
+            tc_rest = field[len("tool_calls.") :]
             tc_parts = tc_rest.split(".", 1)
             if not tc_parts[0].isdigit() or len(tc_parts) < 2:
                 continue
