@@ -193,7 +193,7 @@ export const DashboardView: React.FC = () => {
 
           <TraceTable
             rows={Array.from(state.tableRows.values())}
-            selectedMetrics={state.selectedMetrics}
+            selectedEvaluatorNames={state.selectedEvaluatorNames}
             threshold={state.threshold}
             onRowClick={handleTraceClick}
             onRowHover={handleRowHover}

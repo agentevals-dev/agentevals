@@ -107,6 +107,18 @@ class TestExtractUserText:
         }
         assert extract_user_text_from_attrs(attrs) == "Second"
 
+    def test_adk_llm_request_outer_contents_pascalcase(self):
+        attrs = {
+            ADK_LLM_REQUEST: json.dumps(
+                {
+                    "Contents": [
+                        {"role": "user", "parts": [{"text": "Outer PascalCase only"}]},
+                    ]
+                }
+            )
+        }
+        assert extract_user_text_from_attrs(attrs) == "Outer PascalCase only"
+
     def test_genai_content_based(self):
         attrs = {
             OTEL_GENAI_INPUT_MESSAGES: json.dumps(
@@ -169,6 +181,10 @@ class TestExtractAgentResponse:
     def test_adk_llm_response(self):
         attrs = {ADK_LLM_RESPONSE: json.dumps({"content": {"parts": [{"text": "ADK response"}]}})}
         assert extract_agent_response_from_attrs(attrs) == "ADK response"
+
+    def test_adk_llm_response_outer_content_pascalcase(self):
+        attrs = {ADK_LLM_RESPONSE: json.dumps({"Content": {"parts": [{"text": "Outer Content only"}]}})}
+        assert extract_agent_response_from_attrs(attrs) == "Outer Content only"
 
     def test_genai_content_based(self):
         attrs = {
@@ -519,6 +535,39 @@ class TestAdkExtractorSpanFinding:
         ext = AdkExtractor()
         assert [s.span_id for s in ext.find_llm_spans_in(root)] == ["llm1"]
 
+    def test_find_llm_spans_in_falls_back_to_adk_generate_content(self):
+        child_llm = _span(
+            op="generate_content mockllm-deterministic",
+            tags={ADK_LLM_REQUEST: "{}"},
+            span_id="llm1",
+        )
+        child_tool = _span(op="execute_tool search", span_id="tool1")
+        root = _span(op="invoke_agent a", children=[child_llm, child_tool])
+        ext = AdkExtractor()
+        assert [s.span_id for s in ext.find_llm_spans_in(root)] == ["llm1"]
+
+    def test_find_llm_spans_in_ignores_provider_generate_content_without_adk_payload(self):
+        child_llm = _span(
+            op="generate_content gpt-4",
+            tags={OTEL_GENAI_REQUEST_MODEL: "gpt-4"},
+            span_id="llm1",
+        )
+        root = _span(op="invoke_agent a", children=[child_llm])
+        ext = AdkExtractor()
+        assert ext.find_llm_spans_in(root) == []
+
+    def test_find_llm_spans_in_prefers_call_llm_over_generate_content(self):
+        call_llm = _span(op="call_llm gemini", span_id="llm1", start_time=20)
+        generate_content = _span(
+            op="generate_content gemini",
+            tags={ADK_LLM_REQUEST: "{}"},
+            span_id="llm2",
+            start_time=10,
+        )
+        root = _span(op="invoke_agent a", children=[generate_content, call_llm])
+        ext = AdkExtractor()
+        assert [s.span_id for s in ext.find_llm_spans_in(root)] == ["llm1"]
+
     def test_find_tool_spans_in(self):
         child_llm = _span(op="call_llm gemini", span_id="llm1")
         child_tool = _span(op="execute_tool search", span_id="tool1")
@@ -530,6 +579,7 @@ class TestAdkExtractorSpanFinding:
         ext = AdkExtractor()
         assert ext.classify_span(_span(op="invoke_agent a", tags={OTEL_SCOPE: ADK_SCOPE_VALUE})) == "invocation"
         assert ext.classify_span(_span(op="call_llm", tags={OTEL_SCOPE: ADK_SCOPE_VALUE})) == "llm"
+        assert ext.classify_span(_span(op="generate_content", tags={ADK_LLM_REQUEST: "{}"})) == "llm"
         assert ext.classify_span(_span(op="execute_tool x", tags={OTEL_SCOPE: ADK_SCOPE_VALUE})) == "tool"
         assert ext.classify_span(_span(op="random")) is None
 

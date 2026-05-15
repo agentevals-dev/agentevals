@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from agentevals.config import OpenAIEvalDef
 from agentevals.openai_eval_backend import (
@@ -7,6 +8,18 @@ from agentevals.openai_eval_backend import (
     _build_testing_criteria,
     evaluate_openai_eval,
 )
+
+
+def _label_grader(**overrides):
+    base = {
+        "type": "label_model",
+        "model": "gpt-4o-mini",
+        "input": [{"role": "user", "content": "Rate: {{ item.actual_response }}"}],
+        "labels": ["good", "bad"],
+        "passing_labels": ["good"],
+    }
+    base.update(overrides)
+    return base
 
 
 def _score_grader(**overrides):
@@ -38,6 +51,21 @@ class TestOpenAIEvalDefValidation:
         with pytest.raises(Exception, match="Unknown evaluation_metric"):
             OpenAIEvalDef(name="sim", grader={"type": "text_similarity", "evaluation_metric": "invalid"})
 
+    def test_label_model_valid(self):
+        d = OpenAIEvalDef(name="lm", grader=_label_grader())
+        assert d.grader["type"] == "label_model"
+
+    @pytest.mark.parametrize("field", ["model", "input", "labels", "passing_labels"])
+    def test_label_model_missing_required_field(self, field):
+        with pytest.raises(Exception, match=field):
+            OpenAIEvalDef(name="lm", grader=_label_grader(**{field: None}))
+
+    def test_label_model_passing_labels_not_in_labels(self):
+        grader = _label_grader()
+        grader["passing_labels"] = ["unknown"]
+        with pytest.raises(Exception, match="passing_labels"):
+            OpenAIEvalDef(name="lm", grader=grader)
+
     def test_score_model_valid(self):
         d = OpenAIEvalDef(name="sc", grader=_score_grader())
         assert d.grader["type"] == "score_model"
@@ -62,14 +90,24 @@ class TestBuildTestingCriteria:
         assert "{{ item.actual_response }}" in c["input"]
         assert "{{ item.expected_response }}" in c["reference"]
 
+    def test_label_model_shape(self):
+        grader = _label_grader()
+        d = OpenAIEvalDef(name="quality", grader=grader)
+        c = _build_testing_criteria(d)
+        assert c["type"] == "label_model"
+        assert c["model"] == "gpt-4o-mini"
+        assert c["labels"] == ["good", "bad"]
+        assert c["passing_labels"] == ["good"]
+        assert c["input"] == grader["input"]
+
     def test_score_model_shape(self):
-        grader = _score_grader(range=[1, 5])
-        d = OpenAIEvalDef(name="sc", grader=grader, threshold=3.0)
+        grader = _score_grader(range=[0, 5])
+        d = OpenAIEvalDef(name="sc", grader=grader, threshold=0.6)
         c = _build_testing_criteria(d)
         assert c["type"] == "score_model"
         assert c["model"] == "gpt-4o-mini"
-        assert c["range"] == [1, 5]
-        assert c["pass_threshold"] == 3.0
+        assert c["range"] == [0, 5]
+        assert c["pass_threshold"] == 0.6
         assert c["input"] == grader["input"]
 
     def test_score_model_default_range(self):
@@ -83,7 +121,7 @@ class TestBuildJsonlItems:
         items = _build_jsonl_items([_invocation("hello")], [_invocation("world")], include_expected=True)
         assert "expected_response" in items[0]["item"]
 
-    def test_score_model_excludes_expected(self):
+    def test_excludes_expected_when_not_requested(self):
         items = _build_jsonl_items([_invocation("hello")], [], include_expected=False)
         assert "expected_response" not in items[0]["item"]
 
@@ -104,6 +142,13 @@ class TestEvaluateOpenAIEval:
         d = OpenAIEvalDef(name="sim", grader={"type": "text_similarity", "evaluation_metric": "bleu"})
         result = await evaluate_openai_eval(d, [_invocation("hi")], None)
         assert "expected invocations" in (result.error or "")
+
+    async def test_label_model_does_not_require_expected(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        monkeypatch.setattr("agentevals.openai_eval_backend._get_openai_client", lambda: None)
+        d = OpenAIEvalDef(name="lm", grader=_label_grader())
+        result = await evaluate_openai_eval(d, [_invocation("hi")], None)
+        assert "expected invocations" not in (result.error or "")
 
     async def test_score_model_does_not_require_expected(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")

@@ -16,8 +16,8 @@ from agentevals.runner import MetricResult, RunResult, TraceResult
 from agentevals.storage.models import ResultStatus, compute_result_id
 
 
-def _params(custom_evaluators=None) -> EvalParams:
-    return EvalParams(metrics=["m_builtin"], custom_evaluators=custom_evaluators or [])
+def _params(evaluators=None) -> EvalParams:
+    return EvalParams(evaluators=evaluators or [BuiltinMetricDef(name="m_builtin")])
 
 
 def _trace_result(*metrics) -> TraceResult:
@@ -34,14 +34,12 @@ class TestClassifyEvaluator:
         assert classify_evaluator("unknown", _params()) == "builtin"
 
     def test_custom_code_classified_correctly(self):
-        params = _params(custom_evaluators=[CodeEvaluatorDef(name="my_code", path="./e.py")])
+        params = _params(evaluators=[CodeEvaluatorDef(name="my_code", path="./e.py")])
         assert classify_evaluator("my_code", params) == "code"
 
-    def test_builtin_in_metrics_list(self):
-        """Even when explicitly listed in params.metrics, the absence of a
-        matching custom_evaluators entry defaults to 'builtin'. This is
-        intentional: the persisted result row needs a stable type label and
-        custom evaluators are the only ones we can disambiguate by name."""
+    def test_builtin_in_evaluators_list(self):
+        """Builtins remain classified as builtin even though every evaluator now
+        lives in the shared params.evaluators list."""
         assert classify_evaluator("m_builtin", _params()) == "builtin"
 
 

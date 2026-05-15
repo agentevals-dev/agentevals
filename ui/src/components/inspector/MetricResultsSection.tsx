@@ -8,18 +8,18 @@ import { TrajectoryComparisonDetails } from './TrajectoryComparisonDetails';
 interface MetricResultsSectionProps {
   metricResults: MetricResult[];
   threshold: number;
-  selectedMetrics?: string[];
+  selectedEvaluatorNames?: string[];
   isEvaluating?: boolean;
 }
 
 export const MetricResultsSection: React.FC<MetricResultsSectionProps> = ({
   metricResults,
   threshold,
-  selectedMetrics = [],
+  selectedEvaluatorNames = [],
   isEvaluating = false,
 }) => {
   const metricResultsMap = new Map(metricResults.map(mr => [mr.metricName, mr]));
-  const metricsToShow = selectedMetrics.length > 0 ? selectedMetrics : metricResults.map(mr => mr.metricName);
+  const metricsToShow = selectedEvaluatorNames.length > 0 ? selectedEvaluatorNames : metricResults.map(mr => mr.metricName);
 
   return (
     <div css={containerStyles}>

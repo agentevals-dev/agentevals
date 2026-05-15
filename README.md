@@ -250,7 +250,7 @@ See the [Custom Evaluators guide](docs/custom-evaluators.md) for the full protoc
 agentevals serve            # bundled UI on http://localhost:8001
 ```
 
-Upload traces and eval sets, select metrics, and view results with interactive span trees. Live-streamed traces appear in the "Local Dev" tab, grouped by session ID. For running from source, see [DEVELOPMENT.md](DEVELOPMENT.md).
+Upload traces and eval sets, select evaluators, and view results with interactive span trees. Live-streamed traces appear in the "Local Dev" tab, grouped by session ID. For running from source, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 Interactive API docs are available at `/docs` (Swagger) and `/redoc` while the server is running. The OTLP receiver on port 4318 serves its own docs at `http://localhost:4318/docs`.
 
@@ -397,6 +397,18 @@ Yes. A custom evaluator is any program that reads JSON from stdin and writes a s
 
 Yes. The OTLP receiver on port 4318 accepts standard `http/protobuf` and `http/json` trace exports, so it slots into any OpenTelemetry pipeline as just another exporter destination. If your pipeline uses gRPC (port 4317), place an [OTel Collector](https://opentelemetry.io/docs/collector/) in front to bridge gRPC to HTTP. The [Kubernetes example](examples/kubernetes/README.md) shows this pattern.
 
+**Can I use agentevals to evaluate Claude Code, Codex, or OpenCode?**
+
+Not today. agentevals scores agent behavior from OpenTelemetry GenAI traces (spans for model calls, tool calls, agent invocations following the [OTel GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)). The major coding agents do not currently emit telemetry in that shape:
+
+- **Claude Code** ships OTel telemetry as logs, not GenAI spans. A prior proof of concept on a feature branch made it work by stitching hook events into synthetic traces. Reviving that path is on the backlog, not a near-term commitment.
+- **Codex** exposes OTel, but in a different shape we have not yet validated against the GenAI semconv.
+- **OpenCode** did not have OTel support merged the last time we checked.
+
+Retrofitting agentevals to ingest each harness's bespoke telemetry is multiple thousands of lines of glue code per agent, for a use case where the dominant signal is "did the final output feel right," not "did the agent call the right tool with the right arguments in the right order." That kind of vibes evaluation is interesting work for harness and coding-agent vendors themselves, but it is not what agentevals is optimized for.
+
+agentevals is built for the opposite end of the spectrum: smaller, purpose-built, properly instrumented agents (kagent, agentregistry, custom Strands / ADK / LangChain / OpenAI Agents SDK flows) running in cloud native environments, where success is measurable through tool trajectories, response matching, and deterministic pass/fail gates. If that is your use case, we are a good fit. If you are evaluating long-running coding sessions end to end, you probably want a tool built specifically for that shape.
+
 **How does this compare to ADK's evaluations?**
 
 Unlike ADK's eval method, which couples agent execution with evaluation, agentevals only handles scoring: it takes pre-recorded traces and compares them against expected behavior using metrics like tool trajectory matching, response quality, and LLM-based judgments.
@@ -420,3 +432,7 @@ Langfuse is a full observability platform (requires Postgres, ClickHouse, Redis,
 **How does this compare to Opik?**
 
 Opik's primary evaluation path re-runs your application code against a dataset, incurring additional LLM costs per eval run. It also supports online evaluation rules that auto-score production traces. While Opik supports OpenTelemetry ingestion alongside its own SDK, its evaluation workflow still centers on re-execution against datasets. agentevals evaluates pre-recorded OTel traces from any framework without re-execution, and runs entirely locally with no cloud dependency.
+
+## Acknowledgements
+
+agentevals is built on top of [Google's Agent Development Kit](https://github.com/google/adk-python). ADK provides the evaluator protocol and the canonical eval data model (`Invocation`, `EvalSet`, `Evaluator`, prebuilt metrics) that this project extends. `google-adk` is licensed under [Apache 2.0](https://github.com/google/adk-python/blob/main/LICENSE), the same license as agentevals. Thanks to the ADK team and contributors.

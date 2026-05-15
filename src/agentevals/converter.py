@@ -23,6 +23,7 @@ from .extraction import (
     extract_tool_call_from_span,
     extract_tool_result_from_span,
     extract_user_text_from_attrs,
+    find_adk_llm_spans_in,
     get_extractor,
     has_adk_descendant,
     is_adk_scope,
@@ -127,15 +128,18 @@ def _find_adk_spans(trace: Trace, operation: str) -> list[Span]:
 
 
 def _convert_invoke_span(invoke_span: Span) -> Invocation:
-    call_llm_spans = _find_children_by_op(invoke_span, "call_llm")
-    if not call_llm_spans:
-        raise ValueError(f"invoke_agent span {invoke_span.span_id} has no child call_llm spans")
+    llm_spans = find_adk_llm_spans_in(invoke_span)
+    if not llm_spans:
+        raise ValueError(
+            f"invoke_agent span {invoke_span.span_id} has no converter-compatible ADK LLM descendants; "
+            "expected call_llm or ADK generate_content spans"
+        )
 
     tool_spans = _find_children_by_op(invoke_span, "execute_tool")
 
-    user_content = _extract_user_content(call_llm_spans[0])
-    final_response = _extract_final_response(call_llm_spans[-1])
-    tool_uses, tool_responses = _extract_tool_trajectory(call_llm_spans, tool_spans)
+    user_content = _extract_user_content(llm_spans[0])
+    final_response = _extract_final_response(llm_spans[-1])
+    tool_uses, tool_responses = _extract_tool_trajectory(llm_spans, tool_spans)
 
     intermediate_data = IntermediateData(
         tool_uses=tool_uses,
@@ -177,7 +181,7 @@ def _extract_user_content(first_call_llm: Span) -> genai_types.Content:
         )
     llm_request_raw = first_call_llm.get_tag(ADK_LLM_REQUEST, "{}")
     llm_request = parse_json(llm_request_raw)
-    for content_dict in llm_request.get("contents", []):
+    for content_dict in llm_request.get("contents", llm_request.get("Contents", [])):
         if content_dict.get("role") == "user":
             return _content_from_dict(content_dict)
     raise ValueError(f"call_llm span {first_call_llm.span_id}: no user content found in llm_request")
@@ -193,7 +197,7 @@ def _extract_final_response(last_call_llm: Span) -> genai_types.Content:
         )
     llm_response_raw = last_call_llm.get_tag(ADK_LLM_RESPONSE, "{}")
     llm_response = parse_json(llm_response_raw)
-    content_dict = llm_response.get("content", {})
+    content_dict = llm_response.get("content", llm_response.get("Content", {}))
     if not content_dict:
         raise ValueError(f"call_llm span {last_call_llm.span_id}: no content in llm_response")
     logger.warning(
@@ -263,12 +267,12 @@ def _extract_function_calls_from_llm_response(
     llm_response_raw = call_llm.get_tag(ADK_LLM_RESPONSE, "{}")
     llm_response = parse_json(llm_response_raw)
 
-    content_dict = llm_response.get("content", {})
+    content_dict = llm_response.get("content", llm_response.get("Content", {}))
     parts = content_dict.get("parts", [])
 
     calls = []
     for part in parts:
-        fc_dict = part.get("function_call")
+        fc_dict = part.get("function_call", part.get("functionCall"))
         if fc_dict:
             calls.append(
                 genai_types.FunctionCall(
@@ -288,9 +292,9 @@ def _content_from_dict(content_dict: dict[str, Any]) -> genai_types.Content:
     parts: list[genai_types.Part] = []
     for p in parts_dicts:
         if "text" in p:
-            parts.append(genai_types.Part(text=p["text"]))
-        elif "function_call" in p:
-            fc = p["function_call"]
+            parts.append(genai_types.Part(text=p.get("text")))
+        elif "function_call" in p or "functionCall" in p:
+            fc = p.get("function_call", p.get("functionCall"))
             parts.append(
                 genai_types.Part(
                     function_call=genai_types.FunctionCall(
@@ -300,8 +304,8 @@ def _content_from_dict(content_dict: dict[str, Any]) -> genai_types.Content:
                     )
                 )
             )
-        elif "function_response" in p:
-            fr = p["function_response"]
+        elif "function_response" in p or "functionResponse" in p:
+            fr = p.get("function_response", p.get("functionResponse"))
             parts.append(
                 genai_types.Part(
                     function_response=genai_types.FunctionResponse(

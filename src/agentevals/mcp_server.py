@@ -8,7 +8,7 @@ import httpx
 from mcp.server import FastMCP
 from pydantic import BaseModel, Field
 
-from agentevals.config import EvalRunConfig
+from agentevals.config import EvalRunConfig, apply_builtin_overrides, make_builtin_evaluator_entries
 from agentevals.runner import run_evaluation
 
 _DEFAULT_SERVER_URL = "http://localhost:8001"
@@ -219,11 +219,11 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
         threshold: float | None = None,
         eval_config_file: str | None = None,
     ) -> EvaluateTracesResponse:
-        """Evaluate one or more local agent trace files against selected metrics.
+        """Evaluate one or more local agent trace files against selected evaluators.
 
         This is the primary offline evaluation tool. It loads trace files from disk,
         converts them to the internal invocation format, and runs each requested
-        metric. Does not require the agentevals server to be running.
+        evaluator. Does not require the agentevals server to be running.
 
         Typical workflow:
             1. Call list_metrics to discover available metrics and their requirements.
@@ -266,29 +266,49 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
                 - warnings: conversion warnings, if any
             - errors: top-level errors (e.g. trace files that failed to load)
         """
-        if metrics is None:
-            metrics = ["tool_trajectory_avg_score"]
         if eval_config_file:
             from agentevals.eval_config_loader import load_eval_config, merge_configs
 
             file_config = load_eval_config(eval_config_file)
-            cli_config = EvalRunConfig(
-                trace_files=trace_files,
-                metrics=metrics,
-                trace_format=trace_format,
-                eval_set_file=eval_set_file,
-                judge_model=judge_model,
-                threshold=threshold,
-            )
-            config = merge_configs(file_config, cli_config)
+            config = file_config
+            if metrics:
+                cli_config = EvalRunConfig(
+                    trace_files=[],
+                    evaluators=make_builtin_evaluator_entries(
+                        metrics,
+                        judge_model=judge_model,
+                        threshold=threshold,
+                    ),
+                )
+                config = merge_configs(file_config, cli_config)
+            elif judge_model is not None or threshold is not None:
+                config = config.model_copy(
+                    update={
+                        "evaluators": apply_builtin_overrides(
+                            config.evaluators,
+                            judge_model=judge_model,
+                            threshold=threshold,
+                        )
+                    }
+                )
+            if trace_files:
+                config.trace_files = trace_files
+            if trace_format is not None:
+                config.trace_format = trace_format
+            if eval_set_file is not None:
+                config.eval_set_file = eval_set_file
         else:
+            if metrics is None:
+                metrics = ["tool_trajectory_avg_score"]
             config = EvalRunConfig(
                 trace_files=trace_files,
-                metrics=metrics,
+                evaluators=make_builtin_evaluator_entries(
+                    metrics,
+                    judge_model=judge_model,
+                    threshold=threshold,
+                ),
                 trace_format=trace_format,
                 eval_set_file=eval_set_file,
-                judge_model=judge_model,
-                threshold=threshold,
             )
         result = await run_evaluation(config)
         return summarize_run_result(result)
@@ -400,8 +420,10 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
     async def evaluate_sessions(
         golden_session_id: str,
         metrics: list[str] | None = None,
-        judge_model: str = "gemini-2.5-flash",
         eval_set_id: str | None = None,
+        judge_model: str | None = None,
+        threshold: float | None = None,
+        trajectory_match_type: str | None = None,
     ) -> EvaluateSessionsResponse:
         """Evaluate all completed sessions against a golden reference session.
 
@@ -425,11 +447,15 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
             metrics: Metric names to evaluate (from list_metrics). Defaults to
                 ["tool_trajectory_avg_score"]. Only metrics that support eval
                 set comparison are meaningful here.
-            judge_model: LLM model for judge-based metrics. Defaults to
-                "gemini-2.5-flash".
             eval_set_id: A label for the eval set built from the golden session.
                 Any string is accepted. If omitted, a default is generated from
                 the golden session ID.
+            judge_model: Optional LLM judge model override for judge-based
+                built-in evaluators.
+            threshold: Optional pass/fail threshold override for built-in
+                evaluators.
+            trajectory_match_type: Optional match type override for
+                "tool_trajectory_avg_score" (EXACT, IN_ORDER, ANY_ORDER).
 
         Returns:
             An EvaluateSessionsResponse with:
@@ -450,8 +476,15 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
             {
                 "golden_session_id": golden_session_id,
                 "eval_set_id": eval_set_id or f"eval-{golden_session_id[:12]}",
-                "metrics": metrics,
-                "judge_model": judge_model,
+                "evaluators": [
+                    e.model_dump(mode="json", by_alias=True)
+                    for e in make_builtin_evaluator_entries(
+                        metrics,
+                        judge_model=judge_model,
+                        threshold=threshold,
+                        trajectory_match_type=trajectory_match_type,
+                    )
+                ],
             },
         )
         return EvaluateSessionsResponse(

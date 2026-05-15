@@ -12,7 +12,7 @@ export interface TraceState {
   // Upload state
   traceFiles: File[];
   evalSetFile: File | null;
-  selectedMetrics: string[];
+  selectedEvaluatorNames: string[];
   judgeModel: string;
   threshold: number;
   trajectoryMatchType: string;
@@ -52,7 +52,7 @@ export interface TraceContextType {
   actions: {
     setTraceFiles: (files: File[]) => Promise<void>;
     setEvalSet: (file: File | null) => void;
-    toggleMetric: (metric: string) => void;
+    toggleEvaluatorName: (evaluatorName: string) => void;
     setJudgeModel: (model: string) => void;
     setThreshold: (threshold: number) => void;
     setTrajectoryMatchType: (matchType: string) => void;

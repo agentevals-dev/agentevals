@@ -18,14 +18,7 @@ from pydantic.alias_generators import to_camel
 from agentevals import __version__
 
 from ..builtin_metrics import METRICS_NEEDING_EXPECTED, METRICS_NEEDING_GCP, METRICS_NEEDING_LLM
-from ..config import (
-    BuiltinMetricDef,
-    CodeEvaluatorDef,
-    CustomEvaluatorDef,
-    EvalParams,
-    EvalRunConfig,
-    OpenAIEvalDef,
-)
+from ..config import EvalParams, EvalRunConfig
 from ..converter import convert_traces
 from ..extraction import get_extractor
 from ..loader import load_traces
@@ -120,24 +113,6 @@ async def _maybe_persist_evaluate_run(
 router = APIRouter()
 
 _MAX_JSON_BODY_BYTES = 50 * 1024 * 1024  # 50 MB (multipart endpoints allow 10 MB per file)
-
-_TYPE_TO_MODEL = {
-    "builtin": BuiltinMetricDef,
-    "code": CodeEvaluatorDef,
-    "openai_eval": OpenAIEvalDef,
-}
-
-
-def _parse_custom_evaluators(raw: list[dict]) -> list[CustomEvaluatorDef]:
-    """Parse a list of custom evaluator dicts from the API config JSON."""
-    defs: list[CustomEvaluatorDef] = []
-    for entry in raw:
-        evaluator_type = entry.get("type", "builtin")
-        model_cls = _TYPE_TO_MODEL.get(evaluator_type)
-        if not model_cls:
-            raise ValueError(f"Unknown custom evaluator type: {evaluator_type}")
-        defs.append(model_cls.model_validate(entry))
-    return defs
 
 
 @router.get("/health", response_model=StandardResponse[HealthData])
@@ -489,10 +464,10 @@ async def evaluate_traces(
     eval_set_file: UploadFile | None = File(None),
 ):
     """
-    Evaluate agent traces using specified metrics.
+    Evaluate agent traces using the provided evaluator configuration.
 
     Args:
-        trace_files: List of Jaeger JSON trace files
+        trace_files: List of Jaeger or OTLP JSON trace files
         config: JSON string with evaluation configuration
         eval_set_file: Optional golden eval set file
 
@@ -556,40 +531,23 @@ async def evaluate_traces(
                     )
                 f.write(content)
 
-        metrics = config_dict.get("metrics", ["tool_trajectory_avg_score"])
-        if not metrics or not isinstance(metrics, list):
-            raise HTTPException(
-                status_code=400,
-                detail="Config must include 'metrics' as a non-empty array",
+        try:
+            eval_config = EvalRunConfig.model_validate(
+                {
+                    **config_dict,
+                    "traceFiles": trace_paths,
+                    "evalSetFile": eval_set_path,
+                    "traceFormat": trace_format,
+                }
             )
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid config: {exc}") from exc
 
-        threshold = config_dict.get("threshold")
-        if threshold is not None and (threshold < 0 or threshold > 1):
-            raise HTTPException(
-                status_code=400,
-                detail="Threshold must be between 0 and 1",
-            )
-
-        custom_evaluators: list[CustomEvaluatorDef] = []
-        raw_custom = config_dict.get("customEvaluators", config_dict.get("customMetrics", []))
-        if raw_custom:
-            try:
-                custom_evaluators = _parse_custom_evaluators(raw_custom)
-            except Exception as exc:
-                raise HTTPException(status_code=400, detail=f"Invalid customEvaluators: {exc}") from exc
-
-        eval_config = EvalRunConfig(
-            trace_files=trace_paths,
-            eval_set_file=eval_set_path,
-            metrics=metrics,
-            custom_evaluators=custom_evaluators,
-            trace_format=trace_format,
-            judge_model=config_dict.get("judgeModel"),
-            threshold=threshold,
-            trajectory_match_type=config_dict.get("trajectoryMatchType"),
+        logger.info(
+            "Evaluating %d trace file(s) with evaluators: %s",
+            len(trace_paths),
+            [e.name for e in eval_config.evaluators],
         )
-
-        logger.info(f"Evaluating {len(trace_paths)} trace file(s) with metrics: {metrics}")
         result = await run_evaluation(eval_config)
 
         run_id = await _maybe_persist_evaluate_run(
@@ -675,35 +633,18 @@ async def evaluate_traces_stream(
                         return
                     f.write(content)
 
-            metrics = config_dict.get("metrics", ["tool_trajectory_avg_score"])
-            if not metrics or not isinstance(metrics, list):
-                yield f"data: {SSEErrorEvent(error='Config must include metrics as a non-empty array').model_dump_json(by_alias=True)}\n\n"
+            try:
+                eval_config = EvalRunConfig.model_validate(
+                    {
+                        **config_dict,
+                        "traceFiles": trace_paths,
+                        "evalSetFile": eval_set_path,
+                        "traceFormat": trace_format,
+                    }
+                )
+            except Exception as exc:
+                yield f"data: {SSEErrorEvent(error=f'Invalid config: {exc}').model_dump_json(by_alias=True)}\n\n"
                 return
-
-            threshold = config_dict.get("threshold")
-            if threshold is not None and (threshold < 0 or threshold > 1):
-                yield f"data: {SSEErrorEvent(error='Threshold must be between 0 and 1').model_dump_json(by_alias=True)}\n\n"
-                return
-
-            custom_evaluators: list[CustomEvaluatorDef] = []
-            raw_custom = config_dict.get("customEvaluators", config_dict.get("customMetrics", []))
-            if raw_custom:
-                try:
-                    custom_evaluators = _parse_custom_evaluators(raw_custom)
-                except Exception as exc:
-                    yield f"data: {SSEErrorEvent(error=f'Invalid customEvaluators: {exc}').model_dump_json(by_alias=True)}\n\n"
-                    return
-
-            eval_config = EvalRunConfig(
-                trace_files=trace_paths,
-                eval_set_file=eval_set_path,
-                metrics=metrics,
-                custom_evaluators=custom_evaluators,
-                trace_format=trace_format,
-                judge_model=config_dict.get("judgeModel"),
-                threshold=threshold,
-                trajectory_match_type=config_dict.get("trajectoryMatchType"),
-            )
 
             for trace_file_path in trace_paths:
                 try:

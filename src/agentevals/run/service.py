@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import ValidationError
+
 from ..config import EvalParams
 from ..runner import RunResult
 from ..storage.models import Run, RunSpec, RunStatus, TraceTarget
@@ -41,6 +43,7 @@ class RunService:
         self._results = results
 
     async def submit(self, *, run_id: UUID | None, spec: RunSpec) -> Run:
+        self._validate_spec(spec)
         run = Run(
             run_id=run_id or uuid4(),
             status=RunStatus.QUEUED,
@@ -50,6 +53,13 @@ class RunService:
         if persisted.run_id == run.run_id and persisted.spec != spec:
             raise RunSubmitConflict(persisted)
         return persisted
+
+    @staticmethod
+    def _validate_spec(spec: RunSpec) -> None:
+        try:
+            EvalParams.model_validate(spec.eval_config or {})
+        except ValidationError as exc:
+            raise ValueError(f"Invalid eval_config: {exc}") from exc
 
     async def get(self, run_id: UUID) -> Run | None:
         return await self._runs.get(run_id)

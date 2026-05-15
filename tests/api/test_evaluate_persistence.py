@@ -51,7 +51,7 @@ class TestEvaluateMultipartSync:
                 r = client.post(
                     "/api/evaluate",
                     files={"trace_files": ("helm.json", f, "application/json")},
-                    data={"config": '{"metrics": ["tool_trajectory_avg_score"]}'},
+                    data={"config": '{"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}'},
                 )
         assert r.status_code == 200
         assert r.json()["data"].get("runId") is None
@@ -63,7 +63,7 @@ class TestEvaluateMultipartSync:
                 r = client.post(
                     "/api/evaluate",
                     files={"trace_files": ("helm.json", f, "application/json")},
-                    data={"config": '{"metrics": ["tool_trajectory_avg_score"]}'},
+                    data={"config": '{"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}'},
                 )
         assert r.status_code == 200
         run_id = r.json()["data"]["runId"]
@@ -87,7 +87,7 @@ class TestEvaluateMultipartSync:
                 r = client.post(
                     "/api/evaluate",
                     files={"trace_files": ("helm.json", f, "application/json")},
-                    data={"config": '{"metrics": ["tool_trajectory_avg_score"]}'},
+                    data={"config": '{"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}'},
                 )
         run_id = r.json()["data"]["runId"]
         results = asyncio.run(repos.results.list_by_run(_uuid(run_id)))
@@ -106,7 +106,7 @@ class TestEvaluateMultipartSync:
                     client.post(
                         "/api/evaluate",
                         files={"trace_files": ("helm.json", f, "application/json")},
-                        data={"config": '{"metrics": ["tool_trajectory_avg_score"]}'},
+                        data={"config": '{"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}'},
                     )
         runs = asyncio.run(repos.runs.list())
         assert len(runs) == 3
@@ -126,7 +126,7 @@ class TestEvaluateMultipartSync:
                 r = client.post(
                     "/api/evaluate",
                     files={"trace_files": ("helm.json", f, "application/json")},
-                    data={"config": '{"metrics": ["tool_trajectory_avg_score"]}'},
+                    data={"config": '{"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}'},
                 )
         assert r.status_code == 200
         assert r.json()["data"].get("runId") is None
@@ -142,7 +142,7 @@ class TestEvaluateSseStream:
                     "POST",
                     "/api/evaluate/stream",
                     files={"trace_files": ("helm.json", f, "application/json")},
-                    data={"config": '{"metrics": ["tool_trajectory_avg_score"]}'},
+                    data={"config": '{"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}'},
                 ) as resp:
                     body = b"".join(resp.iter_bytes()).decode()
         # The done event payload is JSON in the last `data:` block.

@@ -32,3 +32,4 @@ evaluators:
     ref: evaluators/random_evaluator/random_evaluator.py
     threshold: 0.110
     executor: local
+

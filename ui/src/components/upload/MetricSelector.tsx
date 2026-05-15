@@ -5,8 +5,8 @@ import { AVAILABLE_METRICS, type MetricMetadata } from '../../lib/types';
 import { listMetrics } from '../../api/client';
 
 interface MetricSelectorProps {
-  selectedMetrics: string[];
-  onToggleMetric: (metric: string) => void;
+  selectedEvaluatorNames: string[];
+  onToggleEvaluatorName: (evaluatorName: string) => void;
   loadFromAPI?: boolean;
 }
 
@@ -128,6 +128,12 @@ const selectorStyle = css`
     border-top: 1px solid var(--border-default);
   }
 
+  .selector-note {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
   .ant-checkbox-wrapper {
     color: var(--text-primary);
   }
@@ -141,11 +147,12 @@ const selectorStyle = css`
 let cachedMetrics: MetricMetadata[] | null = null;
 
 export const MetricSelector: React.FC<MetricSelectorProps> = ({
-  selectedMetrics,
-  onToggleMetric,
+  selectedEvaluatorNames,
+  onToggleEvaluatorName,
   loadFromAPI = false,
 }) => {
   const [metrics, setMetrics] = useState<MetricMetadata[]>(cachedMetrics ?? AVAILABLE_METRICS);
+  const hasCaveatedMetrics = metrics.some((m) => m.requiresRubrics === true || m.working === false);
 
   useEffect(() => {
     if (!loadFromAPI || cachedMetrics) return;
@@ -176,15 +183,15 @@ export const MetricSelector: React.FC<MetricSelectorProps> = ({
 
   const handleSelectAll = () => {
     metrics.forEach((metric) => {
-      if (!selectedMetrics.includes(metric.name)) {
-        onToggleMetric(metric.name);
+      if (!selectedEvaluatorNames.includes(metric.name)) {
+        onToggleEvaluatorName(metric.name);
       }
     });
   };
 
   const handleClearAll = () => {
-    selectedMetrics.forEach((metric) => {
-      onToggleMetric(metric);
+    selectedEvaluatorNames.forEach((metric) => {
+      onToggleEvaluatorName(metric);
     });
   };
 
@@ -199,8 +206,8 @@ export const MetricSelector: React.FC<MetricSelectorProps> = ({
                 <div key={metric.name} className="metric-item">
                   <div className="metric-row">
                     <Checkbox
-                      checked={selectedMetrics.includes(metric.name)}
-                      onChange={() => onToggleMetric(metric.name)}
+                      checked={selectedEvaluatorNames.includes(metric.name)}
+                      onChange={() => onToggleEvaluatorName(metric.name)}
                     >
                       <span className="metric-name">{metric.name}</span>
                     </Checkbox>
@@ -238,6 +245,11 @@ export const MetricSelector: React.FC<MetricSelectorProps> = ({
           Clear All
         </Button>
       </div>
+      {hasCaveatedMetrics && (
+        <div className="selector-note">
+          Some evaluators require rubric configuration or are work-in-progress; see badges.
+        </div>
+      )}
     </div>
   );
 };

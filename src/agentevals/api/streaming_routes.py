@@ -5,13 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
-from ..config import EvalRunConfig
+from ..config import BuiltinMetricDef, EvalRunConfig, EvaluatorDef
 from ..converter import convert_traces
 from ..loader.otlp import OtlpJsonLoader
 from ..runner import run_evaluation
@@ -42,11 +42,11 @@ class CreateEvalSetRequest(BaseModel):
 
 
 class EvaluateSessionsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     golden_session_id: str
     eval_set_id: str
-    metrics: list[str] = ["tool_trajectory_avg_score"]
-    judge_model: str = "gemini-2.5-flash"
-    trajectory_match_type: Literal["EXACT", "IN_ORDER", "ANY_ORDER"] | None = None
+    evaluators: list[EvaluatorDef] = Field(default_factory=lambda: [BuiltinMetricDef(name="tool_trajectory_avg_score")])
 
 
 class PrepareEvaluationRequest(BaseModel):
@@ -209,9 +209,7 @@ async def evaluate_sessions(
                         trace_files=[str(trace_file)],
                         trace_format="otlp-json",
                         eval_set_file=eval_set_file.name,
-                        metrics=request.metrics,
-                        judge_model=request.judge_model,
-                        trajectory_match_type=request.trajectory_match_type,
+                        evaluators=request.evaluators,
                     )
 
                     eval_result = await run_evaluation(config)

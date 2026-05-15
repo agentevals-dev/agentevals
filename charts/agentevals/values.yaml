@@ -159,6 +159,16 @@ env: []
 # -- Extra envFrom sources (ConfigMapRef, SecretRef)
 envFrom: []
 
+# -- Extra volumes appended to the pod spec. Use this to mount additional
+# config files or secrets (e.g. result-sink credentials) into the pod.
+extraVolumes: []
+
+# -- Extra volumeMounts appended to the main container. Pair with
+# extraVolumes by name. securityContext.readOnlyRootFilesystem is true by
+# default; that only makes the root filesystem read-only, mounted paths
+# themselves are unaffected, so a writable extraVolumes entry works fine.
+extraVolumeMounts: []
+
 # ==============================================================================
 # STORAGE  (preview feature)
 #
@@ -195,6 +205,18 @@ database:
     urlFile: ""
     # -- Postgres schema to use for agentevals tables.
     schema: agentevals
+    # -- Apply pending database migrations during server startup before the
+    # HTTP listener opens. The Postgres advisory lock serialises concurrent
+    # replica starts so this is safe with replicaCount > 1. When set to
+    # false the server refuses to start if the schema is behind or dirty;
+    # run "agentevals migrate up" manually in that case.
+    autoMigrate: true
+    # -- Seconds the startup will spend retrying the initial Postgres
+    # connection before the pod aborts. Default 600s matches the chart's
+    # hard-coded startupProbe budget (failureThreshold 60 x periodSeconds
+    # 10). Going above 600s requires overriding the probe in your own
+    # downstream template.
+    connectTimeoutSeconds: 600
     # -- Bundled Postgres instance for development and evaluation only.
     # Not suitable for production. Deployed when enabled is true and url /
     # urlFile are not set.

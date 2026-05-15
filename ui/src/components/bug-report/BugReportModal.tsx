@@ -4,6 +4,7 @@ import { AlertTriangle, Download, X, Loader2 } from 'lucide-react';
 import { useTraceContext } from '../../context/TraceContext';
 import type { TraceState } from '../../context/TraceContext';
 import { generateBugReport } from '../../api/client';
+import { buildEvalConfig } from '../../lib/eval-config';
 import { getConsoleLogs } from '../../lib/console-capture';
 import { getNetworkErrors } from '../../lib/network-capture';
 
@@ -12,6 +13,13 @@ interface BugReportModalProps {
 }
 
 function serializeAppState(state: TraceState): Record<string, unknown> {
+  const evalConfig = buildEvalConfig({
+    selectedEvaluatorNames: state.selectedEvaluatorNames,
+    judgeModel: state.judgeModel,
+    threshold: state.threshold,
+    trajectoryMatchType: state.trajectoryMatchType,
+  });
+
   return {
     currentView: state.currentView,
     evaluationOrigin: state.evaluationOrigin,
@@ -19,9 +27,11 @@ function serializeAppState(state: TraceState): Record<string, unknown> {
     version: state.version,
     isEvaluating: state.isEvaluating,
     progressMessage: state.progressMessage,
-    selectedMetrics: state.selectedMetrics,
+    selectedEvaluatorNames: state.selectedEvaluatorNames,
     judgeModel: state.judgeModel,
     threshold: state.threshold,
+    trajectoryMatchType: state.trajectoryMatchType,
+    evalConfig,
     errors: state.errors,
     traceFileCount: state.traceFiles.length,
     hasEvalSetFile: state.evalSetFile !== null,

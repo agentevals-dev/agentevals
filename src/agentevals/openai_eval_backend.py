@@ -28,9 +28,7 @@ _TEXT_PAIR_SCHEMA = {
 
 _ACTUAL_ONLY_SCHEMA = {
     "type": "object",
-    "properties": {
-        "actual_response": {"type": "string"},
-    },
+    "properties": {"actual_response": {"type": "string"}},
     "required": ["actual_response"],
 }
 
@@ -47,6 +45,16 @@ def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
             "reference": "{{ item.expected_response }}",
             "evaluation_metric": grader["evaluation_metric"],
             "pass_threshold": evaluator_def.threshold,
+        }
+
+    if grader_type == "label_model":
+        return {
+            "type": "label_model",
+            "name": evaluator_def.name,
+            "model": grader["model"],
+            "input": grader["input"],
+            "labels": grader["labels"],
+            "passing_labels": grader["passing_labels"],
         }
 
     if grader_type == "score_model":
@@ -70,11 +78,13 @@ def _build_jsonl_items(
 ) -> list[dict[str, Any]]:
     items = []
     for i, actual_inv in enumerate(actual_invocations):
-        actual_text = _content_to_text(actual_inv.final_response)
-        item: dict[str, Any] = {"actual_response": actual_text}
+        entry: dict[str, Any] = {"actual_response": _content_to_text(actual_inv.final_response)}
         if include_expected:
-            item["expected_response"] = _content_to_text(expected_invocations[i].final_response) if i < len(expected_invocations) else ""
-        items.append({"item": item})
+            expected_text = (
+                _content_to_text(expected_invocations[i].final_response) if i < len(expected_invocations) else ""
+            )
+            entry["expected_response"] = expected_text
+        items.append({"item": entry})
     return items
 
 
@@ -113,7 +123,7 @@ async def evaluate_openai_eval(
             error="OPENAI_API_KEY environment variable is not set.",
         )
 
-    grader_type = evaluator_def.grader.get("type")
+    grader_type = evaluator_def.grader["type"]
     needs_expected = grader_type == "text_similarity"
     if needs_expected and expected_invocations is None:
         return MetricResult(
@@ -137,7 +147,7 @@ async def evaluate_openai_eval(
         item_schema = _TEXT_PAIR_SCHEMA if needs_expected else _ACTUAL_ONLY_SCHEMA
         eval_obj = await asyncio.to_thread(
             client.evals.create,
-            name=f"agentevals-{evaluator_def.name}",
+            name=f"agentevals-openai-{evaluator_def.name}",
             data_source_config={
                 "type": "custom",
                 "item_schema": item_schema,
@@ -151,7 +161,7 @@ async def evaluate_openai_eval(
         run = await asyncio.to_thread(
             client.evals.runs.create,
             eval_id=eval_id,
-            name=f"agentevals-run-{evaluator_def.name}",
+            name=f"agentevals-openai-run-{evaluator_def.name}",
             data_source={
                 "type": "jsonl",
                 "source": {
@@ -230,12 +240,20 @@ async def _collect_results(client: Any, eval_id: str, run_id: str, run: Any, eva
     total = result_counts.total if result_counts else 0
     eval_status = "PASSED" if failed == 0 and total > 0 else "FAILED"
 
+    grader = evaluator_def.grader
     details: dict[str, Any] = {
         "openai_eval_id": eval_id,
         "openai_run_id": run_id,
-        "evaluation_metric": evaluator_def.grader.get("evaluation_metric"),
         "result_counts": {"passed": passed, "failed": failed, "total": total},
     }
+    if grader["type"] == "text_similarity":
+        details["evaluation_metric"] = grader.get("evaluation_metric")
+    elif grader["type"] == "label_model":
+        details["model"] = grader.get("model")
+        details["passing_labels"] = grader.get("passing_labels")
+    elif grader["type"] == "score_model":
+        details["model"] = grader.get("model")
+        details["range"] = grader.get("range", [0, 1])
     per_criteria = getattr(run, "per_testing_criteria_results", None)
     if per_criteria:
         details["per_testing_criteria"] = [

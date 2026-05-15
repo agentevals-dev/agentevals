@@ -76,6 +76,8 @@ async def submit_run(payload: RunRequest, request: Request):
     service = _service(request)
     try:
         run = await service.submit(run_id=payload.run_id, spec=payload.spec)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     except RunSubmitConflict as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
