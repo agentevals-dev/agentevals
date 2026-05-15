@@ -441,8 +441,19 @@ async def evaluate_custom_evaluator(
     """
     import inspect as _inspect
 
-    from .config import CodeEvaluatorDef, OpenAIEvalDef, RemoteEvaluatorDef
+    from .builtin_metrics import evaluate_builtin_metric
+    from .config import BuiltinMetricDef, CodeEvaluatorDef, OpenAIEvalDef, RemoteEvaluatorDef
     from .runner import MetricResult
+
+    if isinstance(evaluator_def, BuiltinMetricDef):
+        return await evaluate_builtin_metric(
+            metric_name=evaluator_def.name,
+            actual_invocations=actual_invocations,
+            expected_invocations=expected_invocations,
+            judge_model=evaluator_def.judge_model,
+            threshold=evaluator_def.threshold,
+            match_type=evaluator_def.trajectory_match_type,
+        )
 
     if isinstance(evaluator_def, OpenAIEvalDef):
         from .openai_eval_backend import evaluate_openai_eval

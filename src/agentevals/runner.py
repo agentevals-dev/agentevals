@@ -14,11 +14,10 @@ from google.adk.evaluation.eval_set import EvalSet
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-from .builtin_metrics import evaluate_builtin_metric
 from .config import (
-    CustomEvaluatorDef,
     EvalParams,
     EvalRunConfig,
+    EvaluatorDef,
 )
 from .converter import ConversionResult, convert_traces
 from .loader import load_traces
@@ -114,12 +113,8 @@ async def run_evaluation_from_traces(
 
             return await _evaluate_trace(
                 conv_result=conv_result,
-                metrics=config.metrics,
-                custom_evaluators=config.custom_evaluators,
+                evaluators=config.evaluators,
                 eval_set=eval_set,
-                judge_model=config.judge_model,
-                threshold=config.threshold,
-                trajectory_match_type=config.trajectory_match_type,
                 eval_semaphore=eval_semaphore,
                 progress_callback=progress_callback,
                 trace_progress_callback=trace_progress_callback,
@@ -248,17 +243,13 @@ async def run_evaluation(
 
 async def _evaluate_trace(
     conv_result: ConversionResult,
-    metrics: list[str],
-    custom_evaluators: list[CustomEvaluatorDef],
+    evaluators: list[EvaluatorDef],
     eval_set: EvalSet | None,
-    judge_model: str | None,
-    threshold: float | None,
     eval_semaphore: asyncio.Semaphore,
     progress_callback: ProgressCallback | None = None,
     trace_progress_callback: TraceProgressCallback | None = None,
     trace=None,
     performance_metrics: dict[str, Any] | None = None,
-    trajectory_match_type: str | None = None,
 ) -> TraceResult:
     trace_result = TraceResult(
         trace_id=conv_result.trace_id,
@@ -290,23 +281,7 @@ async def _evaluate_trace(
             await trace_progress_callback(trace_result)
         return result
 
-    async def _eval_builtin_with_semaphore(metric_name: str) -> MetricResult:
-        async with eval_semaphore:
-            if progress_callback:
-                await progress_callback(f"Running {metric_name}...")
-            t0 = time.monotonic()
-            result = await evaluate_builtin_metric(
-                metric_name=metric_name,
-                actual_invocations=actual_invocations,
-                expected_invocations=expected_invocations,
-                judge_model=judge_model,
-                threshold=threshold,
-                match_type=trajectory_match_type,
-            )
-            result.duration_ms = (time.monotonic() - t0) * 1000
-        return await _append_result(result)
-
-    async def _eval_custom_with_semaphore(evaluator_def: CustomEvaluatorDef) -> MetricResult:
+    async def _eval_with_semaphore(evaluator_def: EvaluatorDef) -> MetricResult:
         async with eval_semaphore:
             if progress_callback:
                 await progress_callback(f"Running {evaluator_def.name}...")
@@ -322,8 +297,7 @@ async def _evaluate_trace(
             result.duration_ms = (time.monotonic() - t0) * 1000
         return await _append_result(result)
 
-    tasks = [_eval_builtin_with_semaphore(m) for m in metrics]
-    tasks.extend(_eval_custom_with_semaphore(g) for g in custom_evaluators)
+    tasks = [_eval_with_semaphore(evaluator_def) for evaluator_def in evaluators]
 
     await asyncio.gather(*tasks)
 

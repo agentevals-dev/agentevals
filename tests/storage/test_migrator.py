@@ -7,6 +7,7 @@ otherwise those tests skip so the suite stays runnable in pure-Python sandboxes.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 
@@ -14,10 +15,12 @@ import pytest
 
 from agentevals.storage.postgres.migrator import (
     ADVISORY_LOCK_KEY,
+    CONNECT_RETRY_DEADLINE_S,
     Migration,
     Migrator,
     _apply_schema,
     _discover_migrations,
+    connect_deadline_seconds,
     discover_migrations,
 )
 
@@ -69,6 +72,61 @@ class TestAdvisoryLockKey:
         """Changing the lock key would let two concurrent migrators race.
         Only update the key alongside an explicit migration to a new key."""
         assert ADVISORY_LOCK_KEY == 7259820376655812345
+
+
+class TestConnectDeadlineSeconds:
+    """``connect_deadline_seconds`` resolves AGENTEVALS_DB_CONNECT_TIMEOUT_S
+    to a float, falling back to CONNECT_RETRY_DEADLINE_S on any input the
+    retry loop cannot consume. Each failure mode logs at WARNING so the
+    cause is diagnosable from pod logs."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_env(self, monkeypatch):
+        monkeypatch.delenv("AGENTEVALS_DB_CONNECT_TIMEOUT_S", raising=False)
+
+    def test_unset_returns_default(self):
+        assert connect_deadline_seconds() == CONNECT_RETRY_DEADLINE_S
+
+    def test_empty_returns_default(self, monkeypatch):
+        monkeypatch.setenv("AGENTEVALS_DB_CONNECT_TIMEOUT_S", "")
+        assert connect_deadline_seconds() == CONNECT_RETRY_DEADLINE_S
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("42", 42.0),
+            ("120.5", 120.5),
+            ("0.1", 0.1),
+            ("3600", 3600.0),
+        ],
+    )
+    def test_parses_valid_positive_values(self, monkeypatch, raw, expected):
+        monkeypatch.setenv("AGENTEVALS_DB_CONNECT_TIMEOUT_S", raw)
+        assert connect_deadline_seconds() == expected
+
+    @pytest.mark.parametrize(
+        ("raw", "reason_substring"),
+        [
+            ("foo", "not a number"),
+            ("nan", "must be finite"),
+            ("inf", "must be finite"),
+            ("-inf", "must be finite"),
+            ("0", "must be positive"),
+            ("-5", "must be positive"),
+        ],
+    )
+    def test_invalid_values_fall_back_with_warning(self, monkeypatch, caplog, raw, reason_substring):
+        """Bad inputs return the default and log exactly one warning that
+        names the specific validation branch. The cardinality check
+        guards against a refactor that double-logs (e.g. emits both a
+        generic and a specific message)."""
+        monkeypatch.setenv("AGENTEVALS_DB_CONNECT_TIMEOUT_S", raw)
+        with caplog.at_level(logging.WARNING, logger="agentevals.storage.postgres.migrator"):
+            result = connect_deadline_seconds()
+        assert result == CONNECT_RETRY_DEADLINE_S
+        warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1, f"expected one warning, got {warnings}"
+        assert reason_substring in warnings[0]
 
 
 class TestMigrationFilePattern:

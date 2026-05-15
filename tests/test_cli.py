@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import sys
+import textwrap
 from types import ModuleType
 from unittest.mock import AsyncMock
 
 import pytest
+from click.testing import CliRunner
 
 from agentevals import cli
+from agentevals.runner import RunResult
 
 
 class _FakeGrpcServer:
@@ -85,3 +88,78 @@ async def test_run_servers_shares_one_trace_manager_across_live_servers(monkeypa
     assert any(route.path == "/v1/traces" for route in otlp_app.routes)
     assert any(route.path == "/v1/logs" for route in otlp_app.routes)
     fake_stop_grpc.assert_awaited_once_with(fake_grpc_server)
+
+
+def test_run_preserves_config_file_settings_when_flags_omitted(monkeypatch, tmp_path):
+    trace_file = tmp_path / "trace.json"
+    trace_file.write_text("{}")
+    config_file = tmp_path / "eval.yaml"
+    config_file.write_text(
+        textwrap.dedent(
+            """
+            evaluators:
+              - name: tool_trajectory_avg_score
+                type: builtin
+            eval_set: from-config.json
+            trace_format: otlp-json
+            output: json
+            """
+        )
+    )
+
+    captured = {}
+
+    async def fake_run_evaluation(config):
+        captured["config"] = config
+        return RunResult()
+
+    monkeypatch.setattr("agentevals.runner.run_evaluation", fake_run_evaluation)
+    monkeypatch.setattr("agentevals.output.format_results", lambda result, fmt: f"format={fmt}")
+
+    result = CliRunner().invoke(cli.main, ["run", str(trace_file), "--config", str(config_file)])
+
+    assert result.exit_code == 0, result.output
+    assert captured["config"].trace_files == [str(trace_file)]
+    assert captured["config"].eval_set_file == "from-config.json"
+    assert captured["config"].trace_format == "otlp-json"
+    assert captured["config"].output_format == "json"
+    assert "format=json" in result.output
+
+
+def test_run_merges_explicit_metrics_with_config_file(monkeypatch, tmp_path):
+    trace_file = tmp_path / "trace.json"
+    trace_file.write_text("{}")
+    config_file = tmp_path / "eval.yaml"
+    config_file.write_text(
+        textwrap.dedent(
+            """
+            evaluators:
+              - name: tool_trajectory_avg_score
+                type: builtin
+              - name: custom_eval
+                type: code
+                path: ./examples/custom_evaluators/tool_call_checker.py
+            """
+        )
+    )
+
+    captured = {}
+
+    async def fake_run_evaluation(config):
+        captured["config"] = config
+        return RunResult()
+
+    monkeypatch.setattr("agentevals.runner.run_evaluation", fake_run_evaluation)
+    monkeypatch.setattr("agentevals.output.format_results", lambda result, fmt: f"format={fmt}")
+
+    result = CliRunner().invoke(
+        cli.main,
+        ["run", str(trace_file), "--config", str(config_file), "-m", "response_match_score"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert [e.name for e in captured["config"].evaluators] == [
+        "tool_trajectory_avg_score",
+        "custom_eval",
+        "response_match_score",
+    ]

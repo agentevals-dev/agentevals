@@ -190,7 +190,7 @@ export const UploadView: React.FC = () => {
 
   const canRunEvaluation =
     state.traceFiles.length > 0 &&
-    state.selectedMetrics.length > 0 &&
+    state.selectedEvaluatorNames.length > 0 &&
     !state.isLoadingMetadata;
 
   return (
@@ -461,10 +461,10 @@ export const UploadView: React.FC = () => {
         )}
 
         <div className="section metrics-section">
-          <div className="section-title">Metrics Configuration</div>
+          <div className="section-title">Built-in Evaluator Configuration</div>
           <MetricSelector
-            selectedMetrics={state.selectedMetrics}
-            onToggleMetric={actions.toggleMetric}
+            selectedEvaluatorNames={state.selectedEvaluatorNames}
+            onToggleEvaluatorName={actions.toggleEvaluatorName}
             loadFromAPI={true}
           />
         </div>
@@ -527,7 +527,7 @@ export const UploadView: React.FC = () => {
             </span>
           </div>
 
-          {state.selectedMetrics.includes('tool_trajectory_avg_score') && (
+          {state.selectedEvaluatorNames.includes('tool_trajectory_avg_score') && (
             <div className="setting-item" style={{ marginTop: 10 }}>
               <label className="setting-label">Trajectory Match Type</label>
               <Select

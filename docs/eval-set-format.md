@@ -1,6 +1,6 @@
 # Eval Set Format
 
-An eval set is a JSON file containing golden reference data that metrics compare agent traces against. It follows the [Google ADK `EvalSet`](https://github.com/google/adk-python/blob/main/src/google/adk/evaluation/eval_set.py) schema, which means eval sets are portable between agentevals and ADK tooling.
+An eval set is a JSON file containing golden reference data that evaluators compare agent traces against. It follows the [Google ADK `EvalSet`](https://github.com/google/adk-python/blob/main/src/google/adk/evaluation/eval_set.py) schema, which means eval sets are portable between agentevals and ADK tooling.
 
 Most users will not need to author eval sets by hand. The web UI can generate them from live sessions (mark a session as golden, and the server builds the eval set automatically). This document is for users who want to create or edit eval sets directly, whether for CLI usage, CI pipelines, or version-controlled test suites.
 
@@ -203,9 +203,9 @@ The `parts` array can contain text, function calls, or function responses. Most 
 
 Each `FunctionCall` has `name`, `args`, and `id`. Each `FunctionResponse` has `name`, `response`, and `id`. Match `id` values between calls and responses to pair them.
 
-## Which Metrics Use Eval Sets
+## Which Evaluators Use Eval Sets
 
-Not all metrics require an eval set. Use `agentevals list-metrics` to see which do:
+Not all evaluators require an eval set. Use `agentevals evaluator list --source builtin` to see which built-in evaluators do:
 
 | Metric | Needs Eval Set | What It Reads |
 |---|---|---|

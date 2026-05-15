@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any
 
@@ -11,13 +10,11 @@ import yaml
 from .config import (
     BuiltinMetricDef,
     CodeEvaluatorDef,
-    CustomEvaluatorDef,
     EvalRunConfig,
+    EvaluatorDef,
     OpenAIEvalDef,
     RemoteEvaluatorDef,
 )
-
-logger = logging.getLogger(__name__)
 
 _TYPE_TO_MODEL = {
     "builtin": BuiltinMetricDef,
@@ -27,12 +24,8 @@ _TYPE_TO_MODEL = {
 }
 
 
-def _parse_evaluator_entry(entry: dict[str, Any]) -> tuple[str | None, CustomEvaluatorDef | None]:
-    """Parse a single evaluator entry from the YAML config.
-
-    Every entry must be a dict with ``name`` and ``type`` fields.
-    Returns (builtin_name, custom_evaluator_def).  Exactly one will be non-None.
-    """
+def _parse_evaluator_entry(entry: dict[str, Any]) -> EvaluatorDef:
+    """Parse a single evaluator entry from the YAML config."""
     if not isinstance(entry, dict):
         raise ValueError(
             f"Each evaluator entry must be a mapping with 'name' and 'type' fields, got {type(entry).__name__}: {entry!r}"
@@ -52,22 +45,14 @@ def _parse_evaluator_entry(entry: dict[str, Any]) -> tuple[str | None, CustomEva
         )
 
     model_cls = _TYPE_TO_MODEL[evaluator_type]
-    evaluator_def = model_cls.model_validate(entry)
-
-    if evaluator_type == "builtin":
-        return name, evaluator_def if (
-            evaluator_def.threshold is not None or evaluator_def.judge_model is not None
-        ) else None
-
-    return None, evaluator_def
+    return model_cls.model_validate(entry)
 
 
 def load_eval_config(path: str | Path) -> EvalRunConfig:
     """Load an eval config YAML file and return a partially-filled EvalRunConfig.
 
     The YAML file uses an ``evaluators`` list where each entry is a dict with
-    ``name`` and ``type`` fields.  Built-in entries populate ``metrics``;
-    code/remote entries populate ``custom_evaluators``.
+    ``name`` and ``type`` fields.
     """
     path = Path(path)
     if not path.exists():
@@ -79,44 +64,40 @@ def load_eval_config(path: str | Path) -> EvalRunConfig:
     if not isinstance(data, dict):
         raise ValueError(f"Eval config must be a YAML mapping, got {type(data).__name__}")
 
+    legacy_keys = {
+        "metrics",
+        "custom_evaluators",
+        "judge_model",
+        "threshold",
+        "trajectory_match_type",
+    }
+    present_legacy_keys = sorted(key for key in legacy_keys if key in data)
+    if present_legacy_keys:
+        raise ValueError(
+            "Legacy eval config keys are no longer supported: "
+            + ", ".join(present_legacy_keys)
+            + ". Use 'evaluators' instead."
+        )
+
     raw_evaluators = data.get("evaluators", [])
     if not isinstance(raw_evaluators, list):
         raise ValueError("'evaluators' must be a list")
 
-    builtin_names: list[str] = []
-    custom_defs: list[CustomEvaluatorDef] = []
-    builtin_overrides: dict[str, BuiltinMetricDef] = {}
-
-    for entry in raw_evaluators:
-        builtin_name, custom_def = _parse_evaluator_entry(entry)
-        if builtin_name:
-            builtin_names.append(builtin_name)
-        if custom_def:
-            if isinstance(custom_def, BuiltinMetricDef):
-                builtin_overrides[custom_def.name] = custom_def
-                if custom_def.name not in builtin_names:
-                    builtin_names.append(custom_def.name)
-            else:
-                custom_defs.append(custom_def)
+    evaluator_defs = [_parse_evaluator_entry(entry) for entry in raw_evaluators]
 
     config = EvalRunConfig(
         trace_files=[],
-        metrics=builtin_names,
-        custom_evaluators=custom_defs,
+        evaluators=evaluator_defs,
     )
 
     if "eval_set" in data:
         config.eval_set_file = str(data["eval_set"])
-    if "judge_model" in data:
-        config.judge_model = data["judge_model"]
-    if "threshold" in data:
-        config.threshold = float(data["threshold"])
-    if "trajectory_match_type" in data:
-        config.trajectory_match_type = data["trajectory_match_type"]
     if "trace_format" in data:
         config.trace_format = data["trace_format"]
-
-    config._builtin_overrides = builtin_overrides  # type: ignore[attr-defined]
+    if "output_format" in data:
+        config.output_format = str(data["output_format"])
+    elif "output" in data:
+        config.output_format = str(data["output"])
 
     return config
 
@@ -124,30 +105,24 @@ def load_eval_config(path: str | Path) -> EvalRunConfig:
 def merge_configs(file_config: EvalRunConfig, cli_config: EvalRunConfig) -> EvalRunConfig:
     """Merge a file-based config with CLI overrides.
 
-    CLI values take precedence for scalar fields.  Metrics lists are merged:
-    CLI ``--metric`` flags are added to the file config's built-in metrics
-    (duplicates removed).
+    CLI values take precedence for scalar fields. Evaluator definitions are
+    merged by evaluator name, with CLI-provided entries replacing file entries
+    of the same identity.
     """
-    merged = file_config.model_copy()
+    merged = file_config.model_copy(deep=True)
 
     if cli_config.trace_files:
         merged.trace_files = cli_config.trace_files
     if cli_config.eval_set_file is not None:
         merged.eval_set_file = cli_config.eval_set_file
-    if cli_config.judge_model is not None:
-        merged.judge_model = cli_config.judge_model
-    if cli_config.threshold is not None:
-        merged.threshold = cli_config.threshold
-    if cli_config.trajectory_match_type is not None:
-        merged.trajectory_match_type = cli_config.trajectory_match_type
     if cli_config.trace_format is not None:
         merged.trace_format = cli_config.trace_format
     if cli_config.output_format != "table":
         merged.output_format = cli_config.output_format
 
-    file_metric_names = set(merged.metrics)
-    for name in cli_config.metrics:
-        if name not in file_metric_names:
-            merged.metrics.append(name)
+    merged_evaluators: dict[str, EvaluatorDef] = {e.name: e for e in merged.evaluators}
+    for evaluator in cli_config.evaluators:
+        merged_evaluators[evaluator.name] = evaluator
+    merged.evaluators = list(merged_evaluators.values())
 
     return merged

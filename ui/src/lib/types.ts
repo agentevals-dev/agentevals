@@ -202,12 +202,15 @@ export interface TraceTableRow {
   annotation?: Annotation;
 }
 
-// Configuration
+// Evaluation API config
 export interface EvalConfig {
-  metrics: string[];
-  judgeModel: string;
-  threshold: number;
-  trajectoryMatchType?: string;
+  evaluators: Array<{
+    type: 'builtin';
+    name: string;
+    judgeModel?: string;
+    threshold?: number;
+    trajectoryMatchType?: string;
+  }>;
 }
 
 // EvalSet types

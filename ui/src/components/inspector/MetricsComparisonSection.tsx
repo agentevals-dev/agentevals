@@ -9,7 +9,7 @@ interface MetricsComparisonSectionProps {
   expectedInvocation: Invocation | null;
   actualInvocation: Invocation | null;
   threshold: number;
-  selectedMetrics: string[];
+  selectedEvaluatorNames: string[];
   isEvaluating: boolean;
   allActualInvocations?: Invocation[];
   allExpectedInvocations?: Invocation[];
@@ -20,7 +20,7 @@ export const MetricsComparisonSection: React.FC<MetricsComparisonSectionProps> =
   expectedInvocation,
   actualInvocation,
   threshold,
-  selectedMetrics,
+  selectedEvaluatorNames,
   isEvaluating,
   allActualInvocations,
   allExpectedInvocations,
@@ -208,7 +208,7 @@ export const MetricsComparisonSection: React.FC<MetricsComparisonSectionProps> =
   };
 
   const metricResultsMap = new Map(metricResults.map(mr => [mr.metricName, mr]));
-  const metricsToShow = selectedMetrics.length > 0 ? selectedMetrics : metricResults.map(mr => mr.metricName);
+  const metricsToShow = selectedEvaluatorNames.length > 0 ? selectedEvaluatorNames : metricResults.map(mr => mr.metricName);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -226,7 +226,7 @@ export const MetricsComparisonSection: React.FC<MetricsComparisonSectionProps> =
   return (
     <div css={sectionContainerStyles}>
       <div css={sectionHeaderStyles}>
-        <h3>Metrics Overview</h3>
+        <h3>Evaluator Results Overview</h3>
         <span css={thresholdBadgeStyles}>Threshold: {threshold}</span>
       </div>
 

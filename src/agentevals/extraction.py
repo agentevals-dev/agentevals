@@ -69,14 +69,15 @@ def extract_user_text_from_attrs(attrs: dict[str, Any]) -> str | None:
     if llm_request_raw:
         llm_request = parse_json(llm_request_raw)
         if isinstance(llm_request, dict):
-            for content_dict in reversed(llm_request.get("contents", [])):
+            contents = llm_request.get("contents", llm_request.get("Contents", []))
+            for content_dict in reversed(contents):
                 if content_dict.get("role") != "user":
                     continue
                 parts = content_dict.get("parts", [])
                 text_parts = [p for p in parts if "text" in p]
                 if text_parts:
                     return " ".join(p["text"] for p in text_parts)
-            for content_dict in llm_request.get("contents", []):
+            for content_dict in contents:
                 if content_dict.get("role") == "user":
                     parts = content_dict.get("parts", [])
                     if parts:
@@ -101,7 +102,7 @@ def extract_agent_response_from_attrs(attrs: dict[str, Any]) -> str | None:
     if llm_response_raw:
         llm_response = parse_json(llm_response_raw)
         if isinstance(llm_response, dict):
-            content_dict = llm_response.get("content", {})
+            content_dict = llm_response.get("content", llm_response.get("Content", {}))
             if content_dict:
                 parts_dicts = content_dict.get("parts", [])
                 text_parts = [p for p in parts_dicts if "text" in p]
@@ -392,6 +393,38 @@ def is_adk_scope(span: Span) -> bool:
     return False
 
 
+def is_adk_generate_content_llm_span(span: Span) -> bool:
+    if not (span.operation_name.startswith("generate_content") or span.get_tag(OTEL_GENAI_OP) == "generate_content"):
+        return False
+    return bool(span.get_tag(ADK_LLM_REQUEST) or span.get_tag(ADK_LLM_RESPONSE))
+
+
+def is_adk_llm_span(span: Span) -> bool:
+    return span.operation_name.startswith("call_llm") or is_adk_generate_content_llm_span(span)
+
+
+def find_adk_llm_spans_in(root: Span) -> list[Span]:
+    call_llm_spans: list[Span] = []
+    generate_content_spans: list[Span] = []
+
+    def collect(span: Span) -> None:
+        if span.operation_name.startswith("call_llm"):
+            call_llm_spans.append(span)
+        elif is_adk_generate_content_llm_span(span):
+            generate_content_spans.append(span)
+
+    _walk_descendants(root, collect)
+    call_llm_spans.sort(key=lambda s: s.start_time)
+    generate_content_spans.sort(key=lambda s: s.start_time)
+    return call_llm_spans or generate_content_spans
+
+
+def _walk_descendants(span: Span, visit) -> None:
+    for child in span.children:
+        visit(child)
+        _walk_descendants(child, visit)
+
+
 def is_llm_span(span: Span) -> bool:
     return span.get_tag(OTEL_GENAI_REQUEST_MODEL) is not None
 
@@ -477,10 +510,7 @@ class AdkExtractor:
         return matches
 
     def find_llm_spans_in(self, root: Span) -> list[Span]:
-        results: list[Span] = []
-        self._walk(root, lambda s: s.operation_name.startswith("call_llm"), results)
-        results.sort(key=lambda s: s.start_time)
-        return results
+        return find_adk_llm_spans_in(root)
 
     def find_tool_spans_in(self, root: Span) -> list[Span]:
         results: list[Span] = []
@@ -493,7 +523,7 @@ class AdkExtractor:
             return None
         if span.operation_name.startswith("invoke_agent"):
             return "invocation"
-        if span.operation_name.startswith("call_llm"):
+        if is_adk_llm_span(span):
             return "llm"
         if span.operation_name.startswith("execute_tool"):
             return "tool"
