@@ -74,7 +74,7 @@ async def main():
     agent = FunctionAgent(
         tools=[FunctionTool.from_defaults(fn=roll_die), FunctionTool.from_defaults(fn=check_prime)],
         llm=llm,
-        system_prompt="Use roll_die when asked to roll dice. Use check_prime when asked about prime numbers.",
+        system_prompt="You are a helpful assistant. You can roll dice and check if numbers are prime.",
     )
 
     test_queries = [
