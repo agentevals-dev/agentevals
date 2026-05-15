@@ -20,7 +20,7 @@ from ..run.service import RunService
 from ..run.sinks import log_registered_sinks
 from ..run.worker import AsyncRunWorker
 from ..storage import StorageSettings, build_repos
-from ..storage.postgres.migrator import Migrator
+from ..storage.postgres.migrator import Migrator, discover_migrations
 from ..utils.log_buffer import log_buffer
 from .debug_routes import debug_router
 from .routes import router
@@ -30,6 +30,22 @@ if TYPE_CHECKING:
     from ..streaming.ws_server import StreamingTraceManager
 
 logger = logging.getLogger(__name__)
+
+_TRUE_VALUES = {"true", "1", "yes", "on"}
+_FALSE_VALUES = {"false", "0", "no", "off"}
+
+
+def _env_bool(name: str, *, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    val = raw.strip().lower()
+    if val in _TRUE_VALUES:
+        return True
+    if val in _FALSE_VALUES:
+        return False
+    raise ValueError(f"{name} must be one of true/false/1/0/yes/no/on/off (got: {raw!r})")
+
 
 try:
     from dotenv import load_dotenv
@@ -68,13 +84,34 @@ def _build_lifespan():
             logger.error("Storage configuration invalid; /api/runs will not be available: %s", exc)
 
         if storage_settings is not None and storage_settings.backend == "postgres":
-            logger.info("Applying any pending migrations to schema '%s'", storage_settings.schema_name)
             migrator = Migrator(
                 dsn=storage_settings.database_url or "",
                 schema=storage_settings.schema_name,
                 lock_timeout_s=storage_settings.migrate_lock_timeout_s,
             )
-            await migrator.up()
+            if _env_bool("AGENTEVALS_AUTO_MIGRATE", default=True):
+                logger.info("Applying any pending migrations to schema '%s'", storage_settings.schema_name)
+                await migrator.up()
+            else:
+                logger.info(
+                    "AGENTEVALS_AUTO_MIGRATE is disabled; verifying schema '%s' is up to date",
+                    storage_settings.schema_name,
+                )
+                status = await migrator.status()
+                if status.dirty:
+                    raise RuntimeError(
+                        f"schema_migrations is dirty at version {status.version}. "
+                        "Resolve manually and run 'agentevals migrate force <version>', "
+                        "or set AGENTEVALS_AUTO_MIGRATE=true to retry on startup."
+                    )
+                current = status.version
+                pending = [m.version for m in discover_migrations() if current is None or m.version > current]
+                if pending:
+                    raise RuntimeError(
+                        f"Database schema is behind: pending migrations {pending}. "
+                        "Run 'agentevals migrate up' to apply them, "
+                        "or set AGENTEVALS_AUTO_MIGRATE=true to apply on startup."
+                    )
 
             repos = await build_repos(storage_settings)
             app.state.storage_settings = storage_settings

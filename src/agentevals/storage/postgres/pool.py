@@ -50,9 +50,9 @@ async def create_pool(settings: StorageSettings) -> "asyncpg.Pool":
         settings.schema_name,
     )
 
-    from .migrator import CONNECT_RETRY_DEADLINE_S
+    from .migrator import connect_deadline_seconds
 
-    deadline = asyncio.get_event_loop().time() + CONNECT_RETRY_DEADLINE_S
+    deadline = asyncio.get_event_loop().time() + connect_deadline_seconds()
     delay = 0.5
     while True:
         try:

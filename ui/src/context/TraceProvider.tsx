@@ -2,8 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { TraceContext } from './TraceContext';
 import type { TraceState } from './TraceContext';
-import type { ViewType, EvalSet, EvalSetMetadata, EvalCase, LiveSession, AnnotationQueue, Annotation } from '../lib/types';
+import type { ViewType, EvalConfig, EvalSet, EvalSetMetadata, EvalCase, LiveSession, AnnotationQueue, Annotation } from '../lib/types';
 import { evaluateTracesStreaming, convertTraces, getConfig, healthCheck } from '../api/client';
+import { buildEvalConfig } from '../lib/eval-config';
 
 interface TraceProviderProps {
   children: ReactNode;
@@ -13,7 +14,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
   const [state, setState] = useState<TraceState>({
     traceFiles: [],
     evalSetFile: null,
-    selectedMetrics: ['tool_trajectory_avg_score'],
+    selectedEvaluatorNames: ['tool_trajectory_avg_score'],
     judgeModel: 'gemini-2.5-flash',
     threshold: 0.8,
     trajectoryMatchType: 'EXACT',
@@ -81,12 +82,12 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
       setEvalSet: (file: File | null) =>
         setState((prev) => ({ ...prev, evalSetFile: file })),
 
-      toggleMetric: (metric: string) =>
+      toggleEvaluatorName: (evaluatorName: string) =>
         setState((prev) => ({
           ...prev,
-          selectedMetrics: prev.selectedMetrics.includes(metric)
-            ? prev.selectedMetrics.filter((m) => m !== metric)
-            : [...prev.selectedMetrics, metric],
+          selectedEvaluatorNames: prev.selectedEvaluatorNames.includes(evaluatorName)
+            ? prev.selectedEvaluatorNames.filter((name) => name !== evaluatorName)
+            : [...prev.selectedEvaluatorNames, evaluatorName],
         })),
 
       setJudgeModel: (model: string) =>
@@ -130,15 +131,17 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
         }));
 
         try {
+          const evalConfig: EvalConfig = buildEvalConfig({
+            selectedEvaluatorNames: state.selectedEvaluatorNames,
+            judgeModel: state.judgeModel,
+            threshold: state.threshold,
+            trajectoryMatchType: state.trajectoryMatchType,
+          });
+
           await evaluateTracesStreaming(
             state.traceFiles,
             state.evalSetFile,
-            {
-              metrics: state.selectedMetrics,
-              judgeModel: state.judgeModel,
-              threshold: state.threshold,
-              trajectoryMatchType: state.trajectoryMatchType,
-            },
+            evalConfig,
             (message) => {
               setState((prev) => ({ ...prev, progressMessage: message }));
             },
@@ -155,7 +158,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
                   existingMetrics.set(mr.metricName, mr);
                 });
 
-                const allMetricsComplete = prev.selectedMetrics.length === partialResult.metricResults.length;
+                const allMetricsComplete = prev.selectedEvaluatorNames.length === partialResult.metricResults.length;
 
                 newRows.set(traceId, {
                   traceId,
@@ -404,7 +407,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
           };
         }),
     }),
-    [state.traceFiles, state.traceMetadata, state.evalSetFile, state.selectedMetrics, state.judgeModel, state.threshold, state.trajectoryMatchType]
+    [state.traceFiles, state.traceMetadata, state.evalSetFile, state.selectedEvaluatorNames, state.judgeModel, state.threshold, state.trajectoryMatchType]
   );
 
   return (

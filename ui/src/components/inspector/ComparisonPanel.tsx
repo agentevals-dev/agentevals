@@ -17,7 +17,7 @@ interface ComparisonPanelProps {
   expectedInvocation: Invocation | null;
   metricResults: MetricResult[];
   threshold: number;
-  selectedMetrics: string[];
+  selectedEvaluatorNames: string[];
   isEvaluating: boolean;
   performanceMetrics?: PerformanceMetrics;
   traceInfo?: TraceInfo;
@@ -30,7 +30,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
   expectedInvocation,
   metricResults,
   threshold,
-  selectedMetrics,
+  selectedEvaluatorNames,
   isEvaluating,
   performanceMetrics,
   traceInfo,
@@ -78,7 +78,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
           expectedInvocation={expectedInvocation}
           actualInvocation={actualInvocation}
           threshold={threshold}
-          selectedMetrics={selectedMetrics}
+          selectedEvaluatorNames={selectedEvaluatorNames}
           isEvaluating={isEvaluating}
           allActualInvocations={allActualInvocations}
           allExpectedInvocations={allExpectedInvocations}

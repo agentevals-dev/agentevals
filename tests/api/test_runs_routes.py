@@ -126,6 +126,15 @@ class TestSubmitRun:
             )
         assert r.status_code == 422
 
+    def test_invalid_legacy_eval_config_rejected(self, stubbed_app):
+        app, _ = stubbed_app
+        payload = self._payload()
+        payload["spec"]["evalConfig"] = {"judgeModel": "gemini-2.5-flash"}
+        with TestClient(app) as client:
+            r = client.post("/api/runs", json=payload)
+        assert r.status_code == 422
+        assert "Invalid eval_config" in r.json()["detail"]
+
 
 class TestGetAndListRuns:
     def test_unknown_run_id_returns_404(self, stubbed_app):

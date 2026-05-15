@@ -149,7 +149,7 @@ Update `main.py` to test the new functionality.
 **After agent completes:**
 - Status changes to "EVALUATED"
 - Evaluation results appear as colored badges
-- Each metric shows: name and score (e.g., "tool_trajectory_avg_score: 1.00")
+- Each evaluator result shows: name and score (e.g., "tool_trajectory_avg_score: 1.00")
 
 **Multiple runs:**
 - Each run creates a new session with model name in ID

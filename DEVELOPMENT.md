@@ -50,7 +50,7 @@ Once running, submit a run with:
 ```bash
 curl -X POST http://localhost:8001/api/runs \
     -H 'content-type: application/json' \
-    -d '{"spec": {"approach": "trace_replay", "target": {"kind": "inline", "inline": {...}}, "evalConfig": {"metrics": ["tool_trajectory_avg_score"]}}}'
+    -d '{"spec": {"approach": "trace_replay", "target": {"kind": "inline", "inline": {...}}, "evalConfig": {"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}}}'
 ```
 
 Then poll `GET /api/runs/{runId}` and `GET /api/runs/{runId}/results`. Without `storage.backend=postgres`, the `/api/runs` endpoints return 503 with a hint pointing at the env var.

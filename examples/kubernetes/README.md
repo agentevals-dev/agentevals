@@ -221,7 +221,7 @@ This captures the GPT-5 session's tool trajectory and final responses as the gol
 2. Select both sessions (the `gpt-4.1-mini` session and the `gpt-5` session)
 3. Click **Evaluate**
 4. Select the `helm-agent-comparison` eval set
-5. Choose the metrics:
+5. Choose the evaluators:
    - **tool_trajectory_avg_score**: Did the agent call the correct tools in the correct order?
    - **response_match_score**: Did the agent produce responses consistent with the golden reference?
 6. Run the evaluation
@@ -241,7 +241,7 @@ Compare the two sessions in the results table:
 
 <img width="1914" height="1154" alt="image" src="https://github.com/user-attachments/assets/5939a8d4-3775-4cf1-9cf2-d3b6b4afd582" />
 
-You can also click an individual conversation and see a breakdown of each evaluators.
+You can also click an individual conversation and see a breakdown of each evaluator.
 
 <img width="1916" height="1348" alt="image" src="https://github.com/user-attachments/assets/984b3d29-8018-4fcb-9036-bb7c6e97d9ff" />
 

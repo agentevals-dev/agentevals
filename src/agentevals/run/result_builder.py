@@ -23,9 +23,9 @@ def classify_evaluator(metric_name: str, params: EvalParams) -> EvaluatorType:
     """Look up whether a metric was a built-in or a custom evaluator,
     falling back to ``builtin`` so unknown names round-trip cleanly rather
     than raising during persistence."""
-    for ce in params.custom_evaluators:
-        if ce.name == metric_name:
-            return ce.type
+    for evaluator in params.evaluators:
+        if evaluator.name == metric_name:
+            return evaluator.type
     return "builtin"
 
 

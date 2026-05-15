@@ -85,7 +85,7 @@ export const InspectorHeader: React.FC<InspectorHeaderProps> = ({
               <span css={metadataValueStyles}>{traceResult.numInvocations}</span>
             </span>
             <span css={metadataItemStyles}>
-              <span css={metadataLabelStyles}>Metrics:</span>
+              <span css={metadataLabelStyles}>Results:</span>
               <span css={metadataValueStyles}>{traceResult.metricResults.length}</span>
             </span>
             {traceResult.conversionWarnings.length > 0 && (

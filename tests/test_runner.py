@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from agentevals.config import EvalRunConfig
+from agentevals.config import BuiltinMetricDef, EvalRunConfig
 from agentevals.converter import convert_traces
 from agentevals.loader.base import Span, Trace
 from agentevals.runner import _evaluate_trace, load_eval_set, run_evaluation
@@ -112,7 +112,7 @@ class TestRunner:
         config = EvalRunConfig(
             trace_files=[HELM_TRACE],
             eval_set_file=EVAL_SET,
-            metrics=["tool_trajectory_avg_score"],
+            evaluators=[BuiltinMetricDef(name="tool_trajectory_avg_score")],
         )
         result = asyncio.run(run_evaluation(config))
 
@@ -135,7 +135,7 @@ class TestRunner:
         """Trajectory metric without eval set should report a clear error."""
         config = EvalRunConfig(
             trace_files=[HELM_TRACE],
-            metrics=["tool_trajectory_avg_score"],
+            evaluators=[BuiltinMetricDef(name="tool_trajectory_avg_score")],
         )
         result = asyncio.run(run_evaluation(config))
 
@@ -148,7 +148,7 @@ class TestRunner:
     def test_bad_trace_file(self):
         config = EvalRunConfig(
             trace_files=["/nonexistent/file.json"],
-            metrics=["tool_trajectory_avg_score"],
+            evaluators=[BuiltinMetricDef(name="tool_trajectory_avg_score")],
         )
         result = asyncio.run(run_evaluation(config))
         assert len(result.errors) >= 1
@@ -171,7 +171,7 @@ class TestRunner:
         config = EvalRunConfig(
             trace_files=[HELM_3_TRACE],
             eval_set_file=EVAL_SET,
-            metrics=["tool_trajectory_avg_score"],
+            evaluators=[BuiltinMetricDef(name="tool_trajectory_avg_score")],
         )
         result = asyncio.run(run_evaluation(config))
 
@@ -207,7 +207,10 @@ class TestRunner:
         config = EvalRunConfig(
             trace_files=[HELM_TRACE],
             eval_set_file=EVAL_SET,
-            metrics=["tool_trajectory_avg_score", "tool_trajectory_avg_score"],
+            evaluators=[
+                BuiltinMetricDef(name="tool_trajectory_avg_score"),
+                BuiltinMetricDef(name="response_match_score"),
+            ],
         )
         result = asyncio.run(run_evaluation(config))
 
@@ -220,7 +223,7 @@ class TestRunner:
         config = EvalRunConfig(
             trace_files=[HELM_TRACE],
             eval_set_file=EVAL_SET,
-            metrics=["tool_trajectory_avg_score"],
+            evaluators=[BuiltinMetricDef(name="tool_trajectory_avg_score")],
         )
         result = asyncio.run(run_evaluation(config))
         output = format_results(result, fmt="json")
@@ -236,7 +239,7 @@ class TestRunner:
         config = EvalRunConfig(
             trace_files=[HELM_TRACE, "/nonexistent/file.json"],
             eval_set_file=EVAL_SET,
-            metrics=["tool_trajectory_avg_score"],
+            evaluators=[BuiltinMetricDef(name="tool_trajectory_avg_score")],
         )
         result = asyncio.run(run_evaluation(config))
         assert len(result.trace_results) >= 1
@@ -276,12 +279,14 @@ class TestTrajectoryMatchType:
         return asyncio.run(
             _evaluate_trace(
                 conv_result=conv_result,
-                metrics=["tool_trajectory_avg_score"],
-                custom_evaluators=[],
+                evaluators=[
+                    BuiltinMetricDef(
+                        name="tool_trajectory_avg_score",
+                        threshold=0.5,
+                        trajectory_match_type=match_type,
+                    )
+                ],
                 eval_set=eval_set,
-                judge_model=None,
-                threshold=0.5,
-                trajectory_match_type=match_type,
                 eval_semaphore=asyncio.Semaphore(1),
             )
         )
@@ -300,3 +305,33 @@ class TestTrajectoryMatchType:
         mr = self._run("IN_ORDER", tmp_path).metric_results[0]
         assert mr.score == 0.0
         assert mr.eval_status == "FAILED"
+
+
+class TestBuiltinCustomEvaluatorOverrides:
+    def test_builtin_custom_evaluator_uses_per_evaluator_match_type(self, tmp_path):
+        conv_result = convert_traces([_make_tool_trace(["helm_get_release", "helm_list_releases"])])[0]
+
+        eval_set_path = tmp_path / "eval_set.json"
+        eval_set_path.write_text(json.dumps(_make_eval_set_json(["helm_list_releases", "helm_get_release"])))
+        eval_set = load_eval_set(str(eval_set_path))
+
+        trace_result = asyncio.run(
+            _evaluate_trace(
+                conv_result=conv_result,
+                evaluators=[
+                    BuiltinMetricDef(
+                        name="tool_trajectory_avg_score",
+                        threshold=0.5,
+                        trajectory_match_type="ANY_ORDER",
+                    )
+                ],
+                eval_set=eval_set,
+                eval_semaphore=asyncio.Semaphore(1),
+            )
+        )
+
+        assert len(trace_result.metric_results) == 1
+        mr = trace_result.metric_results[0]
+        assert mr.metric_name == "tool_trajectory_avg_score"
+        assert mr.score == 1.0
+        assert mr.eval_status == "PASSED"

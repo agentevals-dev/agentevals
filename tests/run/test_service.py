@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from agentevals.config import EvalParams
+from agentevals.config import BuiltinMetricDef, EvalParams
 from agentevals.run.service import RunService, RunSubmitConflict
 from agentevals.runner import MetricResult, RunResult, TraceResult
 from agentevals.storage.models import RunSpec, RunStatus, TraceTarget
@@ -82,7 +82,7 @@ class TestRecordEvalRun:
     """Option A: /api/evaluate synchronously persists runs + results."""
 
     def _params(self) -> EvalParams:
-        return EvalParams(metrics=["m1"])
+        return EvalParams(evaluators=[BuiltinMetricDef(name="m1")])
 
     def _run_result(self, *, errors=None, metrics=None) -> RunResult:
         return RunResult(

@@ -15,6 +15,7 @@ from agentevals.mcp_server import (
     SummarizeSessionResponse,
     ToolCallResponse,
     TraceEvalResponse,
+    create_server,
     summarize_run_result,
 )
 from agentevals.runner import MetricResult, RunResult, TraceResult
@@ -340,3 +341,62 @@ class TestSummarizeSessionResponse:
     def test_tool_call_default_args(self):
         tc = ToolCallResponse(tool="my_tool")
         assert tc.args == {}
+
+
+@pytest.mark.asyncio
+async def test_evaluate_sessions_posts_builtin_evaluator_overrides(monkeypatch):
+    captured = {}
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "data": {
+                    "goldenSessionId": "golden-1",
+                    "evalSetId": "eval-golden-1",
+                    "results": [],
+                },
+                "error": None,
+            }
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, json):
+            captured["url"] = url
+            captured["json"] = json
+            return _FakeResponse()
+
+    monkeypatch.setattr("agentevals.mcp_server.httpx.AsyncClient", _FakeAsyncClient)
+
+    server = create_server()
+    await server.call_tool(
+        "evaluate_sessions",
+        {
+            "golden_session_id": "golden-1",
+            "metrics": ["final_response_match_v2"],
+            "judge_model": "gemini-2.5-flash",
+            "threshold": 0.9,
+            "trajectory_match_type": "IN_ORDER",
+        },
+    )
+
+    assert captured["url"].endswith("/api/streaming/evaluate-sessions")
+    assert captured["json"]["evaluators"] == [
+        {
+            "name": "final_response_match_v2",
+            "type": "builtin",
+            "threshold": 0.9,
+            "judgeModel": "gemini-2.5-flash",
+            "trajectoryMatchType": "IN_ORDER",
+        }
+    ]

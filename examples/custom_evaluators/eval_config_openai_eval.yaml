@@ -1,0 +1,18 @@
+# Eval config using OpenAI Evals API graders.
+# Requires OPENAI_API_KEY to be set.
+#
+# Run with:
+#   agentevals run samples/helm.json \
+#     --config examples/custom_evaluators/eval_config_openai_eval.yaml
+
+evaluators:
+  - name: quality_check
+    type: openai_eval
+    grader:
+      type: label_model
+      model: gpt-4o-mini
+      input:
+        - role: user
+          content: "Rate this response: {{ item.actual_response }}"
+      labels: [good, bad]
+      passing_labels: [good]

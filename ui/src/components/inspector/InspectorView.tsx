@@ -208,7 +208,7 @@ export const InspectorView: React.FC = () => {
       expectedInvocation={expectedInvocation}
       metricResults={traceResult.metricResults}
       threshold={state.threshold}
-      selectedMetrics={state.selectedMetrics}
+      selectedEvaluatorNames={state.selectedEvaluatorNames}
       isEvaluating={state.isEvaluating}
       performanceMetrics={traceResult.performanceMetrics}
       traceInfo={{

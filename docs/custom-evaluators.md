@@ -317,6 +317,26 @@ The `grader.evaluation_metric` field selects the similarity algorithm:
 | `rouge_1` through `rouge_5` | Unigram through 5-gram overlap (F-measure) |
 | `rouge_l` | Longest common subsequence overlap (F-measure) |
 
+### Label Model Grader
+
+Scores responses without a golden set. The model reads each response and assigns a label from a fixed list. Passing labels are defined in the config.
+
+```yaml
+evaluators:
+  - name: quality_check
+    type: openai_eval
+    grader:
+      type: label_model
+      model: gpt-4o-mini
+      input:
+        - role: user
+          content: "Rate this response: {{ item.actual_response }}"
+      labels: [good, bad]
+      passing_labels: [good]
+```
+
+The `threshold` field is not used for `label_model`. A response passes if its assigned label is in `passing_labels`.
+
 ### How it works
 
 Under the hood, agentevals creates an ephemeral eval on OpenAI, submits the actual and expected responses as JSONL items, polls for results, and cleans up. The agent's response and the golden reference are both placed in the `item` namespace (with `include_sample_schema: false`), so OpenAI only grades the provided text without generating any model outputs.

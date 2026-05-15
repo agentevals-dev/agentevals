@@ -31,6 +31,12 @@ _TEXT_PAIR_SCHEMA = {
     "required": ["actual_response", "expected_response"],
 }
 
+_ACTUAL_ONLY_SCHEMA = {
+    "type": "object",
+    "properties": {"actual_response": {"type": "string"}},
+    "required": ["actual_response"],
+}
+
 
 def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
     """Build the OpenAI testing_criteria dict from the evaluator config.
@@ -51,28 +57,33 @@ def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
             "pass_threshold": evaluator_def.threshold,
         }
 
+    if grader_type == "label_model":
+        return {
+            "type": "label_model",
+            "name": evaluator_def.name,
+            "model": grader["model"],
+            "input": grader["input"],
+            "labels": grader["labels"],
+            "passing_labels": grader["passing_labels"],
+        }
+
     raise ValueError(f"Unsupported grader type: {grader_type}")
 
 
 def _build_jsonl_items(
     actual_invocations: list[Invocation],
     expected_invocations: list[Invocation],
+    include_expected: bool = True,
 ) -> list[dict[str, Any]]:
     items = []
     for i, actual_inv in enumerate(actual_invocations):
-        actual_text = _content_to_text(actual_inv.final_response)
-        if i < len(expected_invocations):
-            expected_text = _content_to_text(expected_invocations[i].final_response)
-        else:
-            expected_text = ""
-        items.append(
-            {
-                "item": {
-                    "actual_response": actual_text,
-                    "expected_response": expected_text,
-                }
-            }
-        )
+        entry: dict[str, Any] = {"actual_response": _content_to_text(actual_inv.final_response)}
+        if include_expected:
+            expected_text = (
+                _content_to_text(expected_invocations[i].final_response) if i < len(expected_invocations) else ""
+            )
+            entry["expected_response"] = expected_text
+        items.append({"item": entry})
     return items
 
 
@@ -111,13 +122,17 @@ async def evaluate_openai_eval(
             error="OPENAI_API_KEY environment variable is not set.",
         )
 
-    if expected_invocations is None:
+    grader_type = evaluator_def.grader["type"]
+
+    if grader_type == "text_similarity" and expected_invocations is None:
         return MetricResult(
             metric_name=evaluator_def.name,
             error="OpenAI text_similarity grader requires expected invocations (golden eval set).",
         )
 
-    items = _build_jsonl_items(actual_invocations, expected_invocations)
+    items = _build_jsonl_items(
+        actual_invocations, expected_invocations or [], include_expected=(grader_type != "label_model")
+    )
     if not items:
         return MetricResult(
             metric_name=evaluator_def.name,
@@ -130,12 +145,13 @@ async def evaluate_openai_eval(
     try:
         client = await asyncio.to_thread(_get_openai_client)
 
+        item_schema = _ACTUAL_ONLY_SCHEMA if grader_type == "label_model" else _TEXT_PAIR_SCHEMA
         eval_obj = await asyncio.to_thread(
             client.evals.create,
-            name=f"agentevals-{evaluator_def.name}",
+            name=f"agentevals-openai-{evaluator_def.name}",
             data_source_config={
                 "type": "custom",
-                "item_schema": _TEXT_PAIR_SCHEMA,
+                "item_schema": item_schema,
                 "include_sample_schema": False,
             },
             testing_criteria=[testing_criteria],
@@ -146,7 +162,7 @@ async def evaluate_openai_eval(
         run = await asyncio.to_thread(
             client.evals.runs.create,
             eval_id=eval_id,
-            name=f"agentevals-run-{evaluator_def.name}",
+            name=f"agentevals-openai-run-{evaluator_def.name}",
             data_source={
                 "type": "jsonl",
                 "source": {
@@ -225,12 +241,17 @@ async def _collect_results(client: Any, eval_id: str, run_id: str, run: Any, eva
     total = result_counts.total if result_counts else 0
     eval_status = "PASSED" if failed == 0 and total > 0 else "FAILED"
 
+    grader = evaluator_def.grader
     details: dict[str, Any] = {
         "openai_eval_id": eval_id,
         "openai_run_id": run_id,
-        "evaluation_metric": evaluator_def.grader.get("evaluation_metric"),
         "result_counts": {"passed": passed, "failed": failed, "total": total},
     }
+    if grader["type"] == "text_similarity":
+        details["evaluation_metric"] = grader.get("evaluation_metric")
+    elif grader["type"] == "label_model":
+        details["model"] = grader.get("model")
+        details["passing_labels"] = grader.get("passing_labels")
     per_criteria = getattr(run, "per_testing_criteria_results", None)
     if per_criteria:
         details["per_testing_criteria"] = [

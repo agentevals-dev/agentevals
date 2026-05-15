@@ -224,7 +224,7 @@ def _make_trace_manager():
 
 
 def _eval_config_json(**overrides) -> str:
-    cfg = {"metrics": ["tool_trajectory_avg_score"]}
+    cfg = {"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}
     cfg.update(overrides)
     return json.dumps(cfg)
 
@@ -500,11 +500,11 @@ class TestEvaluateTraces:
         )
         assert resp.status_code == 400
 
-    def test_evaluate_empty_metrics(self):
+    def test_evaluate_rejects_legacy_metrics_field(self):
         resp = self.client.post(
             "/api/evaluate",
             files={"trace_files": ("trace.json", io.BytesIO(_make_trace_json()))},
-            data={"config": json.dumps({"metrics": ""})},
+            data={"config": json.dumps({"metrics": ["tool_trajectory_avg_score"]})},
         )
         assert resp.status_code == 400
 
@@ -512,7 +512,11 @@ class TestEvaluateTraces:
         resp = self.client.post(
             "/api/evaluate",
             files={"trace_files": ("trace.json", io.BytesIO(_make_trace_json()))},
-            data={"config": _eval_config_json(threshold=1.5)},
+            data={
+                "config": _eval_config_json(
+                    evaluators=[{"name": "tool_trajectory_avg_score", "type": "builtin", "threshold": 1.5}]
+                )
+            },
         )
         assert resp.status_code == 400
 
@@ -632,7 +636,7 @@ class TestEvaluateJson:
             "/api/evaluate/json",
             json={
                 "traces": _make_otlp_json_payload(),
-                "config": {"metrics": ["tool_trajectory_avg_score"]},
+                "config": {"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]},
             },
         )
         body = _assert_envelope(resp)
@@ -647,8 +651,13 @@ class TestEvaluateJson:
             json={
                 "traces": _make_otlp_json_payload(),
                 "config": {
-                    "metrics": ["hallucinations_v1"],
-                    "judgeModel": "gemini-2.0-flash",
+                    "evaluators": [
+                        {
+                            "name": "hallucinations_v1",
+                            "type": "builtin",
+                            "judgeModel": "gemini-2.0-flash",
+                        }
+                    ],
                     "maxConcurrentTraces": 5,
                 },
             },
@@ -656,7 +665,7 @@ class TestEvaluateJson:
         body = _assert_envelope(resp)
         assert "traceResults" in body["data"]
         call_config = mock_eval.call_args.kwargs["config"]
-        assert call_config.judge_model == "gemini-2.0-flash"
+        assert call_config.evaluators[0].judge_model == "gemini-2.0-flash"
         assert call_config.max_concurrent_traces == 5
 
     def test_evaluate_json_missing_resource_spans(self):
@@ -682,7 +691,7 @@ class TestEvaluateJson:
             "/api/evaluate/json",
             json={
                 "traces": _make_otlp_json_payload(),
-                "config": {"metrics": ["tool_trajectory_avg_score"]},
+                "config": {"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]},
                 "evalSet": {
                     "eval_set_id": "test",
                     "eval_cases": [
@@ -725,6 +734,16 @@ class TestEvaluateJson:
         )
         assert resp.status_code == 422
 
+    def test_evaluate_json_rejects_legacy_metrics_field(self):
+        resp = self.client.post(
+            "/api/evaluate/json",
+            json={
+                "traces": _make_otlp_json_payload(),
+                "config": {"metrics": ["tool_trajectory_avg_score"]},
+            },
+        )
+        assert resp.status_code == 422
+
     @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
     def test_evaluate_json_camel_keys_in_result(self, mock_eval):
         mock_eval.return_value = _make_run_result()
@@ -732,7 +751,7 @@ class TestEvaluateJson:
             "/api/evaluate/json",
             json={
                 "traces": _make_otlp_json_payload(),
-                "config": {"metrics": ["tool_trajectory_avg_score"]},
+                "config": {"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]},
             },
         )
         body = resp.json()

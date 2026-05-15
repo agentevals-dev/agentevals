@@ -1,4 +1,11 @@
-import type { RunResult, EvalConfig, TraceResult, MetricMetadata, StandardResponse, ConvertTracesResponse } from '../lib/types';
+import type {
+  RunResult,
+  EvalConfig,
+  TraceResult,
+  MetricMetadata,
+  StandardResponse,
+  ConvertTracesResponse,
+} from '../lib/types';
 import { config } from '../config';
 
 const API_BASE_URL = `${config.api.baseUrl}/api`;

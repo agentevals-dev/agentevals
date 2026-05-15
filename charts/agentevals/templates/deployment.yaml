@@ -29,8 +29,9 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       serviceAccountName: {{ include "agentevals.serviceAccountName" . }}
-      {{- if .Values.ephemeralVolume.enabled }}
+      {{- if or .Values.ephemeralVolume.enabled .Values.extraVolumes }}
       volumes:
+        {{- if .Values.ephemeralVolume.enabled }}
         - name: agentevals-tmp
           {{- if or .Values.ephemeralVolume.sizeLimit (eq .Values.ephemeralVolume.medium "Memory") }}
           emptyDir:
@@ -43,6 +44,10 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       containers:
         - name: agentevals
@@ -70,6 +75,10 @@ spec:
               value: "postgres"
             - name: AGENTEVALS_DATABASE_SCHEMA
               value: {{ .Values.database.postgres.schema | quote }}
+            - name: AGENTEVALS_AUTO_MIGRATE
+              value: {{ .Values.database.postgres.autoMigrate | quote }}
+            - name: AGENTEVALS_DB_CONNECT_TIMEOUT_S
+              value: {{ .Values.database.postgres.connectTimeoutSeconds | quote }}
             {{- if .Values.database.postgres.urlFile }}
             - name: AGENTEVALS_DATABASE_URL_FILE
               value: {{ .Values.database.postgres.urlFile | quote }}
@@ -135,10 +144,15 @@ spec:
               port: http
             initialDelaySeconds: 15
             periodSeconds: 20
-          {{- if .Values.ephemeralVolume.enabled }}
+          {{- if or .Values.ephemeralVolume.enabled .Values.extraVolumeMounts }}
           volumeMounts:
+            {{- if .Values.ephemeralVolume.enabled }}
             - name: agentevals-tmp
               mountPath: /tmp
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
+import os
 import re
 from dataclasses import dataclass
 from importlib.resources import files
@@ -252,23 +254,58 @@ def discover_migrations() -> list[Migration]:
     return _discover_migrations()
 
 
-CONNECT_RETRY_DEADLINE_S = 60.0
-"""Total wall-clock budget for the initial Postgres connection. Bundled PG
-in Kubernetes typically takes 5-15s to be ready (PVC bind, initdb, listener
-bind), so the agentevals lifespan can race the database on a fresh deploy.
-Retrying tolerates that gap rather than failing pod startup and relying on
-CrashLoopBackOff timing to eventually line up."""
+CONNECT_RETRY_DEADLINE_S = 600.0
+"""Default total wall-clock budget for the initial Postgres connection.
+Sized to span Kubernetes bring-up of a freshly provisioned database (PVC
+bind, initdb, listener bind, network policy propagation). Override at
+runtime by setting ``AGENTEVALS_DB_CONNECT_TIMEOUT_S`` to a positive
+number of seconds; an invalid value logs a warning and falls back to this
+default."""
+
+
+def connect_deadline_seconds() -> float:
+    """Resolve the connect-retry budget. Reads ``AGENTEVALS_DB_CONNECT_TIMEOUT_S``
+    and falls back to :data:`CONNECT_RETRY_DEADLINE_S` if the env var is
+    unset, empty, non-numeric, non-finite, or non-positive."""
+    raw = os.getenv("AGENTEVALS_DB_CONNECT_TIMEOUT_S")
+    if raw is None or raw == "":
+        return CONNECT_RETRY_DEADLINE_S
+    try:
+        val = float(raw)
+    except ValueError:
+        logger.warning(
+            "Invalid AGENTEVALS_DB_CONNECT_TIMEOUT_S=%r (not a number); using default %.0fs",
+            raw,
+            CONNECT_RETRY_DEADLINE_S,
+        )
+        return CONNECT_RETRY_DEADLINE_S
+    if not math.isfinite(val):
+        logger.warning(
+            "Invalid AGENTEVALS_DB_CONNECT_TIMEOUT_S=%r (must be finite); using default %.0fs",
+            raw,
+            CONNECT_RETRY_DEADLINE_S,
+        )
+        return CONNECT_RETRY_DEADLINE_S
+    if val <= 0:
+        logger.warning(
+            "Invalid AGENTEVALS_DB_CONNECT_TIMEOUT_S=%r (must be positive); using default %.0fs",
+            raw,
+            CONNECT_RETRY_DEADLINE_S,
+        )
+        return CONNECT_RETRY_DEADLINE_S
+    return val
 
 
 async def connect_with_retry(dsn: str, asyncpg_module) -> "asyncpg.Connection":
     """Open a single asyncpg connection, retrying on connection-refused or
-    server-not-ready errors for up to ``CONNECT_RETRY_DEADLINE_S`` seconds.
+    server-not-ready errors for up to :func:`connect_deadline_seconds`
+    seconds.
 
     Connection-time errors are tolerated; once a connection has been
     established and a query returned, all subsequent failures propagate
     normally.
     """
-    deadline = asyncio.get_event_loop().time() + CONNECT_RETRY_DEADLINE_S
+    deadline = asyncio.get_event_loop().time() + connect_deadline_seconds()
     delay = 0.5
     while True:
         try:

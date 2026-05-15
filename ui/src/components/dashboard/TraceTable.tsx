@@ -8,7 +8,7 @@ import { formatTimestamp } from '../../lib/utils';
 
 interface TraceTableProps {
   rows: TraceTableRow[];
-  selectedMetrics: string[];
+  selectedEvaluatorNames: string[];
   threshold: number;
   onRowClick: (traceId: string) => void;
   onRowHover?: (traceId: string | null) => void;
@@ -154,7 +154,7 @@ const extractText = (parts: any[]): string => {
 
 export const TraceTable: React.FC<TraceTableProps> = ({
   rows,
-  selectedMetrics,
+  selectedEvaluatorNames,
   threshold,
   onRowClick,
   onRowHover,
@@ -292,7 +292,7 @@ export const TraceTable: React.FC<TraceTableProps> = ({
         );
       },
     },
-    ...selectedMetrics.map((metricName) => ({
+    ...selectedEvaluatorNames.map((metricName) => ({
       title: metricName.replace(/_/g, ' ').toUpperCase(),
       key: metricName,
       width: 160,
