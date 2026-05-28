@@ -1,11 +1,19 @@
 """Run a Strands dice agent inside AWS AgentCore with standard OTLP export.
 
-Demonstrates zero-code integration: the BedrockAgentCoreApp runtime wraps a
-Strands agent and serves it over HTTP. StrandsTelemetry emits OTel spans which
-are forwarded to agentevals via OTLPSpanExporter, with no agentevals SDK needed.
+Demonstrates zero-code integration: no agentevals SDK is needed.
+StrandsTelemetry emits OTel spans which are forwarded to agentevals
+via a plain OTLPSpanExporter.
+
+The key difference from a plain Strands script is the AgentCore runtime:
+BedrockAgentCoreApp wraps the agent as an HTTP server. The handler is an
+async generator decorated with @app.entrypoint and the server starts with
+app.run(), listening for POST /invocations requests.
+
+Strands telemetry exports spans even when Bedrock raises NoCredentialsError,
+so the OTel pipeline can be tested locally without AWS credentials.
 
 The agent exposes two tools:
-  roll_die   -- rolls a die with a given number of sides
+  roll_die    -- rolls a die with a given number of sides
   check_prime -- checks whether a number is prime
 
 Prerequisites:
