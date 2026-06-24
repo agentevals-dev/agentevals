@@ -16,3 +16,9 @@ evaluators:
           content: "Rate this response: {{ item.actual_response }}"
       labels: [good, bad]
       passing_labels: [good]
+  - name: response_contains_hello
+    type: openai_eval
+    grader:
+      type: string_check
+      reference: "hello"
+      operation: ilike

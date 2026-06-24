@@ -1,9 +1,4 @@
-"""OpenAI Evals API backend — delegates grading to the OpenAI Evals API.
-
-Builds testing criteria from the evaluator config, submits invocation pairs
-as JSONL items, polls for completion, and maps per-item results back to a
-MetricResult.
-"""
+"""OpenAI Evals API backend."""
 
 from __future__ import annotations
 
@@ -39,11 +34,6 @@ _ACTUAL_ONLY_SCHEMA = {
 
 
 def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
-    """Build the OpenAI testing_criteria dict from the evaluator config.
-
-    Each grader type produces a different shape.  Extend this function
-    when adding support for new OpenAI grader types.
-    """
     grader = evaluator_def.grader
     grader_type = grader["type"]
 
@@ -67,12 +57,22 @@ def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
             "passing_labels": grader["passing_labels"],
         }
 
+    if grader_type == "string_check":
+        return {
+            "type": "string_check",
+            "name": evaluator_def.name,
+            "input": "{{ item.actual_response }}",
+            "reference": grader["reference"],
+            "operation": grader["operation"],
+        }
+
     raise ValueError(f"Unsupported grader type: {grader_type}")
 
 
 def _build_jsonl_items(
     actual_invocations: list[Invocation],
     expected_invocations: list[Invocation],
+    *,
     include_expected: bool = True,
 ) -> list[dict[str, Any]]:
     items = []
@@ -123,16 +123,14 @@ async def evaluate_openai_eval(
         )
 
     grader_type = evaluator_def.grader["type"]
-
-    if grader_type == "text_similarity" and expected_invocations is None:
+    needs_expected = grader_type == "text_similarity"
+    if needs_expected and expected_invocations is None:
         return MetricResult(
             metric_name=evaluator_def.name,
-            error="OpenAI text_similarity grader requires expected invocations (golden eval set).",
+            error=f"OpenAI {grader_type} grader requires expected invocations (golden eval set).",
         )
 
-    items = _build_jsonl_items(
-        actual_invocations, expected_invocations or [], include_expected=(grader_type != "label_model")
-    )
+    items = _build_jsonl_items(actual_invocations, expected_invocations or [], include_expected=needs_expected)
     if not items:
         return MetricResult(
             metric_name=evaluator_def.name,
@@ -145,7 +143,7 @@ async def evaluate_openai_eval(
     try:
         client = await asyncio.to_thread(_get_openai_client)
 
-        item_schema = _ACTUAL_ONLY_SCHEMA if grader_type == "label_model" else _TEXT_PAIR_SCHEMA
+        item_schema = _TEXT_PAIR_SCHEMA if needs_expected else _ACTUAL_ONLY_SCHEMA
         eval_obj = await asyncio.to_thread(
             client.evals.create,
             name=f"agentevals-openai-{evaluator_def.name}",
@@ -252,6 +250,8 @@ async def _collect_results(client: Any, eval_id: str, run_id: str, run: Any, eva
     elif grader["type"] == "label_model":
         details["model"] = grader.get("model")
         details["passing_labels"] = grader.get("passing_labels")
+    elif grader["type"] == "string_check":
+        details["operation"] = grader.get("operation")
     per_criteria = getattr(run, "per_testing_criteria_results", None)
     if per_criteria:
         details["per_testing_criteria"] = [

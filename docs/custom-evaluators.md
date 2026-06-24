@@ -337,6 +337,32 @@ evaluators:
 
 The `threshold` field is not used for `label_model`. A response passes if its assigned label is in `passing_labels`.
 
+### String Check Grader
+
+Checks whether the agent response contains, equals, or matches a fixed reference string. No eval set is needed.
+
+```yaml
+evaluators:
+  - name: response_contains_hello
+    type: openai_eval
+    threshold: 0.8
+    grader:
+      type: string_check
+      reference: "hello"
+      operation: ilike
+```
+
+The `operation` field controls how the check is applied:
+
+| Operation | Description |
+|---|---|
+| `eq` | Exact match (case-sensitive) |
+| `ne` | Does not equal (case-sensitive) |
+| `like` | Contains the reference (case-sensitive) |
+| `ilike` | Contains the reference (case-insensitive) |
+
+Each invocation either passes or fails. The `threshold` field is not used by `string_check`.
+
 ### How it works
 
 Under the hood, agentevals creates an ephemeral eval on OpenAI, submits the actual and expected responses as JSONL items, polls for results, and cleans up. The agent's response and the golden reference are both placed in the `item` namespace (with `include_sample_schema: false`), so OpenAI only grades the provided text without generating any model outputs.
