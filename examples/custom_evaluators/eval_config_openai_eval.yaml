@@ -16,3 +16,13 @@ evaluators:
           content: "Rate this response: {{ item.actual_response }}"
       labels: [good, bad]
       passing_labels: [good]
+  - name: quality_score
+    type: openai_eval
+    threshold: 0.7
+    grader:
+      type: score_model
+      model: gpt-4o-mini
+      input:
+        - role: user
+          content: "Rate the quality of this response from 0 to 1: {{ item.actual_response }}"
+      range: [0, 1]

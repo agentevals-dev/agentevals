@@ -291,6 +291,26 @@ Remote evaluators are cached in `~/.cache/agentevals/evaluators/`. To force a re
 
 You can delegate grading to the [OpenAI Evals API](https://developers.openai.com/api/reference/resources/evals/methods/create) instead of running scoring logic locally. This requires `pip install "agentevals-cli[openai]"` and `OPENAI_API_KEY` to be set.
 
+### Score Model Grader
+
+Uses a model to score each response without a golden set. The model reads the response and returns a float.
+
+```yaml
+evaluators:
+  - name: quality_score
+    type: openai_eval
+    threshold: 0.7
+    grader:
+      type: score_model
+      model: gpt-4o-mini
+      input:
+        - role: user
+          content: "Rate the quality of this response from 0 to 1: {{ item.actual_response }}"
+      range: [0, 1]
+```
+
+The `range` field sets the min and max the model can return (defaults to `[0, 1]`). No eval set is needed.
+
 ### Text Similarity Grader
 
 Compares the agent's response against a golden reference using text similarity metrics. Requires an eval set.

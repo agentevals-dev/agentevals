@@ -121,8 +121,14 @@ class OpenAIEvalDef(BaseModel):
             invalid = [lbl for lbl in v["passing_labels"] if lbl not in v["labels"]]
             if invalid:
                 raise ValueError(f"passing_labels contains labels not declared in labels: {invalid}")
+        elif grader_type == "score_model":
+            for field in ("model", "input"):
+                if not v.get(field):
+                    raise ValueError(f"'{field}' is required for score_model grader")
         else:
-            raise ValueError(f"Unsupported grader type: '{grader_type}'. Supported: label_model, text_similarity")
+            raise ValueError(
+                f"Unsupported grader type: '{grader_type}'. Supported: label_model, score_model, text_similarity"
+            )
         return v
 
 
