@@ -30,6 +30,7 @@ agentevals accepts OTLP/HTTP on port 4318 (`http/protobuf` and `http/json`) and 
 | [zero-code-examples/strands/](./zero-code-examples/strands/) | Strands | OpenAI |
 | [zero-code-examples/adk/](./zero-code-examples/adk/) | Google ADK | Gemini |
 | [zero-code-examples/pydantic-ai/](./zero-code-examples/pydantic-ai/) | Pydantic AI | OpenAI |
+| [zero-code-examples/llama-index/](./zero-code-examples/llama-index/) | LlamaIndex | OpenAI |
 
 This approach works with any framework that has OTel instrumentation: LangChain, Strands, Google ADK, etc. If your framework already emits OTel spans, you only need to add `OTLPSpanExporter` (and `OTLPLogExporter` if it uses GenAI log-based content delivery).
 
@@ -105,6 +106,7 @@ Detection checks for `gen_ai.request.model` / `gen_ai.input.messages` (GenAI sem
 | [zero-code-examples/strands/](./zero-code-examples/strands/) | Strands | OpenAI | GenAI semconv (events*) | Standard OTLP export |
 | [zero-code-examples/adk/](./zero-code-examples/adk/) | Google ADK | Gemini | ADK built-in | Standard OTLP export |
 | [zero-code-examples/pydantic-ai/](./zero-code-examples/pydantic-ai/) | Pydantic AI | OpenAI | GenAI semconv (span attrs) | Standard OTLP export |
+| [zero-code-examples/llama-index/](./zero-code-examples/llama-index/) | LlamaIndex | OpenAI | GenAI semconv (logs) | Standard OTLP export |
 | [langchain_agent](./langchain_agent/) | LangChain | OpenAI | GenAI semconv (logs) | SDK WebSocket |
 | [strands_agent](./strands_agent/) | Strands | OpenAI | GenAI semconv (events*) | SDK WebSocket |
 | [dice_agent](./dice_agent/) | Google ADK | Gemini | ADK built-in | SDK WebSocket |
@@ -226,6 +228,7 @@ python examples/zero-code-examples/ollama/run.py
 python examples/zero-code-examples/strands/run.py
 python examples/zero-code-examples/adk/run.py
 python examples/zero-code-examples/pydantic-ai/run.py
+python examples/zero-code-examples/llama-index/run.py
 
 # SDK examples:
 python examples/sdk_example/context_manager_example.py
