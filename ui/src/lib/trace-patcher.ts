@@ -153,13 +153,14 @@ function buildGenAIMappings(trace: Trace): SpanEditMapping[] {
         return attrKey ? { spanId: span.spanId, attrKey } : null;
       })
       .filter((location): location is ToolMessageEditLocation => location !== null);
+    const toolSpans = findGenAIToolSpans(rootSpan);
 
     mappings.push({
       invocationId: rootSpan.spanId,
       format: 'genai',
       userInputSpanId: firstLlm.spanId,
       finalResponseSpanId: lastLlm.spanId,
-      toolSpanIds: [],
+      toolSpanIds: toolSpans.map(s => s.spanId),
       toolMessageLocations,
       userInputAttrKey,
       finalResponseAttrKey,
@@ -183,6 +184,27 @@ function resolveOutputAttrKey(span: Span): string | null {
   return null;
 }
 
+function findGenAIToolSpans(root: Span): Span[] {
+  const results: Span[] = [];
+  const queue = [...root.children];
+
+  while (queue.length > 0) {
+    const span = queue.shift()!;
+    if (
+      span.operationName.startsWith('execute_tool') ||
+      span.tags[OTEL_TOOL_NAME_ATTR] ||
+      span.tags[OTEL_TOOL_CALL_ARGS_ATTR] ||
+      span.tags[OTEL_TOOL_CALL_RESULT_ATTR]
+    ) {
+      results.push(span);
+    }
+    queue.push(...span.children);
+  }
+
+  results.sort((a, b) => a.startTime - b.startTime);
+  return results;
+}
+
 export function applyEditsAndSerialize(
   parsedFile: ParsedTraceFile,
   invocations: Invocation[],
@@ -191,7 +213,7 @@ export function applyEditsAndSerialize(
   const mappingByInvId = new Map(editMappings.map(m => [m.invocationId, m]));
 
   for (const inv of invocations) {
-    const mapping = mappingByInvId.get(inv.invocationId);
+    const mapping = findMappingForInvocation(inv.invocationId, mappingByInvId);
     if (!mapping) continue;
 
     const userText = inv.userContent?.parts?.[0]?.text;
@@ -214,6 +236,20 @@ export function applyEditsAndSerialize(
   return serialize(parsedFile);
 }
 
+function findMappingForInvocation(
+  invocationId: string,
+  mappingByInvId: Map<string, SpanEditMapping>
+): SpanEditMapping | undefined {
+  const direct = mappingByInvId.get(invocationId);
+  if (direct) return direct;
+
+  if (invocationId.startsWith('genai-')) {
+    return mappingByInvId.get(invocationId.slice('genai-'.length));
+  }
+
+  return undefined;
+}
+
 function patchToolTrajectory(
   parsedFile: ParsedTraceFile,
   mapping: SpanEditMapping,
@@ -227,7 +263,7 @@ function patchToolTrajectory(
     const rawSpan = getRawSpan(parsedFile, spanId);
     if (!rawSpan) return;
 
-    patchRawToolSpan(rawSpan, parsedFile.format, toolUse, toolResponses[index]);
+    patchRawToolSpan(rawSpan, parsedFile.format, mapping.format, toolUse, toolResponses[index]);
   });
 
   if (mapping.toolMessageLocations && toolUses.length > 0) {
@@ -248,29 +284,35 @@ function getRawSpan(parsedFile: ParsedTraceFile, spanId: string): any | null {
 
 function patchRawToolSpan(
   rawSpan: any,
-  format: ParsedTraceFile['format'],
+  rawFormat: ParsedTraceFile['format'],
+  traceFormat: SpanEditMapping['format'],
   toolUse: ToolCall,
   toolResponse?: ToolResponse
 ): void {
   patchRawToolOperationName(rawSpan, toolUse.name);
-  setRawStringAttribute(rawSpan, format, ADK_TOOL_CALL_ARGS_ATTR, JSON.stringify(toolUse.args || {}), true);
 
-  if (hasRawStringAttribute(rawSpan, format, OTEL_TOOL_NAME_ATTR)) {
-    setRawStringAttribute(rawSpan, format, OTEL_TOOL_NAME_ATTR, toolUse.name, false);
-  }
-  if (hasRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_ARGS_ATTR)) {
-    setRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_ARGS_ATTR, JSON.stringify(toolUse.args || {}), false);
+  if (traceFormat === 'adk' || hasRawStringAttribute(rawSpan, rawFormat, ADK_TOOL_CALL_ARGS_ATTR)) {
+    setRawStringAttribute(rawSpan, rawFormat, ADK_TOOL_CALL_ARGS_ATTR, JSON.stringify(toolUse.args || {}), traceFormat === 'adk');
   }
 
-  if (toolUse.id !== undefined || hasRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_ID_ATTR)) {
-    setRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_ID_ATTR, toolUse.id || '', toolUse.id !== undefined);
+  if (hasRawStringAttribute(rawSpan, rawFormat, OTEL_TOOL_NAME_ATTR)) {
+    setRawStringAttribute(rawSpan, rawFormat, OTEL_TOOL_NAME_ATTR, toolUse.name, false);
+  }
+  if (hasRawStringAttribute(rawSpan, rawFormat, OTEL_TOOL_CALL_ARGS_ATTR)) {
+    setRawStringAttribute(rawSpan, rawFormat, OTEL_TOOL_CALL_ARGS_ATTR, JSON.stringify(toolUse.args || {}), false);
+  }
+
+  if (toolUse.id !== undefined || hasRawStringAttribute(rawSpan, rawFormat, OTEL_TOOL_CALL_ID_ATTR)) {
+    setRawStringAttribute(rawSpan, rawFormat, OTEL_TOOL_CALL_ID_ATTR, toolUse.id || '', toolUse.id !== undefined);
   }
 
   if (toolResponse) {
-    setRawStringAttribute(rawSpan, format, ADK_TOOL_RESPONSE_ATTR, JSON.stringify(toolResponse.response || {}), true);
+    if (traceFormat === 'adk' || hasRawStringAttribute(rawSpan, rawFormat, ADK_TOOL_RESPONSE_ATTR)) {
+      setRawStringAttribute(rawSpan, rawFormat, ADK_TOOL_RESPONSE_ATTR, JSON.stringify(toolResponse.response || {}), traceFormat === 'adk');
+    }
 
-    if (hasRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_RESULT_ATTR)) {
-      setRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_RESULT_ATTR, JSON.stringify(toolResponse.response || {}), false);
+    if (hasRawStringAttribute(rawSpan, rawFormat, OTEL_TOOL_CALL_RESULT_ATTR)) {
+      setRawStringAttribute(rawSpan, rawFormat, OTEL_TOOL_CALL_RESULT_ATTR, JSON.stringify(toolResponse.response || {}), false);
     }
   }
 }
@@ -374,14 +416,15 @@ function patchGenAIToolMessages(messages: any, toolUses: ToolCall[]): boolean {
   let changed = false;
 
   const nextTool = (toolCallId: unknown): ToolCall | null => {
+    const positionalToolUse = toolUses[nextToolIndex];
+    nextToolIndex += 1;
+
     if (typeof toolCallId === 'string') {
       const byId = toolsById.get(toolCallId);
       if (byId) return byId;
     }
 
-    const toolUse = toolUses[nextToolIndex];
-    nextToolIndex += 1;
-    return toolUse || null;
+    return positionalToolUse || null;
   };
 
   for (const msg of messages) {
