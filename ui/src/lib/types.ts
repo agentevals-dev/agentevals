@@ -524,6 +524,11 @@ export interface InspectorUIState {
 // Trace editor types
 export type TraceFileFormat = 'jaeger' | 'otlp-jsonl';
 
+export interface ToolMessageEditLocation {
+  spanId: string;
+  attrKey: string;
+}
+
 export interface SpanLocationRef {
   traceIndex?: number;
   spanIndex?: number;
@@ -543,6 +548,7 @@ export interface SpanEditMapping {
   userInputSpanId: string;
   finalResponseSpanId: string;
   toolSpanIds: string[];
+  toolMessageLocations?: ToolMessageEditLocation[];
   userInputAttrKey: string;
   finalResponseAttrKey: string;
 }

@@ -1,4 +1,14 @@
-import type { Trace, Span, Invocation, ParsedTraceFile, SpanEditMapping, SpanLocationRef } from './types';
+import type {
+  Trace,
+  Span,
+  Invocation,
+  ParsedTraceFile,
+  SpanEditMapping,
+  SpanLocationRef,
+  ToolCall,
+  ToolMessageEditLocation,
+  ToolResponse,
+} from './types';
 import {
   ADK_SCOPE,
   detectTraceFormat,
@@ -7,6 +17,13 @@ import {
   USER_ROLES,
   ASSISTANT_ROLES,
 } from './trace-helpers';
+
+const ADK_TOOL_CALL_ARGS_ATTR = 'gcp.vertex.agent.tool_call_args';
+const ADK_TOOL_RESPONSE_ATTR = 'gcp.vertex.agent.tool_response';
+const OTEL_TOOL_NAME_ATTR = 'gen_ai.tool.name';
+const OTEL_TOOL_CALL_ID_ATTR = 'gen_ai.tool.call.id';
+const OTEL_TOOL_CALL_ARGS_ATTR = 'gen_ai.tool.call.arguments';
+const OTEL_TOOL_CALL_RESULT_ATTR = 'gen_ai.tool.call.result';
 
 export function parseTraceFileForEditing(content: string, fileName: string): ParsedTraceFile {
   const trimmed = content.trim();
@@ -62,7 +79,7 @@ function parseJaegerJson(content: string, fileName: string): ParsedTraceFile {
   return { format: 'jaeger', fileName, rawData, spanIndex };
 }
 
-export function buildEditMappings(traces: Trace[], _parsedFile: ParsedTraceFile): SpanEditMapping[] {
+export function buildEditMappings(traces: Trace[]): SpanEditMapping[] {
   const mappings: SpanEditMapping[] = [];
 
   for (const trace of traces) {
@@ -130,12 +147,20 @@ function buildGenAIMappings(trace: Trace): SpanEditMapping[] {
 
     if (!userInputAttrKey || !finalResponseAttrKey) continue;
 
+    const toolMessageLocations = llmSpans
+      .map((span): ToolMessageEditLocation | null => {
+        const attrKey = resolveOutputAttrKey(span);
+        return attrKey ? { spanId: span.spanId, attrKey } : null;
+      })
+      .filter((location): location is ToolMessageEditLocation => location !== null);
+
     mappings.push({
       invocationId: rootSpan.spanId,
       format: 'genai',
       userInputSpanId: firstLlm.spanId,
       finalResponseSpanId: lastLlm.spanId,
       toolSpanIds: [],
+      toolMessageLocations,
       userInputAttrKey,
       finalResponseAttrKey,
     });
@@ -178,9 +203,261 @@ export function applyEditsAndSerialize(
     if (responseText !== undefined) {
       patchAttribute(parsedFile, mapping.finalResponseSpanId, mapping.finalResponseAttrKey, mapping.format, 'response', responseText);
     }
+
+    const toolUses = inv.intermediateData?.toolUses || [];
+    const toolResponses = inv.intermediateData?.toolResponses || [];
+    if (toolUses.length > 0 || toolResponses.length > 0) {
+      patchToolTrajectory(parsedFile, mapping, toolUses, toolResponses);
+    }
   }
 
   return serialize(parsedFile);
+}
+
+function patchToolTrajectory(
+  parsedFile: ParsedTraceFile,
+  mapping: SpanEditMapping,
+  toolUses: ToolCall[],
+  toolResponses: ToolResponse[]
+): void {
+  mapping.toolSpanIds.forEach((spanId, index) => {
+    const toolUse = toolUses[index];
+    if (!toolUse) return;
+
+    const rawSpan = getRawSpan(parsedFile, spanId);
+    if (!rawSpan) return;
+
+    patchRawToolSpan(rawSpan, parsedFile.format, toolUse, toolResponses[index]);
+  });
+
+  if (mapping.toolMessageLocations && toolUses.length > 0) {
+    patchToolMessageLocations(parsedFile, mapping.toolMessageLocations, toolUses);
+  }
+}
+
+function getRawSpan(parsedFile: ParsedTraceFile, spanId: string): any | null {
+  const locRef = parsedFile.spanIndex.get(spanId);
+  if (!locRef) return null;
+
+  if (parsedFile.format === 'otlp-jsonl') {
+    return parsedFile.rawData[locRef.lineIndex!];
+  }
+
+  return parsedFile.rawData.data?.[locRef.traceIndex!]?.spans?.[locRef.spanIndex!] || null;
+}
+
+function patchRawToolSpan(
+  rawSpan: any,
+  format: ParsedTraceFile['format'],
+  toolUse: ToolCall,
+  toolResponse?: ToolResponse
+): void {
+  patchRawToolOperationName(rawSpan, toolUse.name);
+  setRawStringAttribute(rawSpan, format, ADK_TOOL_CALL_ARGS_ATTR, JSON.stringify(toolUse.args || {}), true);
+
+  if (hasRawStringAttribute(rawSpan, format, OTEL_TOOL_NAME_ATTR)) {
+    setRawStringAttribute(rawSpan, format, OTEL_TOOL_NAME_ATTR, toolUse.name, false);
+  }
+  if (hasRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_ARGS_ATTR)) {
+    setRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_ARGS_ATTR, JSON.stringify(toolUse.args || {}), false);
+  }
+
+  if (toolUse.id !== undefined || hasRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_ID_ATTR)) {
+    setRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_ID_ATTR, toolUse.id || '', toolUse.id !== undefined);
+  }
+
+  if (toolResponse) {
+    setRawStringAttribute(rawSpan, format, ADK_TOOL_RESPONSE_ATTR, JSON.stringify(toolResponse.response || {}), true);
+
+    if (hasRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_RESULT_ATTR)) {
+      setRawStringAttribute(rawSpan, format, OTEL_TOOL_CALL_RESULT_ATTR, JSON.stringify(toolResponse.response || {}), false);
+    }
+  }
+}
+
+function patchRawToolOperationName(rawSpan: any, toolName: string): void {
+  const nextOperationName = `execute_tool ${toolName}`;
+
+  if (typeof rawSpan.operationName === 'string' && rawSpan.operationName.startsWith('execute_tool')) {
+    rawSpan.operationName = nextOperationName;
+  }
+  if (typeof rawSpan.name === 'string' && rawSpan.name.startsWith('execute_tool')) {
+    rawSpan.name = nextOperationName;
+  }
+}
+
+function hasRawStringAttribute(rawSpan: any, format: ParsedTraceFile['format'], attrKey: string): boolean {
+  const attrs = format === 'otlp-jsonl' ? rawSpan.attributes : rawSpan.tags;
+  return Array.isArray(attrs) && attrs.some((attr: any) => attr.key === attrKey);
+}
+
+function readRawStringAttribute(rawSpan: any, format: ParsedTraceFile['format'], attrKey: string): string | null {
+  const attrs = format === 'otlp-jsonl' ? rawSpan.attributes : rawSpan.tags;
+  if (!Array.isArray(attrs)) return null;
+
+  const attr = attrs.find((candidate: any) => candidate.key === attrKey);
+  if (!attr) return null;
+
+  if (format === 'otlp-jsonl') {
+    return typeof attr.value?.stringValue === 'string' ? attr.value.stringValue : null;
+  }
+  return typeof attr.value === 'string' ? attr.value : null;
+}
+
+function setRawStringAttribute(
+  rawSpan: any,
+  format: ParsedTraceFile['format'],
+  attrKey: string,
+  value: string,
+  createIfMissing: boolean
+): void {
+  const containerKey = format === 'otlp-jsonl' ? 'attributes' : 'tags';
+  if (!Array.isArray(rawSpan[containerKey])) {
+    if (!createIfMissing) return;
+    rawSpan[containerKey] = [];
+  }
+
+  const attrs = rawSpan[containerKey];
+  const attr = attrs.find((candidate: any) => candidate.key === attrKey);
+  if (attr) {
+    if (format === 'otlp-jsonl') {
+      attr.value = { stringValue: value };
+    } else {
+      attr.type = 'string';
+      attr.value = value;
+    }
+    return;
+  }
+
+  if (!createIfMissing) return;
+
+  if (format === 'otlp-jsonl') {
+    attrs.push({ key: attrKey, value: { stringValue: value } });
+  } else {
+    attrs.push({ key: attrKey, type: 'string', value });
+  }
+}
+
+function patchToolMessageLocations(
+  parsedFile: ParsedTraceFile,
+  locations: ToolMessageEditLocation[],
+  toolUses: ToolCall[]
+): void {
+  for (const location of locations) {
+    const rawSpan = getRawSpan(parsedFile, location.spanId);
+    if (!rawSpan) continue;
+
+    const current = readRawStringAttribute(rawSpan, parsedFile.format, location.attrKey);
+    if (!current) continue;
+
+    try {
+      const data = JSON.parse(current);
+      const changed = patchGenAIToolMessages(data, toolUses);
+      if (changed) {
+        setRawStringAttribute(rawSpan, parsedFile.format, location.attrKey, JSON.stringify(data), false);
+      }
+    } catch {
+      continue;
+    }
+  }
+}
+
+function patchGenAIToolMessages(messages: any, toolUses: ToolCall[]): boolean {
+  if (!Array.isArray(messages)) return false;
+
+  const toolsById = new Map(
+    toolUses
+      .filter((toolUse) => toolUse.id)
+      .map((toolUse) => [toolUse.id, toolUse])
+  );
+  let nextToolIndex = 0;
+  let changed = false;
+
+  const nextTool = (toolCallId: unknown): ToolCall | null => {
+    if (typeof toolCallId === 'string') {
+      const byId = toolsById.get(toolCallId);
+      if (byId) return byId;
+    }
+
+    const toolUse = toolUses[nextToolIndex];
+    nextToolIndex += 1;
+    return toolUse || null;
+  };
+
+  for (const msg of messages) {
+    if (!msg || typeof msg !== 'object') continue;
+    if (msg.role && !ASSISTANT_ROLES.includes(msg.role)) continue;
+
+    if (Array.isArray(msg.tool_calls)) {
+      for (const toolCall of msg.tool_calls) {
+        const toolUse = nextTool(toolCall?.id);
+        if (toolUse && patchOpenAIToolCall(toolCall, toolUse)) {
+          changed = true;
+        }
+      }
+    }
+
+    if (Array.isArray(msg.parts)) {
+      for (const part of msg.parts) {
+        if (!part || typeof part !== 'object' || part.type !== 'tool_call') continue;
+
+        const toolUse = nextTool(part.id);
+        if (toolUse && patchGenAIToolPart(part, toolUse)) {
+          changed = true;
+        }
+      }
+    }
+  }
+
+  return changed;
+}
+
+function patchOpenAIToolCall(toolCall: any, toolUse: ToolCall): boolean {
+  if (!toolCall || typeof toolCall !== 'object') return false;
+
+  let changed = false;
+  if (toolUse.id !== undefined && toolCall.id !== toolUse.id) {
+    toolCall.id = toolUse.id;
+    changed = true;
+  }
+
+  const fn = toolCall.function;
+  if (fn && typeof fn === 'object') {
+    if (fn.name !== toolUse.name) {
+      fn.name = toolUse.name;
+      changed = true;
+    }
+    const nextArgs = JSON.stringify(toolUse.args || {});
+    if (fn.arguments !== nextArgs) {
+      fn.arguments = nextArgs;
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+function patchGenAIToolPart(part: any, toolUse: ToolCall): boolean {
+  let changed = false;
+
+  if (toolUse.id !== undefined && part.id !== toolUse.id) {
+    part.id = toolUse.id;
+    changed = true;
+  }
+  if (part.name !== toolUse.name) {
+    part.name = toolUse.name;
+    changed = true;
+  }
+
+  const nextArgs = typeof part.arguments === 'string'
+    ? JSON.stringify(toolUse.args || {})
+    : toolUse.args || {};
+  if (JSON.stringify(part.arguments) !== JSON.stringify(nextArgs)) {
+    part.arguments = nextArgs;
+    changed = true;
+  }
+
+  return changed;
 }
 
 function patchAttribute(
