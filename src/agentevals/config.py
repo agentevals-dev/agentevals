@@ -94,6 +94,8 @@ _VALID_SIMILARITY_METRICS = frozenset(
     }
 )
 
+_VALID_STRING_CHECK_OPERATIONS = frozenset({"eq", "ne", "like", "ilike"})
+
 
 class OpenAIEvalDef(BaseModel):
     """An evaluator that delegates grading to the OpenAI Evals API."""
@@ -121,8 +123,18 @@ class OpenAIEvalDef(BaseModel):
             invalid = [lbl for lbl in v["passing_labels"] if lbl not in v["labels"]]
             if invalid:
                 raise ValueError(f"passing_labels contains labels not declared in labels: {invalid}")
+        elif grader_type == "string_check":
+            operation = v.get("operation")
+            if not operation:
+                raise ValueError("'operation' is required for string_check grader")
+            if operation not in _VALID_STRING_CHECK_OPERATIONS:
+                raise ValueError(f"Unknown operation '{operation}'. Valid: {sorted(_VALID_STRING_CHECK_OPERATIONS)}")
+            if not v.get("reference"):
+                raise ValueError("'reference' is required for string_check grader")
         else:
-            raise ValueError(f"Unsupported grader type: '{grader_type}'. Supported: label_model, text_similarity")
+            raise ValueError(
+                f"Unsupported grader type: '{grader_type}'. Supported: label_model, string_check, text_similarity"
+            )
         return v
 
 

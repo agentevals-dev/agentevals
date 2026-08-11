@@ -56,6 +56,21 @@ class TestOpenAIEvalDefValidation:
         with pytest.raises(Exception, match="passing_labels"):
             OpenAIEvalDef(name="lm", grader=grader)
 
+    def test_string_check_valid(self):
+        d = OpenAIEvalDef(name="check", grader={"type": "string_check", "operation": "eq", "reference": "Paris"})
+        assert d.grader["type"] == "string_check"
+
+    @pytest.mark.parametrize("field", ["operation", "reference"])
+    def test_string_check_missing_required_field(self, field):
+        grader = {"type": "string_check", "operation": "eq", "reference": "Paris"}
+        grader.pop(field)
+        with pytest.raises(Exception, match=field):
+            OpenAIEvalDef(name="check", grader=grader)
+
+    def test_string_check_invalid_operation(self):
+        with pytest.raises(Exception, match="Unknown operation"):
+            OpenAIEvalDef(name="check", grader={"type": "string_check", "operation": "contains", "reference": "Paris"})
+
     def test_unsupported_grader_type(self):
         with pytest.raises(Exception, match="Unsupported grader type"):
             OpenAIEvalDef(name="x", grader={"type": "unknown"})
@@ -81,6 +96,17 @@ class TestBuildTestingCriteria:
         assert c["passing_labels"] == ["good"]
         assert c["input"] == grader["input"]
 
+    def test_string_check_shape(self):
+        d = OpenAIEvalDef(name="check", grader={"type": "string_check", "operation": "ilike", "reference": "Paris"})
+        c = _build_testing_criteria(d)
+        assert c == {
+            "type": "string_check",
+            "name": "check",
+            "input": "{{ item.actual_response }}",
+            "reference": "Paris",
+            "operation": "ilike",
+        }
+
 
 class TestBuildJsonlItems:
     def test_text_similarity_includes_expected(self):
@@ -90,6 +116,10 @@ class TestBuildJsonlItems:
     def test_label_model_excludes_expected(self):
         items = _build_jsonl_items([_invocation("hello")], [], include_expected=False)
         assert "expected_response" not in items[0]["item"]
+
+    def test_string_check_excludes_expected(self):
+        items = _build_jsonl_items([_invocation("Paris")], [], include_expected=False)
+        assert items == [{"item": {"actual_response": "Paris"}}]
 
     def test_missing_expected_falls_back_to_empty(self):
         items = _build_jsonl_items([_invocation("hello")], [], include_expected=True)
@@ -114,4 +144,11 @@ class TestEvaluateOpenAIEval:
         monkeypatch.setattr("agentevals.openai_eval_backend._get_openai_client", lambda: None)
         d = OpenAIEvalDef(name="lm", grader=_label_grader())
         result = await evaluate_openai_eval(d, [_invocation("hi")], None)
+        assert "expected invocations" not in (result.error or "")
+
+    async def test_string_check_does_not_require_expected(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        monkeypatch.setattr("agentevals.openai_eval_backend._get_openai_client", lambda: None)
+        d = OpenAIEvalDef(name="check", grader={"type": "string_check", "operation": "eq", "reference": "Paris"})
+        result = await evaluate_openai_eval(d, [_invocation("Paris")], None)
         assert "expected invocations" not in (result.error or "")

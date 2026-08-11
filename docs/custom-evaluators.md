@@ -337,9 +337,25 @@ evaluators:
 
 The `threshold` field is not used for `label_model`. A response passes if its assigned label is in `passing_labels`.
 
+### String Check Grader
+
+Compares each response with a fixed reference string. It does not require an eval set.
+
+```yaml
+evaluators:
+  - name: city_name_check
+    type: openai_eval
+    grader:
+      type: string_check
+      operation: eq
+      reference: Paris
+```
+
+Supported operations are `eq`, `ne`, `like`, and `ilike`. The `threshold` field is not used for `string_check`; each comparison returns either 0 or 1.
+
 ### How it works
 
-Under the hood, agentevals creates an ephemeral eval on OpenAI, submits the actual and expected responses as JSONL items, polls for results, and cleans up. The agent's response and the golden reference are both placed in the `item` namespace (with `include_sample_schema: false`), so OpenAI only grades the provided text without generating any model outputs.
+Under the hood, agentevals creates an ephemeral eval on OpenAI, submits response data as JSONL items, polls for results, and cleans up. Text-similarity graders receive actual and expected responses; string-check and label-model graders only receive the actual response. With `include_sample_schema: false`, OpenAI only grades the provided text without generating model outputs.
 
 ### Configuring the GitHub source
 

@@ -33,3 +33,10 @@ evaluators:
     threshold: 0.110
     executor: local
 
+  # OpenAI Evals API grader (requires OPENAI_API_KEY)
+  - name: city_name_check
+    type: openai_eval
+    grader:
+      type: string_check
+      operation: eq
+      reference: Paris

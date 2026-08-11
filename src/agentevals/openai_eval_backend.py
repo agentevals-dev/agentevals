@@ -67,6 +67,15 @@ def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
             "passing_labels": grader["passing_labels"],
         }
 
+    if grader_type == "string_check":
+        return {
+            "type": "string_check",
+            "name": evaluator_def.name,
+            "input": "{{ item.actual_response }}",
+            "reference": grader["reference"],
+            "operation": grader["operation"],
+        }
+
     raise ValueError(f"Unsupported grader type: {grader_type}")
 
 
@@ -131,7 +140,9 @@ async def evaluate_openai_eval(
         )
 
     items = _build_jsonl_items(
-        actual_invocations, expected_invocations or [], include_expected=(grader_type != "label_model")
+        actual_invocations,
+        expected_invocations or [],
+        include_expected=(grader_type == "text_similarity"),
     )
     if not items:
         return MetricResult(
@@ -145,7 +156,7 @@ async def evaluate_openai_eval(
     try:
         client = await asyncio.to_thread(_get_openai_client)
 
-        item_schema = _ACTUAL_ONLY_SCHEMA if grader_type == "label_model" else _TEXT_PAIR_SCHEMA
+        item_schema = _TEXT_PAIR_SCHEMA if grader_type == "text_similarity" else _ACTUAL_ONLY_SCHEMA
         eval_obj = await asyncio.to_thread(
             client.evals.create,
             name=f"agentevals-openai-{evaluator_def.name}",
@@ -252,6 +263,8 @@ async def _collect_results(client: Any, eval_id: str, run_id: str, run: Any, eva
     elif grader["type"] == "label_model":
         details["model"] = grader.get("model")
         details["passing_labels"] = grader.get("passing_labels")
+    elif grader["type"] == "string_check":
+        details["operation"] = grader.get("operation")
     per_criteria = getattr(run, "per_testing_criteria_results", None)
     if per_criteria:
         details["per_testing_criteria"] = [
