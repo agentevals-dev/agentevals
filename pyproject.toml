@@ -23,7 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 live = [
-    "mcp>=1.26.0",
+    "mcp>=1.28.1,<2",
     "httpx>=0.27.0",
 ]
 streaming = [

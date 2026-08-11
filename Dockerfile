@@ -32,6 +32,11 @@ ARG VERSION
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION}
 
 RUN uv sync --frozen --no-dev --extra live --extra postgres --extra kubernetes \
+    # The runtime only uses the uv-managed venv; drop the base image's bundled
+    # pip so its vendored packages (msgpack, pkg_resources) don't ship unused.
+    && rm -rf /usr/local/lib/python*/site-packages/pip \
+              /usr/local/lib/python*/site-packages/pip-*.dist-info \
+              /usr/local/bin/pip* \
     && groupadd --gid 1000 app \
     && useradd --uid 1000 --gid app --home-dir /app --no-log-init app \
     && chown -R app:app /app
