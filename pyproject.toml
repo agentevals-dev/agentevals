@@ -19,11 +19,11 @@ dependencies = [
     "opentelemetry-proto>=1.36.0",
     "pyyaml>=6.0",
     "httpx>=0.27.0",
-    # Security floors for transitive dependencies of the default install
-    # (google-adk[eval] pull all of these).
+    # Security floors for CVE-affected transitive dependencies of the default install.
+    # None are imported directly, do not "clean up" as unused. pip does not read
+    # lockfiles, so installs from PyPI resolve from these floors alone.
     "aiohttp>=3.14.3",
     "authlib>=1.7.2",
-    "cryptography>=50.0.0",
     "idna>=3.18",
     "litellm>=1.85.7",
     "nltk>=3.10.2",
