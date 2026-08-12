@@ -37,6 +37,7 @@ RUN uv sync --frozen --no-dev --extra live --extra postgres --extra kubernetes \
     && rm -rf /usr/local/lib/python*/site-packages/pip \
               /usr/local/lib/python*/site-packages/pip-*.dist-info \
               /usr/local/bin/pip* \
+    && ! /usr/local/bin/python -c "import pip" 2>/dev/null \
     && groupadd --gid 1000 app \
     && useradd --uid 1000 --gid app --home-dir /app --no-log-init app \
     && chown -R app:app /app
