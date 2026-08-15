@@ -38,6 +38,11 @@ _ACTUAL_ONLY_SCHEMA = {
 }
 
 
+def _get_item_schema(grader_type: str) -> dict[str, Any]:
+    """Return the data-source item schema required by a grader type."""
+    return _TEXT_PAIR_SCHEMA if grader_type == "text_similarity" else _ACTUAL_ONLY_SCHEMA
+
+
 def _build_testing_criteria(evaluator_def: OpenAIEvalDef) -> dict[str, Any]:
     """Build the OpenAI testing_criteria dict from the evaluator config.
 
@@ -139,10 +144,11 @@ async def evaluate_openai_eval(
             error="OpenAI text_similarity grader requires expected invocations (golden eval set).",
         )
 
+    item_schema = _get_item_schema(grader_type)
     items = _build_jsonl_items(
         actual_invocations,
         expected_invocations or [],
-        include_expected=(grader_type == "text_similarity"),
+        include_expected="expected_response" in item_schema["required"],
     )
     if not items:
         return MetricResult(
@@ -156,7 +162,6 @@ async def evaluate_openai_eval(
     try:
         client = await asyncio.to_thread(_get_openai_client)
 
-        item_schema = _TEXT_PAIR_SCHEMA if grader_type == "text_similarity" else _ACTUAL_ONLY_SCHEMA
         eval_obj = await asyncio.to_thread(
             client.evals.create,
             name=f"agentevals-openai-{evaluator_def.name}",

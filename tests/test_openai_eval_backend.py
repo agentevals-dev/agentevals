@@ -6,6 +6,7 @@ from agentevals.config import OpenAIEvalDef
 from agentevals.openai_eval_backend import (
     _build_jsonl_items,
     _build_testing_criteria,
+    _get_item_schema,
     evaluate_openai_eval,
 )
 
@@ -71,6 +72,11 @@ class TestOpenAIEvalDefValidation:
         with pytest.raises(Exception, match="Unknown operation"):
             OpenAIEvalDef(name="check", grader={"type": "string_check", "operation": "contains", "reference": "Paris"})
 
+    @pytest.mark.parametrize("reference", [None, "", 123, ["Paris"]])
+    def test_string_check_reference_must_be_non_empty_string(self, reference):
+        with pytest.raises(Exception, match="reference"):
+            OpenAIEvalDef(name="check", grader={"type": "string_check", "operation": "eq", "reference": reference})
+
     def test_unsupported_grader_type(self):
         with pytest.raises(Exception, match="Unsupported grader type"):
             OpenAIEvalDef(name="x", grader={"type": "unknown"})
@@ -117,13 +123,18 @@ class TestBuildJsonlItems:
         items = _build_jsonl_items([_invocation("hello")], [], include_expected=False)
         assert "expected_response" not in items[0]["item"]
 
-    def test_string_check_excludes_expected(self):
-        items = _build_jsonl_items([_invocation("Paris")], [], include_expected=False)
-        assert items == [{"item": {"actual_response": "Paris"}}]
-
     def test_missing_expected_falls_back_to_empty(self):
         items = _build_jsonl_items([_invocation("hello")], [], include_expected=True)
         assert items[0]["item"]["expected_response"] == ""
+
+
+class TestGetItemSchema:
+    def test_text_similarity_requires_expected_response(self):
+        assert "expected_response" in _get_item_schema("text_similarity")["required"]
+
+    @pytest.mark.parametrize("grader_type", ["label_model", "string_check"])
+    def test_other_graders_only_require_actual_response(self, grader_type):
+        assert _get_item_schema(grader_type)["required"] == ["actual_response"]
 
 
 class TestEvaluateOpenAIEval:

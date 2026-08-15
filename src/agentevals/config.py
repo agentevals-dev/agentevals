@@ -95,6 +95,7 @@ _VALID_SIMILARITY_METRICS = frozenset(
 )
 
 _VALID_STRING_CHECK_OPERATIONS = frozenset({"eq", "ne", "like", "ilike"})
+_SUPPORTED_GRADER_TYPES = frozenset({"label_model", "string_check", "text_similarity"})
 
 
 class OpenAIEvalDef(BaseModel):
@@ -129,12 +130,11 @@ class OpenAIEvalDef(BaseModel):
                 raise ValueError("'operation' is required for string_check grader")
             if operation not in _VALID_STRING_CHECK_OPERATIONS:
                 raise ValueError(f"Unknown operation '{operation}'. Valid: {sorted(_VALID_STRING_CHECK_OPERATIONS)}")
-            if not v.get("reference"):
-                raise ValueError("'reference' is required for string_check grader")
+            reference = v.get("reference")
+            if not isinstance(reference, str) or not reference:
+                raise ValueError("'reference' must be a non-empty string for string_check grader")
         else:
-            raise ValueError(
-                f"Unsupported grader type: '{grader_type}'. Supported: label_model, string_check, text_similarity"
-            )
+            raise ValueError(f"Unsupported grader type: '{grader_type}'. Supported: {sorted(_SUPPORTED_GRADER_TYPES)}")
         return v
 
 

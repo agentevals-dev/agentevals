@@ -16,3 +16,10 @@ evaluators:
           content: "Rate this response: {{ item.actual_response }}"
       labels: [good, bad]
       passing_labels: [good]
+
+  - name: helm_release_check
+    type: openai_eval
+    grader:
+      type: string_check
+      operation: ilike
+      reference: "*two Helm releases*"
