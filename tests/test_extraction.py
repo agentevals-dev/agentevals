@@ -400,6 +400,58 @@ class TestFlattenOtlpAttributes:
         )
         assert result == {"str": "hello", "num": 3.14, "flag": True}
 
+    def test_array_value(self):
+        result = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {"arrayValue": {"values": [{"stringValue": "stop"}]}},
+                },
+            ]
+        )
+        assert result == {"gen_ai.response.finish_reasons": ["stop"]}
+
+    def test_kvlist_value(self):
+        result = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.request.params",
+                    "value": {
+                        "kvlistValue": {
+                            "values": [
+                                {"key": "temperature", "value": {"doubleValue": 0.7}},
+                                {"key": "stream", "value": {"boolValue": False}},
+                            ]
+                        }
+                    },
+                },
+            ]
+        )
+        assert result == {"gen_ai.request.params": {"temperature": 0.7, "stream": False}}
+
+    def test_array_of_kvlist(self):
+        """Tool calls arrive as an arrayValue of kvlistValue."""
+        result = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.tool.calls",
+                    "value": {
+                        "arrayValue": {
+                            "values": [
+                                {"kvlistValue": {"values": [{"key": "name", "value": {"stringValue": "get_weather"}}]}},
+                            ]
+                        }
+                    },
+                },
+            ]
+        )
+        assert result == {"gen_ai.tool.calls": [{"name": "get_weather"}]}
+
+    def test_bytes_value(self):
+        """MessageToDict base64-encodes bytes fields, so the decoder sees a str."""
+        result = flatten_otlp_attributes([{"key": "payload", "value": {"bytesValue": "AP9oaQ=="}}])
+        assert result == {"payload": "AP9oaQ=="}
+
     def test_empty(self):
         assert flatten_otlp_attributes([]) == {}
 

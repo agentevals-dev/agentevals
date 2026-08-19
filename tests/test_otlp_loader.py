@@ -258,6 +258,66 @@ class TestLoadFromDict:
         assert traces == []
 
 
+class TestAnyValueAttributes:
+    """Attributes carrying the full OTLP AnyValue union (array / kvlist / bytes)."""
+
+    @staticmethod
+    def _load_span_with(attribute):
+        loader = OtlpJsonLoader()
+        data = {
+            "resourceSpans": [
+                {
+                    "resource": {"attributes": []},
+                    "scopeSpans": [
+                        {
+                            "scope": {"name": "test-scope"},
+                            "spans": [
+                                {
+                                    "traceId": "t1",
+                                    "spanId": "s1",
+                                    "name": "test",
+                                    "startTimeUnixNano": "1000000000",
+                                    "endTimeUnixNano": "2000000000",
+                                    "attributes": [attribute],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        return loader.load_from_dict(data)[0].all_spans[0]
+
+    def test_array_value(self):
+        span = self._load_span_with(
+            {
+                "key": "gen_ai.response.finish_reasons",
+                "value": {"arrayValue": {"values": [{"stringValue": "stop"}]}},
+            }
+        )
+        assert span.tags["gen_ai.response.finish_reasons"] == ["stop"]
+
+    def test_kvlist_value(self):
+        span = self._load_span_with(
+            {
+                "key": "gen_ai.request.params",
+                "value": {
+                    "kvlistValue": {
+                        "values": [
+                            {"key": "temperature", "value": {"doubleValue": 0.7}},
+                            {"key": "stream", "value": {"boolValue": False}},
+                        ]
+                    }
+                },
+            }
+        )
+        assert span.tags["gen_ai.request.params"] == {"temperature": 0.7, "stream": False}
+
+    def test_bytes_value(self):
+        span = self._load_span_with({"key": "payload", "value": {"bytesValue": "AP9oaQ=="}})
+        assert span.tags["payload"] == "AP9oaQ=="
+
+
 class TestFlatDictAttributes:
     """Tests for flat dict attribute format (e.g. from simplified producers)."""
 

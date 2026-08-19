@@ -17,6 +17,7 @@ import re
 from typing import Any, Protocol, TypedDict, TypeVar
 
 from .loader.base import Span, Trace
+from .otlp_anyvalue import decode_attributes
 from .trace_attrs import (
     ADK_LLM_REQUEST,
     ADK_LLM_RESPONSE,
@@ -523,20 +524,12 @@ def is_invocation_span(span: Span) -> bool:
 
 
 def flatten_otlp_attributes(attrs_list: list[dict]) -> dict[str, Any]:
-    """Convert OTLP attributes array [{key, value: {stringValue|...}}] to flat dict."""
-    result: dict[str, Any] = {}
-    for attr in attrs_list:
-        key = attr.get("key", "")
-        value_obj = attr.get("value", {})
-        if "stringValue" in value_obj:
-            result[key] = value_obj["stringValue"]
-        elif "intValue" in value_obj:
-            result[key] = int(value_obj["intValue"])
-        elif "doubleValue" in value_obj:
-            result[key] = float(value_obj["doubleValue"])
-        elif "boolValue" in value_obj:
-            result[key] = value_obj["boolValue"]
-    return result
+    """Convert OTLP attributes array [{key, value: {stringValue|...}}] to flat dict.
+
+    Delegates to the shared ``AnyValue`` decoder so array/kvlist/bytes
+    attributes survive instead of being dropped.
+    """
+    return decode_attributes(attrs_list)
 
 
 # ---------------------------------------------------------------------------
