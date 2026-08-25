@@ -15,6 +15,27 @@ from agentevals import cli
 from agentevals.runner import RunResult
 
 
+def _route_paths(app) -> set[str]:
+    """Collect every mounted route path, descending into lazily-included routers.
+
+    FastAPI >=0.133 keeps each ``include_router`` call as a single ``_IncludedRouter``
+    wrapper in ``app.routes`` rather than flattening its routes into the list, so a
+    plain ``route.path`` sweep both misses those paths and raises on the wrapper.
+    """
+    paths: set[str] = set()
+    stack: list[tuple[str, object]] = [("", route) for route in app.routes]
+    while stack:
+        prefix, route = stack.pop()
+        path = getattr(route, "path", None)
+        if path is not None:
+            paths.add(prefix + path)
+        included = getattr(route, "original_router", None)
+        if included is not None:
+            nested = prefix + getattr(route.include_context, "prefix", "")
+            stack.extend((nested, inner) for inner in included.routes)
+    return paths
+
+
 class _FakeGrpcServer:
     def __init__(self):
         self.started = False
@@ -84,10 +105,12 @@ async def test_run_servers_shares_one_trace_manager_across_live_servers(monkeypa
     assert fake_grpc_server.started is True
     assert created_servers[0].handle_exit is not None
     assert created_servers[1].handle_exit is not None
-    assert any(route.path == "/ws/traces" for route in main_app.routes)
-    assert any(route.path == "/stream/ui-updates" for route in main_app.routes)
-    assert any(route.path == "/v1/traces" for route in otlp_app.routes)
-    assert any(route.path == "/v1/logs" for route in otlp_app.routes)
+    main_paths = _route_paths(main_app)
+    otlp_paths = _route_paths(otlp_app)
+    assert "/ws/traces" in main_paths
+    assert "/stream/ui-updates" in main_paths
+    assert "/v1/traces" in otlp_paths
+    assert "/v1/logs" in otlp_paths
     fake_stop_grpc.assert_awaited_once_with(fake_grpc_server)
 
 
