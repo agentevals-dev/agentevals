@@ -87,7 +87,7 @@ jobs:
           name: wheels
           path: dist/
 
-      - uses: softprops/action-gh-release@v2.5.0
+      - uses: softprops/action-gh-release@v3.0.2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: dist/**/*.whl
