@@ -12,6 +12,8 @@ updates:
       - "CI"
     commit-message:
       prefix: "chore(deps):"
+    cooldown:
+      default-days: 5
     groups:
       github-actions:
         applies-to: version-updates
@@ -84,7 +86,6 @@ updates:
       prefix-development: "chore(deps-dev):"
     cooldown:
       default-days: 5
-      semver-major-days: 14
     ignore:
       # react/vite/antd majors require migrations.
       - dependency-name: "*"
@@ -126,6 +127,8 @@ updates:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
+    cooldown:
+      default-days: 5
     groups:
       docker-base-images:
         applies-to: version-updates
