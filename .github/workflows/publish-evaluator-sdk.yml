@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       # Repo root cwd: uv build puts artifacts in ./dist; uv publish looks for dist/* relative to cwd.
       - name: 'Release Python Packages'
