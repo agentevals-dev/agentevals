@@ -89,7 +89,6 @@ updates:
       prefix: "chore(deps):"
     cooldown:
       default-days: 5
-      semver-major-days: 14
     groups:
       docker-base-images:
         applies-to: version-updates
