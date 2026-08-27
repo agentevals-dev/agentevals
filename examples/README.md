@@ -69,9 +69,11 @@ For simple prompt-to-response agents, there's also a decorator shorthand:
 ```python
 app = AgentEvals(eval_set_id="my-eval")
 
+
 @app.agent
 def my_agent(prompt):
     return llm.invoke(prompt).content
+
 
 app.run(["Hello!", "Tell me a joke"])
 ```

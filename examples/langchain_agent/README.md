@@ -145,7 +145,7 @@ os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "true"
 
 ```python
 tracer_provider = TracerProvider()  # For spans
-logger_provider = LoggerProvider()   # For logs
+logger_provider = LoggerProvider()  # For logs
 ```
 
 **Both are required** - spans provide metadata, logs provide message content.
@@ -164,9 +164,11 @@ The log processor shares the WebSocket connection from the span processor.
 ```python
 loop = asyncio.new_event_loop()
 
+
 def run_loop_in_background():
     asyncio.set_event_loop(loop)
     loop.run_forever()
+
 
 thread = threading.Thread(target=run_loop_in_background, daemon=True)
 thread.start()

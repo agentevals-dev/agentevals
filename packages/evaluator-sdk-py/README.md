@@ -15,6 +15,7 @@ pip install agentevals-evaluator-sdk
 ```python
 from agentevals_evaluator_sdk import evaluator, EvalInput, EvalResult
 
+
 @evaluator
 def my_evaluator(input: EvalInput) -> EvalResult:
     scores = []
@@ -26,6 +27,7 @@ def my_evaluator(input: EvalInput) -> EvalResult:
         score=sum(scores) / len(scores) if scores else 0.0,
         per_invocation_scores=scores,
     )
+
 
 if __name__ == "__main__":
     my_evaluator.run()

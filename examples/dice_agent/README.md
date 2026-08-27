@@ -89,13 +89,8 @@ Add a new tool in `agent.py`:
 def roll_multiple(count: int, sides: int = 6) -> dict:
     """Roll multiple dice at once."""
     results = [random.randint(1, sides) for _ in range(count)]
-    return {
-        "count": count,
-        "sides": sides,
-        "results": results,
-        "total": sum(results),
-        "average": sum(results) / count
-    }
+    return {"count": count, "sides": sides, "results": results, "total": sum(results), "average": sum(results) / count}
+
 
 dice_agent = Agent(
     name="dice_agent",

@@ -37,6 +37,7 @@ pip install agentevals-evaluator-sdk
 # evaluators/response_quality.py
 from agentevals_evaluator_sdk import evaluator, EvalInput, EvalResult
 
+
 @evaluator
 def response_quality(input: EvalInput) -> EvalResult:
     scores = []
@@ -52,6 +53,7 @@ def response_quality(input: EvalInput) -> EvalResult:
         score=sum(scores) / len(scores) if scores else 0.0,
         per_invocation_scores=scores,
     )
+
 
 if __name__ == "__main__":
     response_quality.run()
@@ -436,7 +438,7 @@ Then register it:
 _RUNTIMES: list[Runtime] = [
     PythonRuntime(),
     NodeRuntime(),
-    GoRuntime(),       # new
+    GoRuntime(),  # new
 ]
 ```
 
@@ -484,6 +486,7 @@ To support a different evaluator registry (e.g., a custom API), implement `Evalu
 ```python
 from agentevals.evaluator.sources import EvaluatorSource, EvaluatorInfo, register_source
 
+
 class MyRegistrySource(EvaluatorSource):
     @property
     def source_name(self) -> str:
@@ -491,6 +494,7 @@ class MyRegistrySource(EvaluatorSource):
 
     async def list_evaluators(self) -> list[EvaluatorInfo]: ...
     async def fetch_evaluator(self, ref: str, dest: Path) -> Path: ...
+
 
 register_source(MyRegistrySource())
 ```
