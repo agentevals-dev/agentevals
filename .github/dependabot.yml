@@ -66,9 +66,15 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "antd"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "antd"
+      # Plugin majors track vite majors: @vitejs/plugin-react 6 peers on vite 8.
+      - dependency-name: "@vitejs/*"
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint declares a typescript upper bound, so TS majors move with it.
+      - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
     groups:
       npm:
