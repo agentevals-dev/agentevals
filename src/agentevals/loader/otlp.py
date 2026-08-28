@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 
-from ..otlp_anyvalue import decode_attributes
+from ..otlp_anyvalue import decode_any_value, decode_attributes, is_any_value
 from ..trace_attrs import (
     OTEL_GENAI_INPUT_MESSAGES,
     OTEL_GENAI_OUTPUT_MESSAGES,
@@ -176,8 +176,8 @@ class OtlpJsonLoader(TraceLoader):
                     key = attr.get("key", "")
                     if key in self._GENAI_EVENT_KEYS and key not in attributes:
                         value_obj = attr.get("value", {})
-                        if "stringValue" in value_obj:
-                            attributes[key] = value_obj["stringValue"]
+                        if is_any_value(value_obj):
+                            attributes[key] = decode_any_value(value_obj)
 
     def _extract_attributes(self, attrs) -> dict:
         """Convert attributes to a flat ``{key: value}`` dict.

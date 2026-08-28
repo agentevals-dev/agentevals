@@ -317,6 +317,73 @@ class TestAnyValueAttributes:
         span = self._load_span_with({"key": "payload", "value": {"bytesValue": "AP9oaQ=="}})
         assert span.tags["payload"] == "AP9oaQ=="
 
+    @staticmethod
+    def _load_span_with_event_attribute(attribute):
+        """Span carrying a GenAI event attribute in OTLP array format."""
+        loader = OtlpJsonLoader()
+        data = {
+            "resourceSpans": [
+                {
+                    "resource": {"attributes": []},
+                    "scopeSpans": [
+                        {
+                            "scope": {"name": "test-scope"},
+                            "spans": [
+                                {
+                                    "traceId": "t1",
+                                    "spanId": "s1",
+                                    "name": "chat",
+                                    "startTimeUnixNano": "0",
+                                    "endTimeUnixNano": "0",
+                                    "attributes": [],
+                                    "events": [
+                                        {
+                                            "timeUnixNano": "0",
+                                            "name": "gen_ai.client.inference.operation.details",
+                                            "attributes": [attribute],
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        return loader.load_from_dict(data)[0].all_spans[0]
+
+    def test_event_promotion_decodes_array_value(self):
+        """Strands stores messages in span events, and newer GenAI semconv makes
+        them a complex array. Promotion must decode it instead of dropping it."""
+        span = self._load_span_with_event_attribute(
+            {
+                "key": "gen_ai.input.messages",
+                "value": {
+                    "arrayValue": {
+                        "values": [
+                            {
+                                "kvlistValue": {
+                                    "values": [
+                                        {"key": "role", "value": {"stringValue": "user"}},
+                                        {"key": "content", "value": {"stringValue": "Hello"}},
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                },
+            }
+        )
+        assert span.tags["gen_ai.input.messages"] == [{"role": "user", "content": "Hello"}]
+
+    def test_event_promotion_keeps_string_value(self):
+        """The pre-existing stringValue path must keep working unchanged."""
+        messages_json = '[{"role": "user", "content": "Hello"}]'
+        span = self._load_span_with_event_attribute(
+            {"key": "gen_ai.output.messages", "value": {"stringValue": messages_json}}
+        )
+        assert span.tags["gen_ai.output.messages"] == messages_json
+
 
 class TestFlatDictAttributes:
     """Tests for flat dict attribute format (e.g. from simplified producers)."""
