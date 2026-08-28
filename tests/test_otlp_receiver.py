@@ -233,6 +233,46 @@ class TestExtractMetadata:
         assert meta["session_name"] is None
         assert meta["service_name"] is None
 
+    def test_non_string_session_name_is_ignored(self):
+        """session_name is used as a dict key in _active_session_for_name.
+
+        The shared AnyValue decoder can now return lists and dicts, which are
+        unhashable; reading stringValue only keeps them out of the key path.
+        """
+        attrs = [
+            {
+                "key": "agentevals.session_name",
+                "value": {"arrayValue": {"values": [{"stringValue": "run-42"}]}},
+            }
+        ]
+        meta = _extract_agentevals_metadata(attrs)
+        assert meta["session_name"] is None
+        # Would raise TypeError: unhashable type if a list leaked through.
+        assert {}.get(meta["session_name"]) is None
+
+    def test_non_string_eval_set_id_is_ignored(self):
+        """eval_set_id is typed ``str | None`` on the session models."""
+        attrs = [
+            {
+                "key": "agentevals.eval_set_id",
+                "value": {"kvlistValue": {"values": [{"key": "id", "value": {"stringValue": "my-eval"}}]}},
+            }
+        ]
+        meta = _extract_agentevals_metadata(attrs)
+        assert meta["eval_set_id"] is None
+
+    def test_non_string_values_still_reach_resource_attrs(self):
+        """Narrowing applies to the two key-like fields only; the decoded value
+        is still available in resource_attrs for anything that wants it."""
+        attrs = [
+            {
+                "key": "agentevals.session_name",
+                "value": {"arrayValue": {"values": [{"stringValue": "run-42"}]}},
+            }
+        ]
+        meta = _extract_agentevals_metadata(attrs)
+        assert meta["resource_attrs"]["agentevals.session_name"] == ["run-42"]
+
 
 # ---------------------------------------------------------------------------
 # OTLP log record conversion
