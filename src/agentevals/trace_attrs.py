@@ -84,3 +84,33 @@ GENAI_ATTRIBUTE_ALIASES: dict[str, list[str]] = {
 
 # agentevals custom attributes (repository-specific, outside OTel semconv)
 AGENTEVALS_SESSION_ID = "agentevals.session_id"
+AGENTEVALS_EVAL_SET_ID = "agentevals.eval_set_id"
+AGENTEVALS_SESSION_NAME = "agentevals.session_name"
+
+# Attributes the GenAI semconv types as arrays or structured values. These are
+# the only keys the shared AnyValue decoder returns as a native list or dict;
+# every other key is decoded to a scalar or dropped, which is what
+# ``extraction.py`` did before the decoder was shared.
+#
+# The set is an allowlist on purpose. A missing entry drops one value, matching
+# the pre-existing extraction behaviour; a denylist would instead let an
+# unhashable value reach a dict key or set member on an unauthenticated
+# receiver port, which crashes ingestion. See the discussion on #187.
+#
+# Hand-maintained: opentelemetry-semantic-conventions exposes constants and
+# prose docstrings only, so attribute value types are not machine-readable and
+# this set cannot be derived from the package.
+#
+# What should happen to container values on keys outside this set is not
+# settled; today they are dropped. Tracked in #208.
+SPEC_CONTAINER_ATTRS: frozenset[str] = frozenset(
+    {
+        OTEL_GENAI_RESPONSE_FINISH_REASONS,
+        OTEL_GENAI_INPUT_MESSAGES,
+        OTEL_GENAI_OUTPUT_MESSAGES,
+        OTEL_GENAI_TOOL_DEFINITIONS,
+        OTEL_GENAI_SYSTEM_INSTRUCTIONS,
+        OTEL_GENAI_TOOL_CALL_ARGUMENTS,
+        OTEL_GENAI_TOOL_CALL_RESULT,
+    }
+)

@@ -6,6 +6,7 @@ import json
 
 import pytest
 
+from agentevals import trace_attrs
 from agentevals.extraction import (
     AdkExtractor,
     GenAIExtractor,
@@ -399,6 +400,129 @@ class TestFlattenOtlpAttributes:
             ]
         )
         assert result == {"str": "hello", "num": 3.14, "flag": True}
+
+    def test_array_value(self):
+        result = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {"arrayValue": {"values": [{"stringValue": "stop"}]}},
+                },
+            ]
+        )
+        assert result == {"gen_ai.response.finish_reasons": ["stop"]}
+
+    def test_kvlist_value(self):
+        result = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.tool.call.arguments",
+                    "value": {
+                        "kvlistValue": {
+                            "values": [
+                                {"key": "city", "value": {"stringValue": "Berlin"}},
+                                {"key": "metric", "value": {"boolValue": False}},
+                            ]
+                        }
+                    },
+                },
+            ]
+        )
+        assert result == {"gen_ai.tool.call.arguments": {"city": "Berlin", "metric": False}}
+
+    def test_array_of_kvlist(self):
+        """Messages arrive as an arrayValue of kvlistValue."""
+        result = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.input.messages",
+                    "value": {
+                        "arrayValue": {
+                            "values": [
+                                {"kvlistValue": {"values": [{"key": "role", "value": {"stringValue": "user"}}]}},
+                            ]
+                        }
+                    },
+                },
+            ]
+        )
+        assert result == {"gen_ai.input.messages": [{"role": "user"}]}
+
+    def test_finish_reasons_survive_to_extracted_model_info(self):
+        """The symptom #173 names: gen_ai.response.finish_reasons reaching the
+        consumer as ["stop"] rather than a literal blob or nothing.
+
+        Asserting through extract_extended_model_info_from_attrs rather than at
+        the decoder keeps the whole path covered - decoding it correctly is not
+        the same as it arriving correctly.
+        """
+        attrs = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {"arrayValue": {"values": [{"stringValue": "stop"}]}},
+                },
+                {"key": "gen_ai.response.model", "value": {"stringValue": "claude-opus-5"}},
+            ]
+        )
+        info = extract_extended_model_info_from_attrs(attrs)
+        assert info["finish_reasons"] == ["stop"]
+        assert info["response_model"] == "claude-opus-5"
+
+    def test_multiple_finish_reasons_survive(self):
+        attrs = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {"arrayValue": {"values": [{"stringValue": "stop"}, {"stringValue": "length"}]}},
+                }
+            ]
+        )
+        assert extract_extended_model_info_from_attrs(attrs)["finish_reasons"] == [
+            "stop",
+            "length",
+        ]
+
+    def test_unlisted_key_drops_container_value(self):
+        """Containers survive only for SPEC_CONTAINER_ATTRS. Everything else is
+        dropped, which is what extraction did before the decoder was shared."""
+        attrs = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.response.model",
+                    "value": {"arrayValue": {"values": [{"stringValue": "claude-opus-5"}]}},
+                },
+                {"key": "gen_ai.request.model", "value": {"stringValue": "claude-sonnet-5"}},
+            ]
+        )
+        assert "gen_ai.response.model" not in attrs
+        info = extract_extended_model_info_from_attrs(attrs)
+        assert info["response_model"] is None
+        assert info["request_model"] == "claude-sonnet-5"
+
+    def test_no_unlisted_key_can_yield_an_unhashable_value(self):
+        """The property the allowlist exists for: nothing outside
+        SPEC_CONTAINER_ATTRS can reach a consumer as a dict key or set member
+        and raise TypeError. Covers every attribute constant we declare, so a
+        new one cannot quietly reopen the hazard."""
+        container = {"arrayValue": {"values": [{"stringValue": "x"}]}}
+        for name in dir(trace_attrs):
+            if not name.isupper():
+                continue
+            key = getattr(trace_attrs, name)
+            if not isinstance(key, str):
+                continue
+            value = flatten_otlp_attributes([{"key": key, "value": container}]).get(key)
+            if key in trace_attrs.SPEC_CONTAINER_ATTRS:
+                assert value == ["x"], f"{key} should keep its container"
+            else:
+                assert value is None, f"{key} leaked a container"
+                hash(value)
+
+    def test_bytes_value(self):
+        """MessageToDict base64-encodes bytes fields, so the decoder sees a str."""
+        result = flatten_otlp_attributes([{"key": "payload", "value": {"bytesValue": "AP9oaQ=="}}])
+        assert result == {"payload": "AP9oaQ=="}
 
     def test_empty(self):
         assert flatten_otlp_attributes([]) == {}

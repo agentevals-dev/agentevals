@@ -233,6 +233,60 @@ class TestExtractMetadata:
         assert meta["session_name"] is None
         assert meta["service_name"] is None
 
+    def test_non_string_session_name_is_ignored(self):
+        """session_name is used as a dict key in _active_session_for_name.
+
+        The shared AnyValue decoder can now return lists and dicts, which are
+        unhashable; reading stringValue only keeps them out of the key path.
+        """
+        attrs = [
+            {
+                "key": "agentevals.session_name",
+                "value": {"arrayValue": {"values": [{"stringValue": "run-42"}]}},
+            }
+        ]
+        meta = _extract_agentevals_metadata(attrs)
+        assert meta["session_name"] is None
+        # Would raise TypeError: unhashable type if a list leaked through.
+        assert {}.get(meta["session_name"]) is None
+
+    def test_non_string_eval_set_id_is_ignored(self):
+        """eval_set_id is typed ``str | None`` on the session models."""
+        attrs = [
+            {
+                "key": "agentevals.eval_set_id",
+                "value": {"kvlistValue": {"values": [{"key": "id", "value": {"stringValue": "my-eval"}}]}},
+            }
+        ]
+        meta = _extract_agentevals_metadata(attrs)
+        assert meta["eval_set_id"] is None
+
+    def test_non_string_values_are_dropped_from_resource_attrs(self):
+        """agentevals.session_name is not in SPEC_CONTAINER_ATTRS, so a container
+        never lands in resource_attrs and can never reach a dict key."""
+        attrs = [
+            {
+                "key": "agentevals.session_name",
+                "value": {"arrayValue": {"values": [{"stringValue": "run-42"}]}},
+            },
+            _make_otlp_attr("service.name", "test-agent"),
+        ]
+        meta = _extract_agentevals_metadata(attrs)
+        assert "agentevals.session_name" not in meta["resource_attrs"]
+        assert meta["resource_attrs"]["service.name"] == "test-agent"
+
+    def test_spec_array_attributes_keep_their_container(self):
+        """Keys in SPEC_CONTAINER_ATTRS keep their decoded container - that is
+        what #173 fixes."""
+        attrs = [
+            {
+                "key": "gen_ai.response.finish_reasons",
+                "value": {"arrayValue": {"values": [{"stringValue": "stop"}]}},
+            }
+        ]
+        meta = _extract_agentevals_metadata(attrs)
+        assert meta["resource_attrs"]["gen_ai.response.finish_reasons"] == ["stop"]
+
 
 # ---------------------------------------------------------------------------
 # OTLP log record conversion

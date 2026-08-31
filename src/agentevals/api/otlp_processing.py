@@ -15,7 +15,10 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 )
 
 from ..extraction import flatten_otlp_attributes
+from ..otlp_anyvalue import decode_any_value
 from ..trace_attrs import (
+    AGENTEVALS_EVAL_SET_ID,
+    AGENTEVALS_SESSION_NAME,
     OTEL_GENAI_CONVERSATION_ID,
     OTEL_GENAI_INPUT_MESSAGES,
     OTEL_GENAI_OUTPUT_MESSAGES,
@@ -29,9 +32,6 @@ if TYPE_CHECKING:
     from ..streaming.ws_server import StreamingTraceManager
 
 logger = logging.getLogger(__name__)
-
-AGENTEVALS_EVAL_SET_ID = "agentevals.eval_set_id"
-AGENTEVALS_SESSION_NAME = "agentevals.session_name"
 
 
 async def process_traces(body: dict, manager: StreamingTraceManager) -> None:
@@ -242,7 +242,13 @@ def _normalize_span(span_data: dict, scope_name: str, scope_version: str, schema
 
 
 def _extract_agentevals_metadata(resource_attrs: list[dict]) -> dict:
-    """Extract agentevals-specific metadata from OTLP resource attributes."""
+    """Extract agentevals-specific metadata from OTLP resource attributes.
+
+    ``eval_set_id`` and ``session_name`` are used as dict keys downstream
+    (``_active_session_for_name``) and typed ``str | None`` on the session
+    models. Neither is in ``SPEC_CONTAINER_ATTRS``, so the shared decoder never
+    hands them a list or dict in the first place.
+    """
     flat = flatten_otlp_attributes(resource_attrs)
     return {
         "eval_set_id": flat.get(AGENTEVALS_EVAL_SET_ID),
@@ -310,37 +316,12 @@ def _convert_otlp_log_record(log_record: dict) -> dict | None:
     return result
 
 
-def _parse_otlp_any_value(value_obj: dict):
-    """Recursively parse an OTLP AnyValue to native Python types.
-
-    Handles the full AnyValue union: stringValue, intValue, doubleValue,
-    boolValue, kvlistValue (→ dict), arrayValue (→ list), bytesValue.
-    """
-    if "stringValue" in value_obj:
-        return value_obj["stringValue"]
-    if "intValue" in value_obj:
-        return int(value_obj["intValue"])
-    if "doubleValue" in value_obj:
-        return float(value_obj["doubleValue"])
-    if "boolValue" in value_obj:
-        return value_obj["boolValue"]
-    if "kvlistValue" in value_obj:
-        kv = value_obj["kvlistValue"]
-        return {item.get("key", ""): _parse_otlp_any_value(item.get("value", {})) for item in kv.get("values", [])}
-    if "arrayValue" in value_obj:
-        arr = value_obj["arrayValue"]
-        return [_parse_otlp_any_value(v) for v in arr.get("values", [])]
-    if "bytesValue" in value_obj:
-        return value_obj["bytesValue"]
-    return value_obj
-
-
 def _parse_otlp_body(body_raw: dict) -> dict | str:
     """Parse OTLP log record body value.
 
     Top-level stringValue bodies are JSON-decoded (Strands-style logs store
     message content as JSON strings). All other AnyValue types are parsed
-    recursively via ``_parse_otlp_any_value`` (handles the nested kvlistValue /
+    recursively via ``decode_any_value`` (handles the nested kvlistValue /
     arrayValue structures used by the OpenAI instrumentor).
     """
     if "stringValue" in body_raw:
@@ -351,4 +332,4 @@ def _parse_otlp_body(body_raw: dict) -> dict | str:
             return json.loads(raw)
         except (json.JSONDecodeError, TypeError):
             return raw
-    return _parse_otlp_any_value(body_raw)
+    return decode_any_value(body_raw)
