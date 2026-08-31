@@ -6,6 +6,7 @@ import json
 
 import pytest
 
+from agentevals import trace_attrs
 from agentevals.extraction import (
     AdkExtractor,
     GenAIExtractor,
@@ -415,37 +416,37 @@ class TestFlattenOtlpAttributes:
         result = flatten_otlp_attributes(
             [
                 {
-                    "key": "gen_ai.request.params",
+                    "key": "gen_ai.tool.call.arguments",
                     "value": {
                         "kvlistValue": {
                             "values": [
-                                {"key": "temperature", "value": {"doubleValue": 0.7}},
-                                {"key": "stream", "value": {"boolValue": False}},
+                                {"key": "city", "value": {"stringValue": "Berlin"}},
+                                {"key": "metric", "value": {"boolValue": False}},
                             ]
                         }
                     },
                 },
             ]
         )
-        assert result == {"gen_ai.request.params": {"temperature": 0.7, "stream": False}}
+        assert result == {"gen_ai.tool.call.arguments": {"city": "Berlin", "metric": False}}
 
     def test_array_of_kvlist(self):
-        """Tool calls arrive as an arrayValue of kvlistValue."""
+        """Messages arrive as an arrayValue of kvlistValue."""
         result = flatten_otlp_attributes(
             [
                 {
-                    "key": "gen_ai.tool.calls",
+                    "key": "gen_ai.input.messages",
                     "value": {
                         "arrayValue": {
                             "values": [
-                                {"kvlistValue": {"values": [{"key": "name", "value": {"stringValue": "get_weather"}}]}},
+                                {"kvlistValue": {"values": [{"key": "role", "value": {"stringValue": "user"}}]}},
                             ]
                         }
                     },
                 },
             ]
         )
-        assert result == {"gen_ai.tool.calls": [{"name": "get_weather"}]}
+        assert result == {"gen_ai.input.messages": [{"role": "user"}]}
 
     def test_finish_reasons_survive_to_extracted_model_info(self):
         """The symptom #173 names: gen_ai.response.finish_reasons reaching the
@@ -482,9 +483,9 @@ class TestFlattenOtlpAttributes:
             "length",
         ]
 
-    def test_string_typed_attribute_drops_container_value(self):
-        """gen_ai.response.model is typed as a string by the spec; a container
-        in that slot is dropped rather than carried into consumers."""
+    def test_unlisted_key_drops_container_value(self):
+        """Containers survive only for SPEC_CONTAINER_ATTRS. Everything else is
+        dropped, which is what extraction did before the decoder was shared."""
         attrs = flatten_otlp_attributes(
             [
                 {
@@ -498,6 +499,25 @@ class TestFlattenOtlpAttributes:
         info = extract_extended_model_info_from_attrs(attrs)
         assert info["response_model"] is None
         assert info["request_model"] == "claude-sonnet-5"
+
+    def test_no_unlisted_key_can_yield_an_unhashable_value(self):
+        """The property the allowlist exists for: nothing outside
+        SPEC_CONTAINER_ATTRS can reach a consumer as a dict key or set member
+        and raise TypeError. Covers every attribute constant we declare, so a
+        new one cannot quietly reopen the hazard."""
+        container = {"arrayValue": {"values": [{"stringValue": "x"}]}}
+        for name in dir(trace_attrs):
+            if not name.isupper():
+                continue
+            key = getattr(trace_attrs, name)
+            if not isinstance(key, str):
+                continue
+            value = flatten_otlp_attributes([{"key": key, "value": container}]).get(key)
+            if key in trace_attrs.SPEC_CONTAINER_ATTRS:
+                assert value == ["x"], f"{key} should keep its container"
+            else:
+                assert value is None, f"{key} leaked a container"
+                hash(value)
 
     def test_bytes_value(self):
         """MessageToDict base64-encodes bytes fields, so the decoder sees a str."""

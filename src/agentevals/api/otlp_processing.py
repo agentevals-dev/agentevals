@@ -246,8 +246,8 @@ def _extract_agentevals_metadata(resource_attrs: list[dict]) -> dict:
 
     ``eval_set_id`` and ``session_name`` are used as dict keys downstream
     (``_active_session_for_name``) and typed ``str | None`` on the session
-    models. Both keys are in ``SPEC_STRING_ATTRS``, so the shared decoder has
-    already narrowed them to str-or-absent by the time they get here.
+    models. Neither is in ``SPEC_CONTAINER_ATTRS``, so the shared decoder never
+    hands them a list or dict in the first place.
     """
     flat = flatten_otlp_attributes(resource_attrs)
     return {

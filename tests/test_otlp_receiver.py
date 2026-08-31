@@ -262,8 +262,8 @@ class TestExtractMetadata:
         assert meta["eval_set_id"] is None
 
     def test_non_string_values_are_dropped_from_resource_attrs(self):
-        """Narrowing happens in the decoder, so a container in a string-typed
-        slot never lands in resource_attrs either."""
+        """agentevals.session_name is not in SPEC_CONTAINER_ATTRS, so a container
+        never lands in resource_attrs and can never reach a dict key."""
         attrs = [
             {
                 "key": "agentevals.session_name",
@@ -276,8 +276,8 @@ class TestExtractMetadata:
         assert meta["resource_attrs"]["service.name"] == "test-agent"
 
     def test_spec_array_attributes_keep_their_container(self):
-        """The narrowing must not touch attributes the spec types as arrays -
-        that is what #173 fixes."""
+        """Keys in SPEC_CONTAINER_ATTRS keep their decoded container - that is
+        what #173 fixes."""
         attrs = [
             {
                 "key": "gen_ai.response.finish_reasons",

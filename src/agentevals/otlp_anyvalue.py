@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .trace_attrs import SPEC_STRING_ATTRS
+from .trace_attrs import SPEC_CONTAINER_ATTRS
 
 logger = logging.getLogger(__name__)
 
@@ -71,22 +71,40 @@ def is_any_value(value_obj: dict) -> bool:
     return False
 
 
+def decode_attribute(key: str, value_obj: dict) -> tuple[bool, Any]:
+    """Decode one attribute, applying the container allowlist.
+
+    Returns ``(keep, value)``. Scalars are always kept. A list or dict is kept
+    only when *key* is in :data:`SPEC_CONTAINER_ATTRS`; otherwise it is dropped,
+    which is what ``extraction.py`` did with containers before this decoder was
+    shared.
+
+    Dropping rather than serialising is deliberate: JSON-dumping the value would
+    put a blob back into user-visible output, which is the symptom #173 is
+    about. What the default *should* be is tracked in #208.
+    """
+    value = decode_any_value(value_obj)
+    if isinstance(value, (list, dict)) and key not in SPEC_CONTAINER_ATTRS:
+        logger.warning(
+            "Dropping container value for %s (got %s); only spec container attributes are kept",
+            key,
+            type(value).__name__,
+        )
+        return False, None
+    return True, value
+
+
 def decode_attributes(attrs_list: list[dict]) -> dict[str, Any]:
     """Decode an OTLP attributes array to a flat ``{key: value}`` dict.
 
-    Entries whose value carries no ``AnyValue`` field are skipped, matching
-    the behaviour every call site had before they shared this decoder.
+    Entries whose value carries no ``AnyValue`` field are skipped, matching the
+    behaviour every call site had before they shared this decoder.
 
-    Attributes listed in :data:`SPEC_STRING_ATTRS` are narrowed back to
-    str-or-absent. Decoding the full union means an attribute the spec types as
-    a string can now arrive as a list or dict, and several consumers use these
-    values as dict keys, where an unhashable value raises ``TypeError``.
-    Narrowing here rather than at each call site keeps the guarantee tied to
-    the spec rather than to whichever consumers we have already found.
-
-    A container in a string-typed slot is dropped rather than serialised: JSON
-    dumping it would put the literal blob back into user-visible output, which
-    is the symptom this decoder exists to remove.
+    Container values survive only for the keys in
+    :data:`~agentevals.trace_attrs.SPEC_CONTAINER_ATTRS`. Keeping the allowlist
+    here rather than narrowing per consumer means an attribute nobody has
+    thought about cannot become an unhashable dict key downstream - there is
+    nothing to remember, because it was never widened in the first place.
     """
     result: dict[str, Any] = {}
     for attr in attrs_list:
@@ -94,13 +112,7 @@ def decode_attributes(attrs_list: list[dict]) -> dict[str, Any]:
         if not is_any_value(value_obj):
             continue
         key = attr.get("key", "")
-        value = decode_any_value(value_obj)
-        if key in SPEC_STRING_ATTRS and not isinstance(value, str):
-            logger.warning(
-                "Dropping non-string value for string-typed attribute %s (got %s)",
-                key,
-                type(value).__name__,
-            )
-            continue
-        result[key] = value
+        keep, value = decode_attribute(key, value_obj)
+        if keep:
+            result[key] = value
     return result

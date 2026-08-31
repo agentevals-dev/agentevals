@@ -87,44 +87,30 @@ AGENTEVALS_SESSION_ID = "agentevals.session_id"
 AGENTEVALS_EVAL_SET_ID = "agentevals.eval_set_id"
 AGENTEVALS_SESSION_NAME = "agentevals.session_name"
 
-# Attributes the GenAI semconv (and our own agentevals.* namespace) define as
-# plain strings. The shared AnyValue decoder narrows these to str-or-absent so
-# a container value can never reach a dict-key position such as
-# ``StreamingTraceManager._active_session_for_name``.
+# Attributes the GenAI semconv types as arrays or structured values. These are
+# the only keys the shared AnyValue decoder returns as a native list or dict;
+# every other key is decoded to a scalar or dropped, which is what
+# ``extraction.py`` did before the decoder was shared.
 #
-# Hand-maintained on purpose: opentelemetry-semantic-conventions exposes only
-# constants and prose docstrings, so the value type of an attribute is not
-# machine-readable and this set cannot be derived from the package.
+# The set is an allowlist on purpose. A missing entry drops one value, matching
+# the pre-existing extraction behaviour; a denylist would instead let an
+# unhashable value reach a dict key or set member on an unauthenticated
+# receiver port, which crashes ingestion. See the discussion on #187.
 #
-# Attributes the spec types as arrays or structured values are deliberately
-# absent - gen_ai.response.finish_reasons, gen_ai.input/output.messages,
-# gen_ai.tool.definitions and gen_ai.system_instructions must keep their
-# decoded containers, which is the whole point of #173. Numeric attributes are
-# likewise absent; the decoder already returns them as int/float.
-SPEC_STRING_ATTRS: frozenset[str] = frozenset(
+# Hand-maintained: opentelemetry-semantic-conventions exposes constants and
+# prose docstrings only, so attribute value types are not machine-readable and
+# this set cannot be derived from the package.
+#
+# What should happen to container values on keys outside this set is not
+# settled; today they are dropped. Tracked in #208.
+SPEC_CONTAINER_ATTRS: frozenset[str] = frozenset(
     {
-        OTEL_SERVICE_NAME,
-        OTEL_SCOPE,
-        OTEL_SCOPE_VERSION,
-        OTEL_SCHEMA_URL,
-        OTEL_ERROR_TYPE,
-        OTEL_GENAI_OP,
-        OTEL_GENAI_AGENT_NAME,
-        OTEL_GENAI_AGENT_ID,
-        OTEL_GENAI_AGENT_DESCRIPTION,
-        OTEL_GENAI_REQUEST_MODEL,
-        OTEL_GENAI_RESPONSE_MODEL,
-        OTEL_GENAI_RESPONSE_ID,
-        OTEL_GENAI_PROVIDER_NAME,
-        OTEL_GENAI_SYSTEM,
-        OTEL_GENAI_CONVERSATION_ID,
-        OTEL_GENAI_TOOL_NAME,
-        OTEL_GENAI_TOOL_CALL_ID,
-        OTEL_GENAI_TOOL_TYPE,
-        OTEL_GENAI_TOOL_DESCRIPTION,
-        OTEL_GENAI_OUTPUT_TYPE,
-        AGENTEVALS_SESSION_ID,
-        AGENTEVALS_EVAL_SET_ID,
-        AGENTEVALS_SESSION_NAME,
+        OTEL_GENAI_RESPONSE_FINISH_REASONS,
+        OTEL_GENAI_INPUT_MESSAGES,
+        OTEL_GENAI_OUTPUT_MESSAGES,
+        OTEL_GENAI_TOOL_DEFINITIONS,
+        OTEL_GENAI_SYSTEM_INSTRUCTIONS,
+        OTEL_GENAI_TOOL_CALL_ARGUMENTS,
+        OTEL_GENAI_TOOL_CALL_RESULT,
     }
 )

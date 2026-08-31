@@ -301,7 +301,7 @@ class TestAnyValueAttributes:
     def test_kvlist_value(self):
         span = self._load_span_with(
             {
-                "key": "gen_ai.request.params",
+                "key": "gen_ai.tool.call.arguments",
                 "value": {
                     "kvlistValue": {
                         "values": [
@@ -312,7 +312,7 @@ class TestAnyValueAttributes:
                 },
             }
         )
-        assert span.tags["gen_ai.request.params"] == {"temperature": 0.7, "stream": False}
+        assert span.tags["gen_ai.tool.call.arguments"] == {"temperature": 0.7, "stream": False}
 
     def test_bytes_value(self):
         span = self._load_span_with({"key": "payload", "value": {"bytesValue": "AP9oaQ=="}})
