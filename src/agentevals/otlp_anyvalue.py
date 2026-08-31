@@ -6,14 +6,19 @@ OTLP encodes every attribute value, log body and nested element as an
 ``MessageToDict``) and OTLP/JSON payloads deliver that same dict shape, so
 every consumer needs identical decoding rules.
 
-This module is deliberately dependency-free: importing only the standard
-library lets ``extraction``, ``loader.otlp`` and ``api.otlp_processing`` all
-use it without creating an import cycle.
+This module depends only on the standard library and ``trace_attrs`` (a leaf
+constants module), so ``extraction``, ``loader.otlp`` and ``api.otlp_processing``
+can all use it without creating an import cycle.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+from .trace_attrs import SPEC_STRING_ATTRS
+
+logger = logging.getLogger(__name__)
 
 ANY_VALUE_FIELDS = (
     "stringValue",
@@ -71,10 +76,31 @@ def decode_attributes(attrs_list: list[dict]) -> dict[str, Any]:
 
     Entries whose value carries no ``AnyValue`` field are skipped, matching
     the behaviour every call site had before they shared this decoder.
+
+    Attributes listed in :data:`SPEC_STRING_ATTRS` are narrowed back to
+    str-or-absent. Decoding the full union means an attribute the spec types as
+    a string can now arrive as a list or dict, and several consumers use these
+    values as dict keys, where an unhashable value raises ``TypeError``.
+    Narrowing here rather than at each call site keeps the guarantee tied to
+    the spec rather than to whichever consumers we have already found.
+
+    A container in a string-typed slot is dropped rather than serialised: JSON
+    dumping it would put the literal blob back into user-visible output, which
+    is the symptom this decoder exists to remove.
     """
     result: dict[str, Any] = {}
     for attr in attrs_list:
         value_obj = attr.get("value", {})
-        if is_any_value(value_obj):
-            result[attr.get("key", "")] = decode_any_value(value_obj)
+        if not is_any_value(value_obj):
+            continue
+        key = attr.get("key", "")
+        value = decode_any_value(value_obj)
+        if key in SPEC_STRING_ATTRS and not isinstance(value, str):
+            logger.warning(
+                "Dropping non-string value for string-typed attribute %s (got %s)",
+                key,
+                type(value).__name__,
+            )
+            continue
+        result[key] = value
     return result

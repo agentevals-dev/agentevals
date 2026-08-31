@@ -17,6 +17,8 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from ..extraction import flatten_otlp_attributes
 from ..otlp_anyvalue import decode_any_value
 from ..trace_attrs import (
+    AGENTEVALS_EVAL_SET_ID,
+    AGENTEVALS_SESSION_NAME,
     OTEL_GENAI_CONVERSATION_ID,
     OTEL_GENAI_INPUT_MESSAGES,
     OTEL_GENAI_OUTPUT_MESSAGES,
@@ -30,9 +32,6 @@ if TYPE_CHECKING:
     from ..streaming.ws_server import StreamingTraceManager
 
 logger = logging.getLogger(__name__)
-
-AGENTEVALS_EVAL_SET_ID = "agentevals.eval_set_id"
-AGENTEVALS_SESSION_NAME = "agentevals.session_name"
 
 
 async def process_traces(body: dict, manager: StreamingTraceManager) -> None:
@@ -242,32 +241,18 @@ def _normalize_span(span_data: dict, scope_name: str, scope_version: str, schema
     return span
 
 
-def _extract_string_attribute(attrs_list: list[dict], key: str) -> str | None:
-    """Read one OTLP attribute, accepting ``stringValue`` only.
-
-    ``flatten_otlp_attributes`` used to guarantee a scalar or nothing. Now that
-    it goes through the shared ``AnyValue`` decoder it can also yield lists and
-    dicts, which are unhashable and would raise ``TypeError`` in the callers
-    that use these values as dict keys. Reading ``stringValue`` directly keeps
-    non-string values out instead of letting them reach that far.
-    """
-    for attr in attrs_list:
-        if attr.get("key") == key:
-            return attr.get("value", {}).get("stringValue")
-    return None
-
-
 def _extract_agentevals_metadata(resource_attrs: list[dict]) -> dict:
     """Extract agentevals-specific metadata from OTLP resource attributes.
 
-    ``eval_set_id`` and ``session_name`` are read with the string-only accessor
-    because both are used as dict keys downstream (``_active_session_for_name``)
-    or typed ``str | None`` on the session models.
+    ``eval_set_id`` and ``session_name`` are used as dict keys downstream
+    (``_active_session_for_name``) and typed ``str | None`` on the session
+    models. Both keys are in ``SPEC_STRING_ATTRS``, so the shared decoder has
+    already narrowed them to str-or-absent by the time they get here.
     """
     flat = flatten_otlp_attributes(resource_attrs)
     return {
-        "eval_set_id": _extract_string_attribute(resource_attrs, AGENTEVALS_EVAL_SET_ID),
-        "session_name": _extract_string_attribute(resource_attrs, AGENTEVALS_SESSION_NAME),
+        "eval_set_id": flat.get(AGENTEVALS_EVAL_SET_ID),
+        "session_name": flat.get(AGENTEVALS_SESSION_NAME),
         "service_name": flat.get("service.name"),
         "resource_attrs": flat,
     }
@@ -290,7 +275,10 @@ def _prescan_conversation_id(resource_span: dict) -> str | None:
 
 def _extract_conversation_id(attrs_list: list[dict]) -> str | None:
     """Extract gen_ai.conversation.id from OTLP span attributes."""
-    return _extract_string_attribute(attrs_list, OTEL_GENAI_CONVERSATION_ID)
+    for attr in attrs_list:
+        if attr.get("key") == OTEL_GENAI_CONVERSATION_ID:
+            return attr.get("value", {}).get("stringValue")
+    return None
 
 
 def _convert_otlp_log_record(log_record: dict) -> dict | None:

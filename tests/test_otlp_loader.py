@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from agentevals.extraction import extract_user_text_from_attrs
 from agentevals.loader.otlp import OtlpJsonLoader
 
 
@@ -375,6 +376,34 @@ class TestAnyValueAttributes:
             }
         )
         assert span.tags["gen_ai.input.messages"] == [{"role": "user", "content": "Hello"}]
+
+    def test_promoted_array_messages_reach_the_consumer(self):
+        """Past span.tags: a complex-array gen_ai.input.messages promoted out of
+        a span event must still yield the user text downstream, which is what a
+        consumer actually reads."""
+        span = self._load_span_with_event_attribute(
+            {
+                "key": "gen_ai.input.messages",
+                "value": {
+                    "arrayValue": {
+                        "values": [
+                            {
+                                "kvlistValue": {
+                                    "values": [
+                                        {"key": "role", "value": {"stringValue": "user"}},
+                                        {
+                                            "key": "content",
+                                            "value": {"stringValue": "What is the weather?"},
+                                        },
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                },
+            }
+        )
+        assert extract_user_text_from_attrs(span.tags) == "What is the weather?"
 
     def test_event_promotion_keeps_string_value(self):
         """The pre-existing stringValue path must keep working unchanged."""

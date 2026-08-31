@@ -261,17 +261,31 @@ class TestExtractMetadata:
         meta = _extract_agentevals_metadata(attrs)
         assert meta["eval_set_id"] is None
 
-    def test_non_string_values_still_reach_resource_attrs(self):
-        """Narrowing applies to the two key-like fields only; the decoded value
-        is still available in resource_attrs for anything that wants it."""
+    def test_non_string_values_are_dropped_from_resource_attrs(self):
+        """Narrowing happens in the decoder, so a container in a string-typed
+        slot never lands in resource_attrs either."""
         attrs = [
             {
                 "key": "agentevals.session_name",
                 "value": {"arrayValue": {"values": [{"stringValue": "run-42"}]}},
+            },
+            _make_otlp_attr("service.name", "test-agent"),
+        ]
+        meta = _extract_agentevals_metadata(attrs)
+        assert "agentevals.session_name" not in meta["resource_attrs"]
+        assert meta["resource_attrs"]["service.name"] == "test-agent"
+
+    def test_spec_array_attributes_keep_their_container(self):
+        """The narrowing must not touch attributes the spec types as arrays -
+        that is what #173 fixes."""
+        attrs = [
+            {
+                "key": "gen_ai.response.finish_reasons",
+                "value": {"arrayValue": {"values": [{"stringValue": "stop"}]}},
             }
         ]
         meta = _extract_agentevals_metadata(attrs)
-        assert meta["resource_attrs"]["agentevals.session_name"] == ["run-42"]
+        assert meta["resource_attrs"]["gen_ai.response.finish_reasons"] == ["stop"]
 
 
 # ---------------------------------------------------------------------------

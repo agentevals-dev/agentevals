@@ -447,6 +447,58 @@ class TestFlattenOtlpAttributes:
         )
         assert result == {"gen_ai.tool.calls": [{"name": "get_weather"}]}
 
+    def test_finish_reasons_survive_to_extracted_model_info(self):
+        """The symptom #173 names: gen_ai.response.finish_reasons reaching the
+        consumer as ["stop"] rather than a literal blob or nothing.
+
+        Asserting through extract_extended_model_info_from_attrs rather than at
+        the decoder keeps the whole path covered - decoding it correctly is not
+        the same as it arriving correctly.
+        """
+        attrs = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {"arrayValue": {"values": [{"stringValue": "stop"}]}},
+                },
+                {"key": "gen_ai.response.model", "value": {"stringValue": "claude-opus-5"}},
+            ]
+        )
+        info = extract_extended_model_info_from_attrs(attrs)
+        assert info["finish_reasons"] == ["stop"]
+        assert info["response_model"] == "claude-opus-5"
+
+    def test_multiple_finish_reasons_survive(self):
+        attrs = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {"arrayValue": {"values": [{"stringValue": "stop"}, {"stringValue": "length"}]}},
+                }
+            ]
+        )
+        assert extract_extended_model_info_from_attrs(attrs)["finish_reasons"] == [
+            "stop",
+            "length",
+        ]
+
+    def test_string_typed_attribute_drops_container_value(self):
+        """gen_ai.response.model is typed as a string by the spec; a container
+        in that slot is dropped rather than carried into consumers."""
+        attrs = flatten_otlp_attributes(
+            [
+                {
+                    "key": "gen_ai.response.model",
+                    "value": {"arrayValue": {"values": [{"stringValue": "claude-opus-5"}]}},
+                },
+                {"key": "gen_ai.request.model", "value": {"stringValue": "claude-sonnet-5"}},
+            ]
+        )
+        assert "gen_ai.response.model" not in attrs
+        info = extract_extended_model_info_from_attrs(attrs)
+        assert info["response_model"] is None
+        assert info["request_model"] == "claude-sonnet-5"
+
     def test_bytes_value(self):
         """MessageToDict base64-encodes bytes fields, so the decoder sees a str."""
         result = flatten_otlp_attributes([{"key": "payload", "value": {"bytesValue": "AP9oaQ=="}}])
