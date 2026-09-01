@@ -9,13 +9,17 @@ DOCKER_IMAGE_REF := $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY:%/=%)/$(DOCKER_IMA
 # Multi-arch build (requires docker buildx). Manifest lists must be pushed — use build-docker-local for a single-arch --load.
 PLATFORMS ?= linux/amd64,linux/arm64
 
+# LOCAL_VERSION falls back to a stub so build-docker-local works without uv or git history.
+LOCAL_VERSION ?= $(if $(VERSION),$(VERSION),0.0.0.dev0)
+LOCAL_TAG ?= local
+
 HELM_REPO ?= oci://ghcr.io/agentevals-dev/agentevals
 HELM_DIST_FOLDER ?= dist/helm
 HELM_CHART_DIR ?= charts/agentevals
 HELM_CHART_OCI_URL ?= $(HELM_REPO)/helm
 HELM_CHART_VERSION ?= $(VERSION)
 
-.PHONY: build build-bundle build-docker build-ui release clean dev-backend dev-backend-pg dev-frontend dev-bundle pg-up pg-down migrate test test-unit test-integration test-e2e helm-lint helm-template helm-test helm-cleanup helm-package helm-publish
+.PHONY: build build-bundle build-docker build-docker-local build-ui release clean dev-backend dev-backend-pg dev-frontend dev-bundle pg-up pg-down migrate test test-unit test-integration test-e2e helm-lint helm-template helm-test helm-cleanup helm-package helm-publish
 
 PG_CONTAINER ?= agentevals-pg
 PG_PORT      ?= 5432
@@ -30,6 +34,9 @@ build:
 build-docker:
 	@test -n "$(VERSION)" || { echo "ERROR: VERSION is empty. Pass VERSION=x.y.z explicitly, or install uv so hatch-vcs can resolve it."; exit 1; }
 	docker buildx build --platform $(PLATFORMS) --build-arg VERSION=$(VERSION) -t $(DOCKER_IMAGE_REF):$(DOCKER_TAG) --push .
+
+build-docker-local:
+	docker buildx build --build-arg VERSION=$(LOCAL_VERSION) -t $(DOCKER_IMAGE_REF):$(LOCAL_TAG) --load .
 
 build-ui:
 	cd ui && npm ci && npm run build

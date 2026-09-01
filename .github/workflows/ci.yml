@@ -59,6 +59,59 @@ jobs:
       - name: Build UI
         run: make build-ui
 
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      IMAGE_REF: agentevals:ci
+      IMAGE_VERSION: 0.0.0.dev0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      # The release workflow is the only other place this Dockerfile gets built, and it
+      # runs after the GitHub release is already published. Build it here so a break
+      # lands on the PR instead of halfway through a release.
+      # Single-arch keeps it native; the multi-arch build stays release-only because
+      # emulating arm64 through the node and uv layers is an order of magnitude slower.
+      - name: Build image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: VERSION=${{ env.IMAGE_VERSION }}
+          tags: ${{ env.IMAGE_REF }}
+          push: false
+          load: true
+          cache-from: type=gha
+          # Pull requests read main's layers but never write, so a branch cannot grow
+          # or displace the cache the other jobs share.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max' || '' }}
+
+      - name: Smoke test
+        run: |
+          docker run -d --name agentevals-ci -p 127.0.0.1:8001:8001 "$IMAGE_REF"
+          for _ in $(seq 1 30); do
+            if curl -fsS --max-time 3 http://127.0.0.1:8001/api/health -o "$RUNNER_TEMP/health.json"; then
+              break
+            fi
+            sleep 2
+          done
+          test -s "$RUNNER_TEMP/health.json" || { echo "server never became healthy"; exit 1; }
+          cat "$RUNNER_TEMP/health.json"
+          grep -q '"status":"ok"' "$RUNNER_TEMP/health.json"
+          # Proves the SETUPTOOLS_SCM_PRETEND_VERSION path still resolves; a silent
+          # break there would ship a mis-versioned image.
+          grep -q "\"version\":\"$IMAGE_VERSION\"" "$RUNNER_TEMP/health.json"
+          curl -fsS http://127.0.0.1:8001/ | grep -q '<div id="root">'
+          test "$(docker exec agentevals-ci id -u)" = "1000"
+
+      - name: Container logs
+        if: failure()
+        run: docker logs agentevals-ci
+
   test:
     runs-on: ubuntu-latest
     strategy:
