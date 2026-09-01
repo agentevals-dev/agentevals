@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:25-bookworm-slim AS ui
+FROM node:26-bookworm-slim AS ui
 WORKDIR /build/ui
 COPY ui/package.json ui/package-lock.json ./
 # Skip lifecycle scripts during ci, then rebuild esbuild in its own layer — avoids ETXTBSY when
