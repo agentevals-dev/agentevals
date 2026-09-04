@@ -703,7 +703,7 @@ class TestAdkExtractorSpanFinding:
         ext = AdkExtractor()
         assert ext.find_llm_spans_in(root) == []
 
-    def test_find_llm_spans_in_prefers_call_llm_over_generate_content(self):
+    def test_find_llm_spans_in_prefers_call_llm_spans(self):
         call_llm = _span(op="call_llm gemini", span_id="llm1", start_time=20)
         generate_content = _span(
             op="generate_content gemini",
@@ -713,7 +713,33 @@ class TestAdkExtractorSpanFinding:
         )
         root = _span(op="invoke_agent a", children=[generate_content, call_llm])
         ext = AdkExtractor()
+        # When call_llm spans are present they are preferred (matching the
+        # pre-existing behaviour); generate_content spans are a fallback only.
         assert [s.span_id for s in ext.find_llm_spans_in(root)] == ["llm1"]
+
+    def test_find_llm_spans_in_falls_back_to_generate_content(self):
+        generate_content = _span(
+            op="generate_content gemini",
+            tags={ADK_LLM_REQUEST: "{}"},
+            span_id="llm2",
+            start_time=10,
+        )
+        root = _span(op="invoke_agent a", children=[generate_content])
+        ext = AdkExtractor()
+        assert [s.span_id for s in ext.find_llm_spans_in(root)] == ["llm2"]
+
+    def test_find_llm_spans_in_skips_nested_invoke_agent(self):
+        # A coordinator delegates to a sub-agent: the sub-agent's invoke_agent
+        # span nests under the coordinator's, but its LLM spans belong to the
+        # sub-agent invocation and must not be double-counted on the coordinator.
+        sub_llm = _span(op="call_llm gemini", span_id="sub_llm", start_time=10)
+        nested_invoke = _span(
+            op="invoke_agent sub_agent", span_id="sub_invoke", children=[sub_llm]
+        )
+        own_llm = _span(op="call_llm gemini", span_id="own_llm", start_time=20)
+        root = _span(op="invoke_agent coordinator", children=[own_llm, nested_invoke])
+        ext = AdkExtractor()
+        assert [s.span_id for s in ext.find_llm_spans_in(root)] == ["own_llm"]
 
     def test_find_tool_spans_in(self):
         child_llm = _span(op="call_llm gemini", span_id="llm1")
