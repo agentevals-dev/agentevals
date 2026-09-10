@@ -1,5 +1,10 @@
 # syntax=docker/dockerfile:1
 
+ARG BASE_IMAGE_REGISTRY=cgr.dev
+ARG UV_VERSION=0.12.11
+
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
+
 FROM node:26-bookworm-slim AS ui
 WORKDIR /build/ui
 COPY ui/package.json ui/package-lock.json ./
@@ -10,13 +15,19 @@ RUN npm rebuild esbuild
 COPY ui/ ./
 RUN npm run build
 
-FROM python:3.14-slim-bookworm
+FROM ${BASE_IMAGE_REGISTRY}/chainguard/wolfi-base:latest
+
+ARG PYTHON_VERSION=3.14
+# Shared libraries the compiled wheels in the venv link against (scikit-learn and
+# tokenizers need libstdc++); tzdata backs zoneinfo lookups.
+RUN apk add --no-cache python-${PYTHON_VERSION} ca-certificates libstdc++ \
+        zlib libffi sqlite-libs bzip2 xz tzdata
 
 WORKDIR /app
 
 # Install uv binary only (no pip); same approach as astral-sh/uv's Dockerfile.
 # https://github.com/astral-sh/uv/blob/6d889fd53d5c108d304c5a4085eb3140ec6a9cdb/Dockerfile#L21
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=uv-bin /uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock README.md ./
 COPY packages ./packages
@@ -31,15 +42,10 @@ COPY --from=ui /build/ui/dist ./src/agentevals/_static
 ARG VERSION
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION}
 
-RUN uv sync --frozen --no-dev --extra live --extra postgres --extra kubernetes \
-    # The runtime only uses the uv-managed venv; drop the base image's bundled
-    # pip so its vendored packages (msgpack, pkg_resources) don't ship unused.
-    && rm -rf /usr/local/lib/python*/site-packages/pip \
-              /usr/local/lib/python*/site-packages/pip-*.dist-info \
-              /usr/local/bin/pip* \
-    && ! /usr/local/bin/python -c "import pip" 2>/dev/null \
-    && groupadd --gid 1000 app \
-    && useradd --uid 1000 --gid app --home-dir /app --no-log-init app \
+RUN UV_PYTHON_PREFERENCE=only-system \
+    uv sync --frozen --no-dev --extra live --extra postgres --extra kubernetes \
+    && addgroup -g 1000 app \
+    && adduser -u 1000 -G app -h /app -D -H app \
     && chown -R app:app /app
 
 USER app
