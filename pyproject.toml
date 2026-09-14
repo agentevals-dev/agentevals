@@ -35,7 +35,7 @@ dependencies = [
 
 [project.optional-dependencies]
 live = [
-    "mcp>=1.28.1,<2",
+    "mcp>=1.28.1,<3",
     "httpx>=0.27.0",
     "pyjwt>=2.13.0",
     "pydantic-settings>=2.15.0",
