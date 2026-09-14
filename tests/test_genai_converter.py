@@ -616,7 +616,7 @@ class TestDeduplicateInvocations:
             self._make_invocation("Q2", "A2"),
             self._make_invocation("Q3", "A3"),
         ]
-        result = _deduplicate_invocations(invocations)
+        result, _ = _deduplicate_invocations(invocations)
         assert len(result) == 3
 
     def test_dedup_keeps_last_duplicate(self):
@@ -624,7 +624,7 @@ class TestDeduplicateInvocations:
             self._make_invocation("Roll a die", "tool_call"),
             self._make_invocation("Roll a die", "I rolled a 3!"),
         ]
-        result = _deduplicate_invocations(invocations)
+        result, _ = _deduplicate_invocations(invocations)
         assert len(result) == 1
         assert result[0].final_response.parts[0].text == "I rolled a 3!"
 
@@ -635,18 +635,44 @@ class TestDeduplicateInvocations:
             self._make_invocation("Q2", "A2-intermediate"),
             self._make_invocation("Q2", "A2-final"),
         ]
-        result = _deduplicate_invocations(invocations)
+        result, _ = _deduplicate_invocations(invocations)
         assert len(result) == 2
         assert result[0].final_response.parts[0].text == "A1-final"
         assert result[1].final_response.parts[0].text == "A2-final"
 
+    def test_dedup_merges_dropped_spans_into_survivor(self):
+        """Dropped duplicate invocations keep their LLM spans (real spend)."""
+        invocations = [
+            self._make_invocation("Roll a die", "tool_call"),
+            self._make_invocation("Roll a die", "I rolled a 3!"),
+        ]
+        spans = [
+            [_make_genai_llm_span("s1", model="m", input_tokens=50, output_tokens=5)],
+            [_make_genai_llm_span("s2", model="m", input_tokens=100, output_tokens=10)],
+        ]
+        deduped, merged = _deduplicate_invocations(invocations, spans)
+        assert len(deduped) == 1
+        assert deduped[0].final_response.parts[0].text == "I rolled a 3!"
+        # The dropped invocation's span (s1) is merged into the survivor (s2),
+        # so the tool-call spend is not discarded.
+        assert [s.span_id for s in merged[0]] == ["s2", "s1"]
+
+    def test_dedup_no_spans_returns_none_second(self):
+        invocations = [
+            self._make_invocation("Roll a die", "tool_call"),
+            self._make_invocation("Roll a die", "I rolled a 3!"),
+        ]
+        deduped, merged = _deduplicate_invocations(invocations)
+        assert len(deduped) == 1
+        assert merged is None
+
     def test_single_invocation_no_change(self):
         invocations = [self._make_invocation("Q1", "A1")]
-        result = _deduplicate_invocations(invocations)
+        result, _ = _deduplicate_invocations(invocations)
         assert len(result) == 1
 
     def test_empty_list(self):
-        result = _deduplicate_invocations([])
+        result, _ = _deduplicate_invocations([])
         assert result == []
 
 
