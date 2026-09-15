@@ -33,6 +33,12 @@ updates:
     cooldown:
       default-days: 5
       semver-major-days: 14
+    ignore:
+      # mcp 2.x renamed FastMCP to MCPServer and dropped host/port from the
+      # constructor, which breaks mcp_server.py and the shipped image. Bump by
+      # hand alongside the migration.
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
     groups:
       python-google-ai:
         applies-to: version-updates
