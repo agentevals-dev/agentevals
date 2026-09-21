@@ -10,10 +10,16 @@ import logging
 from typing import TYPE_CHECKING
 
 from google.protobuf.json_format import MessageToDict
-from opentelemetry.proto.collector.logs.v1 import logs_service_pb2, logs_service_pb2_grpc
-from opentelemetry.proto.collector.trace.v1 import trace_service_pb2, trace_service_pb2_grpc
+from opentelemetry.proto.collector.logs.v1 import logs_service_pb2_grpc
+from opentelemetry.proto.collector.trace.v1 import trace_service_pb2_grpc
 
-from .otlp_processing import fix_protobuf_id_fields, process_logs, process_traces
+from .otlp_processing import (
+    build_logs_response,
+    build_traces_response,
+    fix_protobuf_id_fields,
+    process_logs,
+    process_traces,
+)
 
 if TYPE_CHECKING:
     from grpc import aio
@@ -36,8 +42,7 @@ class OtlpTraceService(trace_service_pb2_grpc.TraceServiceServicer):
     async def Export(self, request, context):  # noqa: N802 (gRPC method name)
         body = MessageToDict(request, preserving_proto_field_name=False)
         fix_protobuf_id_fields(body)
-        await process_traces(body, self._manager)
-        return trace_service_pb2.ExportTraceServiceResponse()
+        return build_traces_response(await process_traces(body, self._manager))
 
 
 class OtlpLogsService(logs_service_pb2_grpc.LogsServiceServicer):
@@ -49,8 +54,7 @@ class OtlpLogsService(logs_service_pb2_grpc.LogsServiceServicer):
     async def Export(self, request, context):  # noqa: N802 (gRPC method name)
         body = MessageToDict(request, preserving_proto_field_name=False)
         fix_protobuf_id_fields(body)
-        await process_logs(body, self._manager)
-        return logs_service_pb2.ExportLogsServiceResponse()
+        return build_logs_response(await process_logs(body, self._manager))
 
 
 def create_otlp_grpc_server(

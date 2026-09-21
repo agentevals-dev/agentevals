@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
+from .otlp_http import register_otlp_exception_handlers
 from .otlp_routes import otlp_router
 
 if TYPE_CHECKING:
@@ -21,6 +22,9 @@ def create_otlp_app(*, trace_manager: StreamingTraceManager | None = None) -> Fa
     if trace_manager is not None:
         app.state.trace_manager = trace_manager
     app.include_router(otlp_router)
+    # Scoped to this app: `require_trace_manager` is shared with the main API,
+    # which must keep its own error body shape.
+    register_otlp_exception_handlers(app)
     return app
 
 

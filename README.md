@@ -180,7 +180,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 ```
 
-Traces stream to the UI in real-time. Works with LangChain, Strands, Google ADK, OpenAI Agents SDK, or any framework that emits OTel spans (`http/protobuf`, `http/json`, and OTLP/gRPC supported). Sessions are auto-created and grouped by `agentevals.session_name`. Set `agentevals.eval_set_id` to associate traces with an eval set.
+Traces stream to the UI in real-time. Works with LangChain, Strands, Google ADK, OpenAI Agents SDK, or any framework that emits OTel spans (`http/protobuf`, `http/json`, and OTLP/gRPC supported; gzip request compression supported). Sessions are auto-created and grouped by `agentevals.session_name`. Set `agentevals.eval_set_id` to associate traces with an eval set.
 
 See [examples/zero-code-examples/](examples/zero-code-examples/) for working examples.
 
@@ -399,7 +399,7 @@ Yes. A custom evaluator is any program that reads JSON from stdin and writes a s
 
 **Can I plug agentevals into an existing OTel pipeline?**
 
-Yes. The OTLP receiver on port 4318 accepts standard `http/protobuf` and `http/json` trace exports, so it slots into any OpenTelemetry pipeline as just another exporter destination. If your pipeline uses gRPC (port 4317), place an [OTel Collector](https://opentelemetry.io/docs/collector/) in front to bridge gRPC to HTTP. The [Kubernetes example](examples/kubernetes/README.md) shows this pattern.
+Yes. The OTLP receiver on port 4318 accepts standard `http/protobuf` and `http/json` trace exports, including gzip-compressed request bodies — so a default-configured OTel Collector works without setting `compression: none`. It slots into any OpenTelemetry pipeline as just another exporter destination. If your pipeline uses gRPC (port 4317), place an [OTel Collector](https://opentelemetry.io/docs/collector/) in front to bridge gRPC to HTTP. The [Kubernetes example](examples/kubernetes/README.md) shows this pattern.
 
 **Can I use agentevals to evaluate Claude Code, Codex, or OpenCode?**
 

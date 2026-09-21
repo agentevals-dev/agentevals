@@ -27,7 +27,7 @@ from agentevals.api.otlp_processing import (
     process_traces,
 )
 from agentevals.cli import _install_shared_exit_handler
-from agentevals.streaming.session import TraceSession
+from agentevals.streaming.session import MAX_LOGS_PER_SESSION, MAX_SPANS_PER_SESSION, TraceSession
 from agentevals.streaming.ws_server import StreamingTraceManager
 
 
@@ -1821,6 +1821,142 @@ class TestProtobufJsonParity:
             attr_map = {a["key"]: a["value"] for a in stored_span["attributes"]}
             assert attr_map["otel.scope.name"]["stringValue"] == "strands.agent"
             assert attr_map["otel.scope.version"]["stringValue"] == "2.0.0"
+            _cancel_timers(mgr)
+
+        _run(go())
+
+
+def _make_log_request(records: list[dict]) -> dict:
+    return {"resourceLogs": [{"resource": {"attributes": []}, "scopeLogs": [{"logRecords": records}]}]}
+
+
+def _make_genai_log_record(trace_id: str, event_name: str = "gen_ai.user.message") -> dict:
+    return {
+        "eventName": event_name,
+        "traceId": trace_id,
+        "observedTimeUnixNano": "1500000000",
+        "body": {"stringValue": "hello"},
+        "attributes": [],
+    }
+
+
+class TestExportResultCounts:
+    """process_* must report drops so OTLP clients can see partial success."""
+
+    def test_full_success_reports_nothing_rejected(self):
+        async def go():
+            mgr = _make_mgr()
+            body = _make_export_request([_make_span()], resource_attrs=_make_resource_attrs(session_name="counts-ok"))
+
+            result = await process_traces(body, mgr)
+
+            assert result.accepted == 1
+            assert result.rejected == 0
+            assert result.error_message == ""
+            _cancel_timers(mgr)
+
+        _run(go())
+
+    def test_span_limit_is_counted_as_rejected(self):
+        async def go():
+            mgr = _make_mgr()
+            attrs = _make_resource_attrs(session_name="counts-span-limit")
+            await process_traces(_make_export_request([_make_span()], resource_attrs=attrs), mgr)
+
+            session = mgr.sessions["counts-span-limit"]
+            session.spans.extend([{}] * MAX_SPANS_PER_SESSION)
+
+            result = await process_traces(
+                _make_export_request([_make_span(span_id="span2")], resource_attrs=attrs), mgr
+            )
+
+            assert result.accepted == 0
+            assert result.rejected == 1
+            assert "maximum span limit" in result.error_message
+            _cancel_timers(mgr)
+
+        _run(go())
+
+    def test_span_without_trace_id_is_counted_as_rejected(self):
+        async def go():
+            mgr = _make_mgr()
+            body = _make_export_request([_make_span(trace_id="")], resource_attrs=_make_resource_attrs())
+
+            result = await process_traces(body, mgr)
+
+            assert result.accepted == 0
+            assert result.rejected == 1
+            assert "trace_id" in result.error_message
+            _cancel_timers(mgr)
+
+        _run(go())
+
+    def test_log_limit_is_counted_as_rejected(self):
+        async def go():
+            mgr = _make_mgr()
+            meta = {"eval_set_id": None, "session_name": "counts-log-limit", "resource_attrs": {}}
+            session = await mgr.get_or_create_otlp_session(TRACE_ID_HEX, meta)
+            session.logs.extend([{}] * MAX_LOGS_PER_SESSION)
+
+            result = await process_logs(_make_log_request([_make_genai_log_record(TRACE_ID_HEX)]), mgr)
+
+            assert result.rejected == 1
+            assert "maximum log limit" in result.error_message
+            _cancel_timers(mgr)
+
+        _run(go())
+
+    def test_filtered_non_genai_logs_are_not_counted_as_rejected(self):
+        """Records the receiver filters by design are not rejections."""
+
+        async def go():
+            mgr = _make_mgr()
+            meta = {"eval_set_id": None, "session_name": "counts-filter", "resource_attrs": {}}
+            await mgr.get_or_create_otlp_session(TRACE_ID_HEX, meta)
+
+            result = await process_logs(
+                _make_log_request([_make_genai_log_record(TRACE_ID_HEX, event_name="http.server.request")]), mgr
+            )
+
+            assert result.rejected == 0
+            assert result.error_message == ""
+            _cancel_timers(mgr)
+
+        _run(go())
+
+
+class TestGrpcPartialSuccess:
+    """The gRPC receiver shares process_* and must report drops the same way."""
+
+    def test_trace_export_reports_rejected_spans(self):
+        async def go():
+            mgr = _make_mgr()
+            service = OtlpTraceService(mgr)
+            attrs = [KeyValue(key="agentevals.session_name", value=AnyValue(string_value="grpc-limit"))]
+
+            await service.Export(_make_pb_export_request([_make_pb_span()], resource_attrs=attrs), None)
+            mgr.sessions["grpc-limit"].spans.extend([{}] * MAX_SPANS_PER_SESSION)
+
+            response = await service.Export(
+                _make_pb_export_request([_make_pb_span(span_id_hex="3132333435363738")], resource_attrs=attrs),
+                None,
+            )
+
+            assert response.partial_success.rejected_spans == 1
+            assert response.partial_success.error_message
+            _cancel_timers(mgr)
+
+        _run(go())
+
+    def test_trace_export_full_success_leaves_partial_success_unset(self):
+        async def go():
+            mgr = _make_mgr()
+            service = OtlpTraceService(mgr)
+            attrs = [KeyValue(key="agentevals.session_name", value=AnyValue(string_value="grpc-ok"))]
+
+            response = await service.Export(_make_pb_export_request([_make_pb_span()], resource_attrs=attrs), None)
+
+            assert not response.HasField("partial_success")
             _cancel_timers(mgr)
 
         _run(go())

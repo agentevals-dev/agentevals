@@ -39,13 +39,11 @@ async def trace_manager():
 @pytest.fixture
 async def otlp_client(trace_manager):
     """httpx client → OTLP app via ASGI transport (no real server)."""
-    from fastapi import FastAPI
+    from agentevals.api.otlp_app import create_otlp_app
 
-    from agentevals.api.otlp_routes import otlp_router
-
-    test_app = FastAPI()
-    test_app.state.trace_manager = trace_manager
-    test_app.include_router(otlp_router)
+    # Use the real factory so tests exercise the same app wiring the CLI serves,
+    # including the OTLP exception handlers.
+    test_app = create_otlp_app(trace_manager=trace_manager)
 
     transport = httpx.ASGITransport(app=test_app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
