@@ -483,16 +483,22 @@ def find_adk_llm_spans_in(root: Span) -> list[Span]:
         elif is_adk_generate_content_llm_span(span):
             generate_content_spans.append(span)
 
-    _walk_descendants(root, collect)
+    _walk_descendants(root, collect, skip_invoke_agents=True)
     call_llm_spans.sort(key=lambda s: s.start_time)
     generate_content_spans.sort(key=lambda s: s.start_time)
     return call_llm_spans or generate_content_spans
 
 
-def _walk_descendants(span: Span, visit) -> None:
+def _walk_descendants(span: Span, visit, skip_invoke_agents: bool = False) -> None:
     for child in span.children:
+        # When collecting the LLM spans that belong to one invocation, a nested
+        # invoke_agent span is a separate invocation: its subtree's LLM spans are
+        # attributed to that child invocation, so walking into it here would
+        # double-count them.
+        if skip_invoke_agents and child.operation_name.startswith("invoke_agent"):
+            continue
         visit(child)
-        _walk_descendants(child, visit)
+        _walk_descendants(child, visit, skip_invoke_agents=skip_invoke_agents)
 
 
 def is_llm_span(span: Span) -> bool:

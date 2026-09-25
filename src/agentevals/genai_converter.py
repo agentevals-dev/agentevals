@@ -93,8 +93,20 @@ def convert_genai_trace(trace: Trace) -> ConversionResult:
                 logger.debug(f"Multi-turn conversation: {len(llm_root_spans)} LLM spans")
                 try:
                     turns = _extract_multiturn_turns(llm_root_spans)
-                    for turn in turns:
+                    if len(turns) == len(llm_root_spans):
+                        # One turn per conversation span: attribute each turn to
+                        # its own span so per-invocation token counts are honest.
+                        per_turn_spans = [[span] for span in llm_root_spans]
+                    else:
+                        # Turns are derived from messages inside the same set of
+                        # conversation spans, so per-turn span attribution is not
+                        # possible at span granularity. Attribute every span to
+                        # the first turn (keeping the session total honest) and
+                        # leave the remaining turns empty to avoid double counting.
+                        per_turn_spans = [list(llm_root_spans)] + [[] for _ in turns[1:]]
+                    for turn, turn_spans in zip(turns, per_turn_spans, strict=True):
                         result.invocations.append(_turn_to_invocation(turn))
+                        result.invocation_llm_spans.append(turn_spans)
                 except Exception as exc:
                     msg = f"Trace {trace.trace_id}: failed to convert multi-turn conversation: {exc}"
                     logger.warning(msg)
@@ -110,14 +122,17 @@ def convert_genai_trace(trace: Trace) -> ConversionResult:
 
     for inv_span in invocation_spans:
         try:
-            turn = _extract_single_turn(inv_span)
+            turn, llm_spans = _extract_single_turn(inv_span)
             result.invocations.append(_turn_to_invocation(turn))
+            result.invocation_llm_spans.append(llm_spans)
         except Exception as exc:
             msg = f"Failed to convert span {inv_span.span_id}: {exc}"
             logger.warning(msg)
             result.warnings.append(msg)
 
-    result.invocations = _deduplicate_invocations(result.invocations)
+    result.invocations, result.invocation_llm_spans = _deduplicate_invocations(
+        result.invocations, result.invocation_llm_spans
+    )
     return result
 
 
@@ -158,7 +173,7 @@ def _find_genai_invocation_spans(trace: Trace) -> list[Span]:
     return candidates
 
 
-def _extract_single_turn(inv_span: Span) -> _ConversationTurn:
+def _extract_single_turn(inv_span: Span) -> tuple[_ConversationTurn, list[Span]]:
     llm_spans = _find_llm_spans(inv_span)
 
     logger.debug(f"Converting invocation span: {inv_span.operation_name}")
@@ -177,7 +192,7 @@ def _extract_single_turn(inv_span: Span) -> _ConversationTurn:
     assistant_text = _extract_assistant_text(llm_spans[-1])
     tool_calls, tool_responses = _extract_tool_calls(tool_spans, llm_spans)
 
-    return _ConversationTurn(
+    turn = _ConversationTurn(
         invocation_id=f"genai-{inv_span.span_id}",
         user_text=user_text,
         assistant_text=assistant_text,
@@ -185,6 +200,8 @@ def _extract_single_turn(inv_span: Span) -> _ConversationTurn:
         tool_responses=tool_responses,
         start_time=float(inv_span.start_time),
     )
+
+    return turn, llm_spans
 
 
 def _extract_multiturn_turns(llm_spans: list[Span]) -> list[_ConversationTurn]:
@@ -254,7 +271,10 @@ def _extract_multiturn_turns(llm_spans: list[Span]) -> list[_ConversationTurn]:
     return turns
 
 
-def _deduplicate_invocations(invocations: list[Invocation]) -> list[Invocation]:
+def _deduplicate_invocations(
+    invocations: list[Invocation],
+    llm_spans: list[list[Span]] | None = None,
+) -> tuple[list[Invocation], list[list[Span]] | None]:
     """Deduplicate invocations with the same user text, keeping the best one.
 
     The OpenAI instrumentor creates separate LLM calls for tool-use loops within
@@ -262,9 +282,16 @@ def _deduplicate_invocations(invocations: list[Invocation]) -> list[Invocation]:
     multiple spans produce invocations with the same user text. We keep the last
     one per unique user text — it has the final response (not the intermediate
     tool-call-only response).
+
+    When ``llm_spans`` is provided it is filtered in lockstep with the
+    invocations so the per-invocation span mapping stays aligned, and the
+    dropped invocations' spans are merged into the surviving invocation for the
+    same user text so real token spend is not discarded.
+
+    Always returns the ``(invocations, llm_spans)`` tuple.
     """
     if len(invocations) <= 1:
-        return invocations
+        return invocations, llm_spans
 
     def _user_text(inv: Invocation) -> str:
         if inv.user_content and inv.user_content.parts:
@@ -281,10 +308,29 @@ def _deduplicate_invocations(invocations: list[Invocation]) -> list[Invocation]:
             seen[text] = i
 
     if len(seen) + len(always_keep) == len(invocations):
-        return invocations
+        return invocations, llm_spans
 
     keep = always_keep | set(seen.values())
-    return [inv for i, inv in enumerate(invocations) if i in keep]
+    deduped = [inv for i, inv in enumerate(invocations) if i in keep]
+
+    if llm_spans is None:
+        return deduped, None
+
+    kept_positions = [i for i in range(len(invocations)) if i in keep]
+    position_of_kept = {i: pos for pos, i in enumerate(kept_positions)}
+    merged: list[list[Span]] = [
+        list(llm_spans[i]) if i < len(llm_spans) and llm_spans[i] else [] for i in kept_positions
+    ]
+    for i, inv in enumerate(invocations):
+        if i in keep or i >= len(llm_spans) or not llm_spans[i]:
+            continue
+        text = _user_text(inv)
+        if not text.strip():
+            continue
+        survivor = seen.get(text)
+        if survivor is not None:
+            merged[position_of_kept[survivor]].extend(llm_spans[i])
+    return deduped, merged
 
 
 def _turn_to_invocation(turn: _ConversationTurn) -> Invocation:
