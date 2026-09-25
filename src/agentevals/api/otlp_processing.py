@@ -4,18 +4,26 @@ from __future__ import annotations
 
 import base64
 import logging
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from google.protobuf.json_format import MessageToDict
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest as LogsServiceRequestPB,
 )
+from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
+    ExportLogsServiceResponse as LogsServiceResponsePB,
+)
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest as TraceServiceRequestPB,
+)
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceResponse as TraceServiceResponsePB,
 )
 
 from ..extraction import flatten_otlp_attributes
 from ..otlp_anyvalue import decode_any_value
+from ..streaming.session import MAX_LOGS_PER_SESSION, MAX_SPANS_PER_SESSION
 from ..trace_attrs import (
     AGENTEVALS_EVAL_SET_ID,
     AGENTEVALS_SESSION_NAME,
@@ -34,8 +42,37 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def process_traces(body: dict, manager: StreamingTraceManager) -> None:
+@dataclass
+class ExportResult:
+    """Outcome of ingesting one Export<signal>ServiceRequest.
+
+    ``rejected`` is what OTLP requires the receiver to report back in the
+    response's ``partial_success`` field; ``accepted`` exists for logging and
+    tests. Reasons are accumulated so one English ``error_message`` can name
+    every cause of rejection.
+    """
+
+    accepted: int = 0
+    rejected: int = 0
+    rejected_reasons: dict[str, int] = field(default_factory=dict)
+
+    def accept(self) -> None:
+        self.accepted += 1
+
+    def reject(self, reason: str) -> None:
+        self.rejected += 1
+        self.rejected_reasons[reason] = self.rejected_reasons.get(reason, 0) + 1
+
+    @property
+    def error_message(self) -> str:
+        """Human-readable English summary of what was rejected and why."""
+        return "; ".join(f"{count} {reason}" for reason, count in self.rejected_reasons.items())
+
+
+async def process_traces(body: dict, manager: StreamingTraceManager) -> ExportResult:
     """Parse ExportTraceServiceRequest and feed spans to the pipeline."""
+    result = ExportResult()
+
     for resource_span in body.get("resourceSpans", []):
         resource_attrs = resource_span.get("resource", {}).get("attributes", [])
         metadata = _extract_agentevals_metadata(resource_attrs)
@@ -55,6 +92,7 @@ async def process_traces(body: dict, manager: StreamingTraceManager) -> None:
                 trace_id = span.get("traceId", "")
 
                 if not trace_id:
+                    result.reject("span(s) rejected: missing trace_id")
                     continue
 
                 if not metadata.get("conversation_id"):
@@ -66,9 +104,11 @@ async def process_traces(body: dict, manager: StreamingTraceManager) -> None:
 
                 if not session.can_accept_span():
                     logger.warning("Session %s at span limit", session.session_id)
+                    result.reject(f"span(s) rejected: session has reached maximum span limit ({MAX_SPANS_PER_SESSION})")
                     continue
 
                 session.spans.append(span)
+                result.accept()
 
                 extractor = manager.incremental_extractors.get(session.session_id)
                 if extractor:
@@ -90,8 +130,10 @@ async def process_traces(body: dict, manager: StreamingTraceManager) -> None:
                     session.has_root_span = True
                     manager.schedule_session_completion(session.session_id)
 
+    return result
 
-async def process_logs(body: dict, manager: StreamingTraceManager) -> None:
+
+async def process_logs(body: dict, manager: StreamingTraceManager) -> ExportResult:
     """Parse ExportLogsServiceRequest and feed logs to sessions.
 
     Logs and spans arrive via separate OTLP exporters (BatchLogRecordProcessor
@@ -103,6 +145,7 @@ async def process_logs(body: dict, manager: StreamingTraceManager) -> None:
     BatchLogRecordProcessor and BatchSpanProcessor flush independently).
     Late-arriving logs are accepted and trigger re-extraction of invocations.
     """
+    result = ExportResult()
     sessions_needing_reextraction: set[str] = set()
 
     for resource_log in body.get("resourceLogs", []):
@@ -118,6 +161,7 @@ async def process_logs(body: dict, manager: StreamingTraceManager) -> None:
 
                 trace_id = log_record.get("traceId", "")
                 if not trace_id:
+                    result.reject("log record(s) rejected: missing trace_id")
                     continue
 
                 session = manager.find_session_by_trace_id(trace_id)
@@ -139,9 +183,14 @@ async def process_logs(body: dict, manager: StreamingTraceManager) -> None:
                     continue
 
                 if not session.can_accept_log():
+                    logger.warning("Session %s at log limit", session.session_id)
+                    result.reject(
+                        f"log record(s) rejected: session has reached maximum log limit ({MAX_LOGS_PER_SESSION})"
+                    )
                     continue
 
                 session.logs.append(log_event)
+                result.accept()
 
                 if session.is_complete:
                     sessions_needing_reextraction.add(session.session_id)
@@ -157,6 +206,8 @@ async def process_logs(body: dict, manager: StreamingTraceManager) -> None:
 
     for session_id in sessions_needing_reextraction:
         manager.schedule_log_reextraction(session_id)
+
+    return result
 
 
 def decode_protobuf_traces(raw: bytes) -> dict:
@@ -198,6 +249,28 @@ def fix_protobuf_id_fields(data) -> None:
         for item in data:
             if isinstance(item, (dict, list)):
                 fix_protobuf_id_fields(item)
+
+
+def build_traces_response(result: ExportResult) -> TraceServiceResponsePB:
+    """Build the ExportTraceServiceResponse for an ingest result.
+
+    OTLP requires ``partial_success`` to be left unset on full success, so it is
+    populated only when spans were actually rejected.
+    """
+    response = TraceServiceResponsePB()
+    if result.rejected:
+        response.partial_success.rejected_spans = result.rejected
+        response.partial_success.error_message = result.error_message
+    return response
+
+
+def build_logs_response(result: ExportResult) -> LogsServiceResponsePB:
+    """Build the ExportLogsServiceResponse for an ingest result."""
+    response = LogsServiceResponsePB()
+    if result.rejected:
+        response.partial_success.rejected_log_records = result.rejected
+        response.partial_success.error_message = result.error_message
+    return response
 
 
 _GENAI_EVENT_KEYS = {OTEL_GENAI_INPUT_MESSAGES, OTEL_GENAI_OUTPUT_MESSAGES}

@@ -312,9 +312,13 @@ class TestSpanLimits:
             session_name="limit-test",
             spans=[make_genai_span(trace_id="limit-trace")],
         )
-        await send_traces(otlp_client, body2)
+        resp = await send_traces(otlp_client, body2)
 
         assert len(session.spans) == MAX_SPANS_PER_SESSION
+        # The rejection must be visible to the caller, not silently swallowed.
+        partial = resp.json()["partialSuccess"]
+        assert int(partial["rejectedSpans"]) == 1
+        assert "maximum span limit" in partial["errorMessage"]
 
 
 class TestSplitBatchReopen:

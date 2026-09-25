@@ -1,8 +1,9 @@
 """OTLP HTTP routes for /v1/traces and /v1/logs.
 
-Route handlers are intentionally thin and delegate decode/process logic to
-`otlp_processing.py` so protocol handling can be reused by gRPC receivers and
-tested independently from HTTP routing.
+Route handlers are intentionally thin: `otlp_http.py` owns protocol handling
+(content negotiation, compression, `google.rpc.Status` error bodies) and
+`otlp_processing.py` owns decoding and ingestion, so both can be reused by the
+gRPC receiver and tested independently from HTTP routing.
 """
 
 from __future__ import annotations
@@ -12,7 +13,10 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, Request, Response
 
 from .dependencies import require_trace_manager
+from .otlp_http import build_export_response, read_export_request
 from .otlp_processing import (
+    build_logs_response,
+    build_traces_response,
     decode_protobuf_logs,
     decode_protobuf_traces,
     process_logs,
@@ -31,20 +35,9 @@ async def receive_traces(
     manager: StreamingTraceManager = Depends(require_trace_manager),
 ) -> Response:
     """OTLP HTTP trace receiver (ExportTraceServiceRequest)."""
-    content_type = request.headers.get("content-type", "")
-
-    if "application/x-protobuf" in content_type:
-        raw = await request.body()
-        body = decode_protobuf_traces(raw)
-    else:
-        body = await request.json()
-
-    await process_traces(body, manager)
-    return Response(
-        status_code=200,
-        content='{"partialSuccess":{}}',
-        media_type="application/json",
-    )
+    body, media_type = await read_export_request(request, decode_protobuf_traces, "resourceSpans")
+    result = await process_traces(body, manager)
+    return build_export_response(request, build_traces_response(result), media_type)
 
 
 @otlp_router.post("/v1/logs")
@@ -53,17 +46,6 @@ async def receive_logs(
     manager: StreamingTraceManager = Depends(require_trace_manager),
 ) -> Response:
     """OTLP HTTP log receiver (ExportLogsServiceRequest)."""
-    content_type = request.headers.get("content-type", "")
-
-    if "application/x-protobuf" in content_type:
-        raw = await request.body()
-        body = decode_protobuf_logs(raw)
-    else:
-        body = await request.json()
-
-    await process_logs(body, manager)
-    return Response(
-        status_code=200,
-        content='{"partialSuccess":{}}',
-        media_type="application/json",
-    )
+    body, media_type = await read_export_request(request, decode_protobuf_logs, "resourceLogs")
+    result = await process_logs(body, manager)
+    return build_export_response(request, build_logs_response(result), media_type)

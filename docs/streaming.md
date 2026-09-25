@@ -243,6 +243,10 @@ eventSource.onmessage = (event) => {
 - Maximum **100 sessions** kept at a time
 - Per-session limits: **10,000 spans** and **5,000 logs**
 
+Reaching a per-session limit is reported to the caller on every transport: WebSocket clients get an
+`error` message, and OTLP clients (HTTP and gRPC) get `partial_success` with `rejected_spans` /
+`rejected_log_records`. See [otel-compatibility.md](otel-compatibility.md#partial-success).
+
 ## CLI Options
 
 ```bash
