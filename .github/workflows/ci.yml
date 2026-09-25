@@ -137,3 +137,26 @@ jobs:
 
       - name: Run tests
         run: uv run pytest -m "not integration and not e2e" --tb=short -q
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: |
+          uv venv --python 3.13
+          uv pip install setuptools
+          uv sync --dev --all-extras --frozen --python 3.13
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration/ -m "integration and not e2e" --tb=short -q
