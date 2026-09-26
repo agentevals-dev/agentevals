@@ -167,6 +167,19 @@ evaluators:
     threshold: 0.7
 ```
 
+Rubric metrics accept named properties in the evaluator config:
+
+```yaml
+evaluators:
+  - name: rubric_based_final_response_quality_v1
+    type: builtin
+    rubrics:
+      - id: latest_correction
+        text: The response uses the user's latest correction.
+```
+
+Rubrics can also come from a matched eval case or its invocations; see [Rubrics](docs/eval-set-format.md#rubrics).
+
 `type: remote` pulls community evaluators from GitHub. Protocol, SDK helpers and runtimes: [Custom Evaluators](docs/custom-evaluators.md).
 
 ## Run it

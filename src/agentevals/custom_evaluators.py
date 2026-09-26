@@ -344,7 +344,7 @@ async def evaluate_custom_evaluator(
     from .runner import MetricResult
 
     if isinstance(evaluator_def, BuiltinMetricDef):
-        from .adk_bridge import expected_invocations, to_adk_invocations
+        from .adk_bridge import criterion_rubrics, expected_invocations, expected_rubrics, to_adk_invocations
         from .builtin_metrics import evaluate_builtin_metric
 
         actual_invocations = to_adk_invocations(actual.turns)
@@ -365,6 +365,8 @@ async def evaluate_custom_evaluator(
             credential_ref=evaluator_def.credential_ref,
             judge_base_url=evaluator_def.judge_base_url,
             expected_reason=expected_reason,
+            rubrics=criterion_rubrics(evaluator_def.rubrics),
+            case_rubrics=expected_rubrics(expected),
         )
         if alignment:
             result.details = {**(result.details or {}), **alignment}

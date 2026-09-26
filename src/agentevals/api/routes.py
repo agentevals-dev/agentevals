@@ -278,7 +278,7 @@ async def list_metrics():
                     requires_gcp=m.metric_name in METRICS_NEEDING_GCP,
                     requires_rubrics=_needs_rubrics(m.metric_name),
                     description=m.description or "No description available",
-                    working=not _needs_rubrics(m.metric_name),
+                    working=True,
                 )
             )
 

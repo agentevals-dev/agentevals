@@ -25,6 +25,22 @@ UNSUPPORTED_BUILTIN_METRICS = {
 GroupBy = Literal["auto", "trace", "conversation"]
 
 
+class RubricDef(BaseModel):
+    """A named property for a rubric metric, without ADK-specific configuration."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+
+    id: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+
+    @field_validator("id", "text")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Rubric id and text must not be blank")
+        return value
+
+
 class BuiltinMetricDef(BaseModel):
     """A built-in ADK metric, optionally with threshold/judge overrides."""
 
@@ -35,6 +51,9 @@ class BuiltinMetricDef(BaseModel):
     threshold: float | None = Field(default=None, ge=0, le=1)
     judge_model: str | None = None
     trajectory_match_type: str | None = None
+    rubrics: list[RubricDef] | None = Field(
+        default=None, description="Named {id, text} properties, or strings with positional ids, for rubric metrics."
+    )
     credential_ref: str | None = Field(
         default=None,
         description="Logical name of a RunSpec.credential_refs entry whose resolved value is the judge API key.",
@@ -55,6 +74,24 @@ class BuiltinMetricDef(BaseModel):
         if v in UNSUPPORTED_BUILTIN_METRICS:
             raise ValueError(f"Built-in metric '{v}' is not supported: {UNSUPPORTED_BUILTIN_METRICS[v]}")
         return v
+
+    @field_validator("rubrics", mode="before")
+    @classmethod
+    def _normalize_rubrics(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if not isinstance(value, list):
+            raise ValueError("'rubrics' must be a list of strings or {id, text} mappings")
+        return [{"id": f"rubric_{index}", "text": entry} if isinstance(entry, str) else entry
+                for index, entry in enumerate(value)]
+
+    @field_validator("rubrics")
+    @classmethod
+    def _unique_rubric_ids(cls, value: list[RubricDef] | None) -> list[RubricDef] | None:
+        duplicates = sorted(key for key, count in Counter(r.id for r in value or []).items() if count > 1)
+        if duplicates:
+            raise ValueError("Rubric ids must be unique within a metric. Duplicate ids: " + ", ".join(duplicates))
+        return value
 
 
 class BaseEvaluatorDef(BaseModel):

@@ -15,6 +15,9 @@ from typing import Any
 
 from google.adk.evaluation.eval_case import EvalCase, IntermediateData, Invocation
 from google.adk.evaluation.eval_set import EvalSet
+from google.adk.evaluation.eval_rubrics import Rubric, RubricContent
+
+from .config import RubricDef
 from google.genai import types as genai_types
 
 from .genai.matching import ExpectedConversation, ExpectedTurn
@@ -69,6 +72,16 @@ def expected_invocations(expected: ExpectedConversation | None) -> list[Invocati
     if expected is None or not isinstance(expected.raw, EvalCase):
         return None
     return list(expected.raw.conversation or [])
+
+
+def criterion_rubrics(definitions: list[RubricDef] | None) -> list[Rubric]:
+    return [Rubric(rubric_id=r.id, rubric_content=RubricContent(text_property=r.text)) for r in definitions or []]
+
+
+def expected_rubrics(expected: ExpectedConversation | None) -> list[Rubric]:
+    if expected is None or not isinstance(expected.raw, EvalCase):
+        return []
+    return list(expected.raw.rubrics or [])
 
 
 def multi_turn_cases(eval_set: EvalSet | None) -> bool:
