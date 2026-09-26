@@ -240,6 +240,22 @@ evaluators:
     threshold: 0.7
 ```
 
+Rubric-based metrics take their rubrics from the same config, as `{id, text}` mappings or plain strings, and score each rubric per invocation:
+
+```yaml
+evaluators:
+  - name: rubric_based_final_response_quality_v1
+    type: builtin
+    judge_model: gemini-2.5-flash
+    rubrics:
+      - id: corrected_value_wins
+        text: The response uses the operator's latest correction, never a superseded value.
+      - id: no_invented_cause
+        text: The response states no root cause the conversation did not establish.
+```
+
+Rubrics on a matched eval case (`rubrics` on the case, or on one of its invocations) are added to the metric's own at run time; see the [eval set format](docs/eval-set-format.md#rubrics).
+
 Evaluators with a `requirements.txt` get automatic virtual environment management. You can also use `type: remote` for community evaluators from GitHub, or `type: openai_eval` to delegate grading to the [OpenAI Evals API](https://developers.openai.com/api/reference/resources/evals/methods/create) (requires `pip install "agentevals-cli[openai]"`).
 
 See the [Custom Evaluators guide](docs/custom-evaluators.md) for the full protocol reference, SDK helpers, and how to contribute evaluators.

@@ -242,7 +242,7 @@ async def list_metrics():
                     requires_gcp=m.metric_name in METRICS_NEEDING_GCP,
                     requires_rubrics=m.metric_name in _METRICS_NEEDING_RUBRICS,
                     description=m.description or "No description available",
-                    working=m.metric_name not in _METRICS_NEEDING_RUBRICS,
+                    working=True,
                 )
             )
 

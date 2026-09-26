@@ -160,6 +160,19 @@ def _enrich_app_details(invocations: list[Invocation]) -> list[Invocation]:
     return [inv.model_copy(update={"app_details": app_details}) for inv in invocations]
 
 
+METRICS_NEEDING_RUBRICS = {
+    "rubric_based_final_response_quality_v1",
+    "rubric_based_tool_use_quality_v1",
+}
+
+# The ADK rubric type each rubric metric applies to invocation-level rubrics;
+# a rubric written for the metric without a type is given this one.
+_METRIC_RUBRIC_TYPES = {
+    "rubric_based_final_response_quality_v1": "FINAL_RESPONSE_QUALITY",
+    "rubric_based_tool_use_quality_v1": "TOOL_USE_QUALITY",
+}
+
+
 def rubric_strings_to_objects(rubric_texts: list[str]) -> list[Rubric]:
     """Convert plain-text rubric strings into ADK Rubric objects."""
     return [
@@ -171,14 +184,88 @@ def rubric_strings_to_objects(rubric_texts: list[str]) -> list[Rubric]:
     ]
 
 
+def to_rubric_objects(rubrics: list[str | Rubric] | None) -> list[Rubric]:
+    """Plain strings become positional rubrics; ADK ``Rubric`` objects pass through."""
+    if not rubrics:
+        return []
+    texts = [r for r in rubrics if isinstance(r, str)]
+    objects = [r for r in rubrics if isinstance(r, Rubric)]
+    return rubric_strings_to_objects(texts) + objects
+
+
+def attach_case_rubrics(
+    metric_name: str,
+    actual_invocations: list[Invocation],
+    expected_invocations: list[Invocation] | None,
+    case_rubrics: list[Rubric] | None,
+) -> list[Invocation]:
+    """Give the actual invocations the eval case's rubrics, as ADK's own eval
+    service does: case-level rubrics on every invocation, invocation-level
+    rubrics from the expected invocation at the same position. A rubric
+    without a type gets the metric's, since ADK filters invocation rubrics by
+    type. Duplicate ids within one invocation are an error."""
+    metric_type = _METRIC_RUBRIC_TYPES.get(metric_name)
+    attached = []
+    for index, actual in enumerate(actual_invocations):
+        extra: list[Rubric] = []
+        if case_rubrics:
+            extra.extend(case_rubrics)
+        if expected_invocations and index < len(expected_invocations) and expected_invocations[index].rubrics:
+            extra.extend(expected_invocations[index].rubrics or [])
+        if not extra:
+            attached.append(actual)
+            continue
+        merged: dict[str, Rubric] = {r.rubric_id: r for r in actual.rubrics or []}
+        for rubric in extra:
+            if rubric.rubric_id in merged:
+                raise ValueError(
+                    f"Rubric id '{rubric.rubric_id}' is defined more than once for invocation {index} "
+                    f"(eval case, invocation and metric rubrics must have distinct ids)."
+                )
+            merged[rubric.rubric_id] = (
+                rubric if rubric.type or not metric_type else rubric.model_copy(update={"type": metric_type})
+            )
+        attached.append(actual.model_copy(update={"rubrics": list(merged.values())}))
+    return attached
+
+
+def extract_rubric_details(eval_result: EvaluationResult) -> dict[str, Any]:
+    """Per-rubric scores, per invocation and overall, from a rubric metric."""
+
+    def _score(rubric_score: Any) -> dict[str, Any]:
+        return {
+            "rubric_id": rubric_score.rubric_id,
+            "score": rubric_score.score,
+            "rationale": rubric_score.rationale,
+        }
+
+    per_invocation = []
+    for per_inv_result in eval_result.per_invocation_results:
+        actual_inv = per_inv_result.actual_invocation
+        per_invocation.append(
+            {
+                "invocation_id": actual_inv.invocation_id if actual_inv else None,
+                "rubric_scores": [_score(r) for r in per_inv_result.rubric_scores or []],
+            }
+        )
+    return {
+        "per_invocation": per_invocation,
+        "overall_rubric_scores": [_score(r) for r in eval_result.overall_rubric_scores or []],
+    }
+
+
 def build_eval_metric(
     metric_name: str,
     judge_model: str | None,
     threshold: float | None,
-    rubrics: list[str] | None = None,
+    rubrics: list[str | Rubric] | None = None,
     match_type: str | None = None,
 ) -> EvalMetric:
-    """Construct an ADK ``EvalMetric`` with the appropriate criterion."""
+    """Construct an ADK ``EvalMetric`` with the appropriate criterion.
+
+    ``rubrics`` feed the ``rubric_based_*`` metrics' criterion: plain strings
+    get positional ids, ADK ``Rubric`` objects are used as given.
+    """
     effective_threshold = threshold if threshold is not None else 0.5
 
     criterion: BaseCriterion | None = None
@@ -211,7 +298,7 @@ def build_eval_metric(
         judge_opts = JudgeModelOptions()
         if judge_model:
             judge_opts.judge_model = judge_model
-        rubric_objects = rubric_strings_to_objects(rubrics) if rubrics else []
+        rubric_objects = to_rubric_objects(rubrics)
         criterion = RubricsBasedCriterion(
             threshold=effective_threshold,
             judge_model_options=judge_opts,
@@ -370,8 +457,16 @@ async def evaluate_builtin_metric(
     match_type: str | None = None,
     credential_ref: str | None = None,
     judge_base_url: str | None = None,
+    rubrics: list[str | Rubric] | None = None,
+    case_rubrics: list[Rubric] | None = None,
 ) -> dict[str, Any]:
     """Evaluate a single built-in ADK metric.
+
+    ``rubrics`` are the metric's own (from the eval config); ``case_rubrics``
+    are the matched eval case's, applied to every invocation, and each
+    expected invocation's own rubrics apply to the actual invocation at the
+    same position. A rubric metric with no rubric from any of these is an
+    error, not an empty evaluation.
 
     Returns a dict with keys: metric_name, score, eval_status,
     per_invocation_scores, error, details.
@@ -387,8 +482,24 @@ async def evaluate_builtin_metric(
             ),
         )
 
+    if metric_name in METRICS_NEEDING_RUBRICS:
+        try:
+            actual_invocations = attach_case_rubrics(
+                metric_name, actual_invocations, expected_invocations, case_rubrics
+            )
+        except ValueError as exc:
+            return MetricResult(metric_name=metric_name, error=str(exc))
+        if not rubrics and not any(inv.rubrics for inv in actual_invocations):
+            return MetricResult(
+                metric_name=metric_name,
+                error=(
+                    f"Metric '{metric_name}' requires rubrics: set 'rubrics' on the evaluator in the eval "
+                    "config, or 'rubrics' on the matched eval case or its invocations."
+                ),
+            )
+
     try:
-        eval_metric = build_eval_metric(metric_name, judge_model, threshold, match_type=match_type)
+        eval_metric = build_eval_metric(metric_name, judge_model, threshold, rubrics=rubrics, match_type=match_type)
         evaluator: Evaluator = get_evaluator(eval_metric)
 
         if credential_ref:
@@ -425,6 +536,8 @@ async def evaluate_builtin_metric(
         details = None
         if metric_name == "tool_trajectory_avg_score":
             details = extract_trajectory_details(eval_result)
+        elif metric_name in METRICS_NEEDING_RUBRICS:
+            details = extract_rubric_details(eval_result)
 
         return MetricResult(
             metric_name=metric_name,

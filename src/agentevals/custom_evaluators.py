@@ -432,6 +432,7 @@ async def evaluate_custom_evaluator(
     actual_invocations: list[Invocation],
     expected_invocations: list[Invocation] | None,
     performance_metrics: dict[str, Any] | None = None,
+    eval_case=None,
 ):
     """Evaluate a single custom evaluator and return a ``MetricResult``.
 
@@ -446,6 +447,9 @@ async def evaluate_custom_evaluator(
     from .runner import MetricResult
 
     if isinstance(evaluator_def, BuiltinMetricDef):
+        from .builtin_metrics import _METRIC_RUBRIC_TYPES
+
+        rubric_type = _METRIC_RUBRIC_TYPES.get(evaluator_def.name)
         return await evaluate_builtin_metric(
             metric_name=evaluator_def.name,
             actual_invocations=actual_invocations,
@@ -455,6 +459,8 @@ async def evaluate_custom_evaluator(
             match_type=evaluator_def.trajectory_match_type,
             credential_ref=evaluator_def.credential_ref,
             judge_base_url=evaluator_def.judge_base_url,
+            rubrics=[r.to_adk(rubric_type) for r in evaluator_def.rubrics] if evaluator_def.rubrics else None,
+            case_rubrics=list(eval_case.rubrics) if eval_case is not None and eval_case.rubrics else None,
         )
 
     if isinstance(evaluator_def, OpenAIEvalDef):
