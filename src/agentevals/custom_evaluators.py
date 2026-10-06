@@ -462,7 +462,8 @@ async def evaluate_custom_evaluator(
 
         return await evaluate_openai_eval(evaluator_def, actual_invocations, expected_invocations)
 
-    if isinstance(evaluator_def, RemoteEvaluatorDef):
+    is_remote = isinstance(evaluator_def, RemoteEvaluatorDef)
+    if is_remote:
         from .evaluator.resolver import get_default_resolver
 
         evaluator_def = await get_default_resolver().resolve(evaluator_def)
@@ -475,7 +476,7 @@ async def evaluate_custom_evaluator(
             from .evaluator.venv import ensure_venv_async
 
             try:
-                venv_python = await ensure_venv_async(evaluator_path)
+                venv_python = await ensure_venv_async(evaluator_path, strict_requirements=is_remote)
             except Exception as exc:
                 logger.error("Failed to set up venv for '%s': %s", evaluator_def.name, exc)
                 return MetricResult(

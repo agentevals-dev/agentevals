@@ -144,6 +144,10 @@ def create_app(
     static_dir: Path | None = None,
 ) -> FastAPI:
     """Create the main agentevals API app."""
+    from ..evaluator.resolver import require_index_membership
+
+    require_index_membership()
+
     app = FastAPI(
         title="agentevals API",
         version=__version__,

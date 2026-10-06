@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -76,6 +77,51 @@ class RemoteEvaluatorDef(BaseEvaluatorDef):
     type: Literal["remote"] = "remote"
     source: str = Field(default="github", description="Evaluator source (e.g. 'github').")
     ref: str = Field(description="Source-specific reference (e.g. path within the repo).")
+
+    @field_validator("ref")
+    @classmethod
+    def _validate_ref(cls, v: str) -> str:
+        return validate_remote_ref(v)
+
+    @model_validator(mode="after")
+    def _validate_source(self) -> RemoteEvaluatorDef:
+        if self.source in _NON_FETCHABLE_SOURCES:
+            raise ValueError(f"Evaluator source '{self.source}' cannot be fetched; use a builtin evaluator instead")
+        return self
+
+
+_NON_FETCHABLE_SOURCES = frozenset({"builtin"})
+_REF_MAX_LENGTH = 512
+_REF_MAX_SEGMENTS = 16
+_REF_SEGMENT = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*$")
+
+
+def validate_remote_ref(ref: str) -> str:
+    """Accept only a plain relative POSIX path to a supported evaluator file.
+
+    The ref is joined into a local cache path and a download URL, so anything
+    that could change either base (absolute paths, dot segments, backslashes,
+    percent escapes) is rejected rather than normalized.
+    """
+    from .custom_evaluators import supported_extensions
+
+    if not ref or len(ref) > _REF_MAX_LENGTH:
+        raise ValueError(f"Remote evaluator ref must be 1 to {_REF_MAX_LENGTH} characters")
+    if "\\" in ref or "%" in ref:
+        raise ValueError("Remote evaluator ref must not contain backslashes or percent escapes")
+    segments = ref.split("/")
+    if len(segments) > _REF_MAX_SEGMENTS:
+        raise ValueError(f"Remote evaluator ref must have at most {_REF_MAX_SEGMENTS} path segments")
+    if not all(_REF_SEGMENT.fullmatch(seg) for seg in segments):
+        raise ValueError(
+            "Remote evaluator ref must be a relative path whose segments use only letters, digits, "
+            "'_', '-' and single dots between name parts"
+        )
+    suffix = PurePosixPath(ref).suffix.lower()
+    allowed = supported_extensions()
+    if suffix not in allowed:
+        raise ValueError(f"Unsupported evaluator file extension '{suffix}'. Supported: {sorted(allowed)}")
+    return ref
 
 
 _VALID_SIMILARITY_METRICS = frozenset(

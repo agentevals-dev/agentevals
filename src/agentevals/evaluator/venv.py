@@ -58,6 +58,48 @@ def _create_venv(venv_dir: Path, uv: str | None) -> None:
     subprocess.run(cmd, check=True, capture_output=True)
 
 
+_VCS_PREFIXES = ("git+", "hg+", "svn+", "bzr+")
+_ARCHIVE_SUFFIXES = (".whl", ".zip", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz")
+
+
+def _requirement_problem(line: str) -> str | None:
+    tokens = line.split()
+    name = tokens[0]
+    if name.startswith("-"):
+        return "installer options are not allowed"
+    if any(tok.startswith("-") and not tok.startswith("--hash=") for tok in tokens[1:]):
+        return "only --hash options are allowed after a requirement"
+    lowered = line.lower()
+    if "://" in line or lowered.startswith(_VCS_PREFIXES) or "@" in line:
+        return "URL, VCS and direct references are not allowed"
+    if name.startswith((".", "/", "~")) or name.lower().endswith(_ARCHIVE_SUFFIXES):
+        return "local paths and archives are not allowed"
+    if "${" in line:
+        return "environment variable references are not allowed"
+    return None
+
+
+def check_requirements(requirements: Path) -> None:
+    """Allow only plain index requirements, so a requirements file cannot redirect the installer.
+
+    Rejects installer options (another index, nested files, editable installs),
+    URL, VCS and local path requirements, and ``${VAR}`` references, which pip
+    expands from the server environment.
+    """
+    for lineno, raw in enumerate(requirements.read_text(encoding="utf-8").splitlines(), start=1):
+        if raw.rstrip().endswith("\\"):
+            raise ValueError(f"{requirements.name} line {lineno}: line continuations are not allowed")
+        line = raw.strip()
+        if line.startswith("#"):
+            continue
+        line = line.split(" #", 1)[0].split("\t#", 1)[0].strip()
+        if not line:
+            continue
+        problem = _requirement_problem(line)
+        if problem:
+            raise ValueError(f"{requirements.name} line {lineno}: {problem}")
+
+
 def _install_deps(venv_dir: Path, requirements: Path, uv: str | None) -> None:
     python = str(_venv_python(venv_dir))
     sdk_spec = "agentevals-evaluator-sdk"
@@ -77,14 +119,20 @@ def _install_deps(venv_dir: Path, requirements: Path, uv: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def ensure_venv(evaluator_path: Path) -> Path | None:
+def ensure_venv(evaluator_path: Path, *, strict_requirements: bool = False) -> Path | None:
     """Ensure a cached venv exists for *evaluator_path* if it has ``requirements.txt``.
+
+    ``strict_requirements`` applies :func:`check_requirements`; it is set for
+    downloaded evaluators, while local evaluators keep full pip syntax.
 
     Returns the venv Python path, or ``None`` if no venv is needed.
     """
     requirements = evaluator_path.resolve().parent / "requirements.txt"
     if not requirements.exists():
         return None
+
+    if strict_requirements:
+        check_requirements(requirements)
 
     req_hash = hashlib.sha256(requirements.read_bytes()).hexdigest()
     venv_dir = _VENV_CACHE_DIR / _venv_key(evaluator_path)
@@ -113,11 +161,11 @@ def ensure_venv(evaluator_path: Path) -> Path | None:
     return _venv_python(venv_dir)
 
 
-async def ensure_venv_async(evaluator_path: Path) -> Path | None:
+async def ensure_venv_async(evaluator_path: Path, *, strict_requirements: bool = False) -> Path | None:
     """Async wrapper around :func:`ensure_venv` with per-evaluator locking."""
     venv_key = _venv_key(evaluator_path)
     if venv_key not in _venv_locks:
         _venv_locks[venv_key] = asyncio.Lock()
 
     async with _venv_locks[venv_key]:
-        return await asyncio.to_thread(ensure_venv, evaluator_path)
+        return await asyncio.to_thread(ensure_venv, evaluator_path, strict_requirements=strict_requirements)

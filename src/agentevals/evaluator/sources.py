@@ -9,6 +9,7 @@ import os
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path, PurePosixPath
+from urllib.parse import quote
 
 import yaml
 
@@ -165,7 +166,16 @@ class GitHubEvaluatorSource(EvaluatorSource):
         return "github"
 
     def _raw_url(self, path: str) -> str:
-        return f"https://raw.githubusercontent.com/{self._repo}/{self._branch}/{path}"
+        quoted = "/".join(quote(segment, safe="") for segment in path.split("/"))
+        return f"https://raw.githubusercontent.com/{self._repo}/{self._branch}/{quoted}"
+
+    async def _get(self, client, url: str, timeout: float):
+        import httpx
+
+        resp = await client.get(url, headers=self._headers(), timeout=timeout, follow_redirects=False)
+        if resp.url.raw_path != httpx.URL(url).raw_path:
+            raise ValueError(f"Evaluator download resolved to an unexpected path: {resp.url.path}")
+        return resp
 
     def _headers(self) -> dict[str, str]:
         if self._token:
@@ -214,18 +224,18 @@ class GitHubEvaluatorSource(EvaluatorSource):
         logger.info("Downloading evaluator from %s", url)
 
         async with httpx.AsyncClient() as client:
-            resp = await client.get(url, headers=self._headers(), timeout=30)
+            resp = await self._get(client, url, timeout=30)
             resp.raise_for_status()
 
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(resp.text, encoding="utf-8")  # noqa: ASYNC240
 
             # Also try to fetch requirements.txt from the same directory.
-            ref_dir = str(PurePosixPath(ref).parent)
-            req_ref = f"{ref_dir}/requirements.txt"
+            ref_dir = PurePosixPath(ref).parent
+            req_ref = "requirements.txt" if str(ref_dir) == "." else f"{ref_dir}/requirements.txt"
             req_url = self._raw_url(req_ref)
             try:
-                req_resp = await client.get(req_url, headers=self._headers(), timeout=15)
+                req_resp = await self._get(client, req_url, timeout=15)
                 if req_resp.status_code == 200:
                     req_dest = dest.parent / "requirements.txt"
                     req_dest.write_text(req_resp.text, encoding="utf-8")  # noqa: ASYNC240
@@ -275,8 +285,11 @@ class FileEvaluatorSource(EvaluatorSource):
         return infos
 
     async def fetch_evaluator(self, ref: str, dest: Path) -> Path:
-        src = (self._path.parent / ref).resolve()
-        if not src.exists():
+        index_dir = self._path.parent.resolve()
+        src = (index_dir / ref).resolve()
+        if not src.is_relative_to(index_dir):
+            raise ValueError(f"Evaluator ref '{ref}' resolves outside the index directory")
+        if not src.is_file():
             raise FileNotFoundError(f"Evaluator file not found: {src} (ref: {ref}, index: {self._path})")
         import shutil
 

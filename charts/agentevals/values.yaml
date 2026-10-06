@@ -67,9 +67,13 @@ serviceAccount:
 rbac:
   # -- Create the Role and RoleBinding
   create: false
-  # -- Restrict the Role to these Secret names. Empty grants get on all
-  # Secrets in the release namespace.
+  # -- Restrict the Role to these Secret names. Required when create is true,
+  # unless allowAllSecrets is set.
   secretNames: []
+  # -- Explicit opt in to grant get on every Secret in the release namespace
+  # when secretNames is empty. Any caller that can submit credential refs can
+  # then make the server read any of those Secrets, so prefer listing names.
+  allowAllSecrets: false
 
 # ==============================================================================
 # Pod
@@ -164,7 +168,10 @@ affinity: {}
 # -- Override the image entrypoint
 command: []
 
-# -- Override the image arguments
+# -- Override the image arguments. The image starts the MCP listener with
+# --mcp-port 8080; to drop it, pass the full command line without that flag:
+#   args: ["agentevals", "serve", "--host", "0.0.0.0", "--port", "8001",
+#          "--otlp-http-port", "4318", "--otlp-grpc-port", "4317"]
 args: []
 
 # -- Extra environment variables appended to the container env block
