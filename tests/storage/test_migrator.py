@@ -157,20 +157,20 @@ class TestMigratorLive:
         yield m
         # cleanup
         try:
-            await m.down(steps=1)
+            await m.down(steps=len(_discover_migrations()))
         except Exception:
             pass
 
     async def test_up_then_replay_is_noop(self, migrator):
         applied = await migrator.up()
-        assert applied == [1]
+        assert applied == [1, 2]
         again = await migrator.up()
         assert again == []
 
     async def test_version_after_up(self, migrator):
         await migrator.up()
         status = await migrator.status()
-        assert status.version == 1
+        assert status.version == 2
         assert status.dirty is False
 
     async def test_force_clears_dirty(self, migrator):

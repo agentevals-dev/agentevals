@@ -12,7 +12,6 @@ from .config import (
     CodeEvaluatorDef,
     EvalRunConfig,
     EvaluatorDef,
-    OpenAIEvalDef,
     RemoteEvaluatorDef,
 )
 
@@ -20,7 +19,15 @@ _TYPE_TO_MODEL = {
     "builtin": BuiltinMetricDef,
     "code": CodeEvaluatorDef,
     "remote": RemoteEvaluatorDef,
-    "openai_eval": OpenAIEvalDef,
+}
+
+_REMOVED_TYPES = {
+    "openai_eval": (
+        "the OpenAI Evals API it delegated to has been retired. "
+        "Replace it with type: builtin (response_match_score for text similarity, "
+        "final_response_match_v2 for judged pass/fail) or type: code with your own "
+        "scoring logic."
+    ),
 }
 
 
@@ -38,6 +45,11 @@ def _parse_evaluator_entry(entry: dict[str, Any]) -> EvaluatorDef:
     evaluator_type = entry.get("type")
     if not evaluator_type:
         raise ValueError(f"Evaluator entry '{name}' must have a 'type' field ({', '.join(_TYPE_TO_MODEL)})")
+
+    if evaluator_type in _REMOVED_TYPES:
+        raise ValueError(
+            f"Evaluator '{name}' uses type '{evaluator_type}', which has been removed: {_REMOVED_TYPES[evaluator_type]}"
+        )
 
     if evaluator_type not in _TYPE_TO_MODEL:
         raise ValueError(

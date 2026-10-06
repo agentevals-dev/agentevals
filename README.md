@@ -39,7 +39,7 @@ It works with any OTel-instrumented framework (LangChain, Strands, Google ADK, O
 
 - **No re-execution**: score agents from existing traces without replaying expensive LLM calls
 - **Golden eval sets**: compare actual behavior against defined expected behaviors for deterministic pass/fail gating
-- **Custom evaluators**: write scoring logic in Python, JavaScript, or any language, or offload scoring to OpenAI Eval API
+- **Custom evaluators**: write scoring logic in Python, JavaScript, or any language
 - **CI/CD ready**: gate deployments on quality thresholds directly in your pipeline
 - **Local-first**: no cloud dependency required; everything runs on your machine
 - **Multiple interfaces**: CLI for scripting and CI, Web UI for visual inspection, MCP server for conversational evaluation, Helm chart for Kubernetes environments
@@ -75,7 +75,6 @@ Optional extras:
 
 ```bash
 pip install "agentevals-cli[live]"        # MCP server support
-pip install "agentevals-cli[openai]"      # OpenAI Evals API graders
 ```
 
 **GitHub [releases](../../releases)** also ship **core** wheels (CLI and API only) and **bundle** wheels (with the embedded UI) if you need a specific version or offline `pip install ./path/to.whl`.
@@ -240,7 +239,7 @@ evaluators:
     threshold: 0.7
 ```
 
-Evaluators with a `requirements.txt` get automatic virtual environment management. You can also use `type: remote` for community evaluators from GitHub, or `type: openai_eval` to delegate grading to the [OpenAI Evals API](https://developers.openai.com/api/reference/resources/evals/methods/create) (requires `pip install "agentevals-cli[openai]"`).
+Evaluators with a `requirements.txt` get automatic virtual environment management. You can also use `type: remote` for community evaluators from GitHub.
 
 See the [Custom Evaluators guide](docs/custom-evaluators.md) for the full protocol reference, SDK helpers, and how to contribute evaluators.
 

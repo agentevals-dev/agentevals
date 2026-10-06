@@ -442,7 +442,7 @@ async def evaluate_custom_evaluator(
     import inspect as _inspect
 
     from .builtin_metrics import evaluate_builtin_metric
-    from .config import BuiltinMetricDef, CodeEvaluatorDef, OpenAIEvalDef, RemoteEvaluatorDef
+    from .config import BuiltinMetricDef, CodeEvaluatorDef, RemoteEvaluatorDef
     from .runner import MetricResult
 
     if isinstance(evaluator_def, BuiltinMetricDef):
@@ -456,11 +456,6 @@ async def evaluate_custom_evaluator(
             credential_ref=evaluator_def.credential_ref,
             judge_base_url=evaluator_def.judge_base_url,
         )
-
-    if isinstance(evaluator_def, OpenAIEvalDef):
-        from .openai_eval_backend import evaluate_openai_eval
-
-        return await evaluate_openai_eval(evaluator_def, actual_invocations, expected_invocations)
 
     is_remote = isinstance(evaluator_def, RemoteEvaluatorDef)
     if is_remote:

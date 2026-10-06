@@ -16,7 +16,7 @@ from ..config import EvalParams
 from ..runner import MetricResult, RunResult
 from ..storage.models import Result, ResultStatus, compute_result_id
 
-EvaluatorType = Literal["builtin", "code", "remote", "openai_eval"]
+EvaluatorType = Literal["builtin", "code", "remote"]
 
 
 def classify_evaluator(metric_name: str, params: EvalParams) -> EvaluatorType:

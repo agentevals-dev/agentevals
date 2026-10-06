@@ -124,56 +124,8 @@ def validate_remote_ref(ref: str) -> str:
     return ref
 
 
-_VALID_SIMILARITY_METRICS = frozenset(
-    {
-        "fuzzy_match",
-        "bleu",
-        "gleu",
-        "meteor",
-        "cosine",
-        "rouge_1",
-        "rouge_2",
-        "rouge_3",
-        "rouge_4",
-        "rouge_5",
-        "rouge_l",
-    }
-)
-
-
-class OpenAIEvalDef(BaseModel):
-    """An evaluator that delegates grading to the OpenAI Evals API."""
-
-    type: Literal["openai_eval"] = "openai_eval"
-    name: str
-    threshold: float = Field(default=0.5, ge=0, le=1)
-    timeout: int = Field(default=120, description="Max seconds to wait for the OpenAI eval run to complete.")
-    grader: dict[str, Any] = Field(description="OpenAI grader config passed to testing_criteria.")
-
-    @field_validator("grader")
-    @classmethod
-    def _validate_grader(cls, v: dict[str, Any]) -> dict[str, Any]:
-        grader_type = v.get("type")
-        if grader_type == "text_similarity":
-            metric = v.get("evaluation_metric")
-            if not metric:
-                raise ValueError("'evaluation_metric' is required for text_similarity grader")
-            if metric not in _VALID_SIMILARITY_METRICS:
-                raise ValueError(f"Unknown evaluation_metric '{metric}'. Valid: {sorted(_VALID_SIMILARITY_METRICS)}")
-        elif grader_type == "label_model":
-            for field in ("model", "input", "labels", "passing_labels"):
-                if not v.get(field):
-                    raise ValueError(f"'{field}' is required for label_model grader")
-            invalid = [lbl for lbl in v["passing_labels"] if lbl not in v["labels"]]
-            if invalid:
-                raise ValueError(f"passing_labels contains labels not declared in labels: {invalid}")
-        else:
-            raise ValueError(f"Unsupported grader type: '{grader_type}'. Supported: label_model, text_similarity")
-        return v
-
-
 EvaluatorDef = Annotated[
-    BuiltinMetricDef | CodeEvaluatorDef | RemoteEvaluatorDef | OpenAIEvalDef,
+    BuiltinMetricDef | CodeEvaluatorDef | RemoteEvaluatorDef,
     Field(discriminator="type"),
 ]
 

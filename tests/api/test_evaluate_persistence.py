@@ -93,7 +93,7 @@ class TestEvaluateMultipartSync:
         results = asyncio.run(repos.results.list_by_run(_uuid(run_id)))
         assert len(results) >= 1
         for res in results:
-            assert res.evaluator_type in ("builtin", "code", "remote", "openai_eval")
+            assert res.evaluator_type in ("builtin", "code", "remote")
             assert res.run_id == _uuid(run_id)
 
     def test_each_call_creates_distinct_run(self, app_with_runs):

@@ -119,7 +119,7 @@ class Result(BaseModel):
     eval_set_item_id: str
     eval_set_item_name: str
     evaluator_name: str
-    evaluator_type: Literal["builtin", "code", "remote", "openai_eval"]
+    evaluator_type: Literal["builtin", "code", "remote"]
     status: ResultStatus
     score: float | None = None
     per_invocation_scores: list[float | None] = Field(default_factory=list)

@@ -133,6 +133,9 @@ class Migrator:
             "(version BIGINT NOT NULL PRIMARY KEY, dirty BOOLEAN NOT NULL)"
         )
 
+    async def _tracking_table_exists(self, conn: "asyncpg.Connection") -> bool:
+        return await conn.fetchval("SELECT to_regclass($1) IS NOT NULL", f'"{self._schema}".schema_migrations')
+
     async def _read_status(self, conn: "asyncpg.Connection") -> MigrationStatus:
         row = await conn.fetchrow(f'SELECT version, dirty FROM "{self._schema}".schema_migrations LIMIT 1')
         if row is None:
@@ -225,7 +228,10 @@ class Migrator:
                     try:
                         async with conn.transaction():
                             await conn.execute(sql)
-                            await self._write_status(conn, next_version, dirty=False)
+                            # The baseline down drops the schema, and the tracking table with it.
+                            # A missing table already reads back as "nothing applied".
+                            if next_version is not None or await self._tracking_table_exists(conn):
+                                await self._write_status(conn, next_version, dirty=False)
                     except Exception:
                         logger.exception(
                             "Down migration %06d_%s failed; schema_migrations left dirty", m.version, m.name

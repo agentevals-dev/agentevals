@@ -63,9 +63,6 @@ live = [
     { name = "pydantic-settings" },
     { name = "pyjwt" },
 ]
-openai = [
-    { name = "openai" },
-]
 postgres = [
     { name = "asyncpg" },
 ]
@@ -109,7 +106,6 @@ requires-dist = [
     { name = "litellm", specifier = ">=1.85.7" },
     { name = "mcp", marker = "extra == 'live'", specifier = ">=1.28.1,<2" },
     { name = "nltk", specifier = ">=3.10.2" },
-    { name = "openai", marker = "extra == 'openai'", specifier = ">=2.0" },
     { name = "opentelemetry-proto", specifier = ">=1.36.0" },
     { name = "opentelemetry-sdk", marker = "extra == 'streaming'", specifier = ">=1.20.0" },
     { name = "pyasn1", specifier = ">=0.6.4" },
@@ -125,7 +121,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
     { name = "websockets", marker = "extra == 'streaming'", specifier = ">=12.0" },
 ]
-provides-extras = ["kubernetes", "live", "openai", "postgres", "streaming"]
+provides-extras = ["kubernetes", "live", "postgres", "streaming"]
 
 [package.metadata.requires-dev]
 dev = [
