@@ -9,7 +9,7 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from google.adk.evaluation.eval_case import Invocation
+from google.adk.evaluation.eval_case import EvalCase, Invocation
 from google.adk.evaluation.eval_set import EvalSet
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -279,8 +279,10 @@ async def _evaluate_trace(
     actual_invocations = conv_result.invocations
 
     expected_invocations: list[Invocation] | None = None
+    eval_case = None
     if eval_set:
-        expected_invocations = _find_expected_invocations(actual_invocations, eval_set)
+        eval_case = _find_eval_case(actual_invocations, eval_set)
+        expected_invocations = eval_case.conversation if eval_case and eval_case.conversation else None
 
     async def _append_result(result: MetricResult) -> MetricResult:
         trace_result.metric_results.append(result)
@@ -300,6 +302,7 @@ async def _evaluate_trace(
                 actual_invocations=actual_invocations,
                 expected_invocations=expected_invocations,
                 performance_metrics=performance_metrics,
+                eval_case=eval_case,
             )
             result.duration_ms = (time.monotonic() - t0) * 1000
         return await _append_result(result)
@@ -311,39 +314,43 @@ async def _evaluate_trace(
     return trace_result
 
 
-def _find_expected_invocations(
+def _find_eval_case(
     actual_invocations: list[Invocation],
     eval_set: EvalSet,
-) -> list[Invocation] | None:
+) -> EvalCase | None:
     """Match actual invocations to an eval case. Uses the sole eval case if
     there's only one, otherwise matches by user content text."""
     if not eval_set.eval_cases:
         return None
 
     if len(eval_set.eval_cases) == 1:
-        case = eval_set.eval_cases[0]
-        if case.conversation:
-            return case.conversation
-        return None
+        return eval_set.eval_cases[0]
 
     actual_user_text = _get_user_text(actual_invocations[0]) if actual_invocations else None
     if not actual_user_text:
-        case = eval_set.eval_cases[0]
-        return case.conversation if case.conversation else None
+        return eval_set.eval_cases[0]
 
     for case in eval_set.eval_cases:
         if not case.conversation:
             continue
         expected_user_text = _get_user_text(case.conversation[0])
         if expected_user_text and _text_matches(actual_user_text, expected_user_text):
-            return case.conversation
+            return case
 
     logger.warning(
         "No matching eval case found for user text: '%s'. Using first eval case.",
         actual_user_text[:100],
     )
-    case = eval_set.eval_cases[0]
-    return case.conversation if case.conversation else None
+    return eval_set.eval_cases[0]
+
+
+def _find_expected_invocations(
+    actual_invocations: list[Invocation],
+    eval_set: EvalSet,
+) -> list[Invocation] | None:
+    """The matched eval case's conversation, or None."""
+    case = _find_eval_case(actual_invocations, eval_set)
+    return case.conversation if case and case.conversation else None
 
 
 def _get_user_text(invocation: Invocation) -> str | None:

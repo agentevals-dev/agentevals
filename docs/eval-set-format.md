@@ -176,6 +176,22 @@ An eval case can have multiple invocations to represent a conversation. Each inv
 | `rubrics` | list[Rubric] | no | Scoring rubrics for this specific invocation |
 | `creation_timestamp` | float | no | Unix timestamp |
 
+### Rubrics
+
+`rubrics` on an eval case apply to every invocation of that case; `rubrics` on an invocation apply to that invocation alone. Each rubric is an ADK `Rubric`: `rubric_id`, `rubric_content.text_property`, and an optional `type`. When a `rubric_based_*` metric runs, the runner adds the matched case's rubrics and each invocation's rubrics to the rubrics the metric's config declares, the way ADK's own eval service does, and a rubric without a `type` is given the metric's (`FINAL_RESPONSE_QUALITY` or `TOOL_USE_QUALITY`), since ADK applies invocation-level rubrics by type. Rubric ids must be distinct across the metric, the case and the invocation; a clash is reported as an error. With no rubric from any of the three, the metric reports an error.
+
+The `rubric_based_*` metrics grade each invocation on its own, with that invocation's prompt, steps and final response, so a case-level rubric is judged once per turn. In a multi-turn case a rubric that describes the end state ("produces the completed draft") is therefore judged against the intermediate turns as well, where it fails, and lowers the case's mean. Write such a rubric on the final invocation instead, and keep case-level rubrics for properties every turn must have.
+
+```json
+{
+  "eval_id": "resume-correction",
+  "rubrics": [
+    {"rubric_id": "corrected_value_wins", "rubric_content": {"text_property": "The response uses the operator's latest correction."}}
+  ],
+  "conversation": [ ... ]
+}
+```
+
 ### Content
 
 Uses the Google GenAI `Content` format:

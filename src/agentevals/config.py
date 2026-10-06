@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
+
+if TYPE_CHECKING:
+    from google.adk.evaluation.eval_rubrics import Rubric
 
 
 def _normalize_trajectory_match_type(v: str | None) -> str | None:
@@ -15,6 +18,53 @@ def _normalize_trajectory_match_type(v: str | None) -> str | None:
     if v is not None and v.upper() not in valid:
         raise ValueError(f"Invalid trajectory_match_type '{v}'. Valid values: {sorted(valid)}")
     return v.upper() if v is not None else v
+
+
+class RubricDef(BaseModel):
+    """One rubric for a ``rubric_based_*`` metric, as written in an eval config.
+
+    A rubric is a testable statement about the response or the tool use, with
+    an id that names it in the per-rubric scores. In YAML an entry is either a
+    mapping ``{id, text}`` or a plain string, which gets a positional id
+    (``rubric_0``, ``rubric_1``, ...).
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+
+    id: str = Field(min_length=1, description="Unique id of the rubric within the metric.")
+    text: str = Field(min_length=1, description="The testable statement the judge assesses.")
+    type: str | None = Field(
+        default=None,
+        description=(
+            "Optional ADK rubric type (for example FINAL_RESPONSE_QUALITY). Left unset, the metric's own type is used."
+        ),
+    )
+
+    def to_adk(self, default_type: str | None = None) -> Rubric:
+        from google.adk.evaluation.eval_rubrics import Rubric, RubricContent
+
+        return Rubric(
+            rubric_id=self.id,
+            rubric_content=RubricContent(text_property=self.text),
+            type=self.type or default_type,
+        )
+
+
+def _normalize_rubrics(value: Any) -> Any:
+    """Accept plain strings beside ``{id, text}`` mappings; reject duplicate ids."""
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError("'rubrics' must be a list of strings or {id, text} mappings")
+    normalized: list[Any] = []
+    for index, entry in enumerate(value):
+        if isinstance(entry, str):
+            if not entry.strip():
+                raise ValueError(f"Rubric {index} is empty")
+            normalized.append({"id": f"rubric_{index}", "text": entry})
+        else:
+            normalized.append(entry)
+    return normalized
 
 
 class BuiltinMetricDef(BaseModel):
@@ -27,6 +77,13 @@ class BuiltinMetricDef(BaseModel):
     threshold: float | None = Field(default=None, ge=0, le=1)
     judge_model: str | None = None
     trajectory_match_type: str | None = None
+    rubrics: list[RubricDef] | None = Field(
+        default=None,
+        description=(
+            "Rubrics for rubric_based_* metrics: a list of {id, text} mappings or plain strings. "
+            "Rubrics on the matched eval case or its invocations are added at run time."
+        ),
+    )
     credential_ref: str | None = Field(
         default=None,
         description="Logical name of a RunSpec.credential_refs entry whose resolved value is the judge API key.",
@@ -40,6 +97,21 @@ class BuiltinMetricDef(BaseModel):
     @classmethod
     def _validate_trajectory_match_type(cls, v: str | None) -> str | None:
         return _normalize_trajectory_match_type(v)
+
+    @field_validator("rubrics", mode="before")
+    @classmethod
+    def _normalize_rubrics(cls, v: Any) -> Any:
+        return _normalize_rubrics(v)
+
+    @field_validator("rubrics")
+    @classmethod
+    def _unique_rubric_ids(cls, v: list[RubricDef] | None) -> list[RubricDef] | None:
+        if v is None:
+            return v
+        duplicates = sorted(rubric_id for rubric_id, count in Counter(r.id for r in v).items() if count > 1)
+        if duplicates:
+            raise ValueError("Rubric ids must be unique within a metric. Duplicate ids: " + ", ".join(duplicates))
+        return v
 
 
 class BaseEvaluatorDef(BaseModel):
