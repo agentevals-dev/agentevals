@@ -181,7 +181,7 @@ class EvaluationEmitter:
         self._provider = LoggerProvider(resource=self.resource)
         self._provider.add_log_record_processor(BatchLogRecordProcessor(exporter or _exporter_from_env()))
         self._logger = self._provider.get_logger(SCOPE_NAME, _package_version())
-        self._last_failure_log = 0.0
+        self._last_failure_log: float | None = None
         self._lock = threading.Lock()
 
     def _record(self, span: tuple[str, str], attributes: Mapping[str, Any]) -> None:
@@ -298,7 +298,7 @@ class EvaluationEmitter:
     def _log_failure(self, message: str) -> None:
         with self._lock:
             now = time.monotonic()
-            if now - self._last_failure_log < FAILURE_LOG_INTERVAL_SECONDS:
+            if self._last_failure_log is not None and now - self._last_failure_log < FAILURE_LOG_INTERVAL_SECONDS:
                 return
             self._last_failure_log = now
         logger.warning(message, exc_info=True)

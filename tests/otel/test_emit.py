@@ -209,7 +209,8 @@ class TestRecords:
 
 
 class TestFailures:
-    def test_an_export_failure_never_raises_and_logs_rarely(self, caplog):
+    def test_an_export_failure_never_raises_and_logs_rarely(self, caplog, monkeypatch):
+        monkeypatch.setattr(emit.time, "monotonic", lambda: 1.0)
         conversation, index = _two_turns()
         emitter = emit.EvaluationEmitter(InMemoryLogRecordExporter())
 

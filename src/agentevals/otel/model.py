@@ -19,6 +19,11 @@ from typing import Any
 
 EMPTY_ATTRS: Mapping[str, Any] = MappingProxyType({})
 
+
+def _empty_attrs() -> Mapping[str, Any]:
+    return EMPTY_ATTRS
+
+
 (
     SPAN_KIND_UNSPECIFIED,
     SPAN_KIND_INTERNAL,
@@ -45,7 +50,7 @@ class SpanRef:
 
 @dataclass(frozen=True, slots=True)
 class Resource:
-    attributes: Mapping[str, Any] = EMPTY_ATTRS
+    attributes: Mapping[str, Any] = field(default_factory=_empty_attrs)
     schema_url: str | None = None
 
 
@@ -54,7 +59,7 @@ class Scope:
     name: str = ""
     version: str | None = None
     schema_url: str | None = None
-    attributes: Mapping[str, Any] = EMPTY_ATTRS
+    attributes: Mapping[str, Any] = field(default_factory=_empty_attrs)
 
 
 EMPTY_RESOURCE = Resource()
@@ -65,7 +70,7 @@ EMPTY_SCOPE = Scope()
 class SpanEvent:
     name: str
     time_unix_nano: int
-    attributes: Mapping[str, Any] = EMPTY_ATTRS
+    attributes: Mapping[str, Any] = field(default_factory=_empty_attrs)
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +78,7 @@ class SpanLink:
     trace_id: str
     span_id: str
     trace_state: str | None = None
-    attributes: Mapping[str, Any] = EMPTY_ATTRS
+    attributes: Mapping[str, Any] = field(default_factory=_empty_attrs)
     flags: int | None = None
 
 
