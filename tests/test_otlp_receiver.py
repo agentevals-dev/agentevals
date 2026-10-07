@@ -34,6 +34,7 @@ from agentevals.api.otlp_processing import (
     ingest_traces,
 )
 from agentevals.cli import _install_shared_exit_handler
+from agentevals.genai.routing import GenAIRoutingPolicy
 from agentevals.otel.store import Limits, TelemetryStore, session_metadata
 from agentevals.streaming.manager import LiveManager
 
@@ -142,7 +143,7 @@ class FakeClock:
 
 def _store(**limits) -> tuple[TelemetryStore, FakeClock]:
     clock = FakeClock()
-    return TelemetryStore(Limits(**limits), clock=clock), clock
+    return TelemetryStore(GenAIRoutingPolicy(), Limits(**limits), clock=clock), clock
 
 
 def _ingest(store: TelemetryStore, body: dict):
@@ -675,9 +676,10 @@ class TestLogs:
 
     def test_evaluation_results_from_this_instance_are_dropped(self):
         clock = FakeClock()
-        store = TelemetryStore(clock=clock, instance_id="me")
+        store = TelemetryStore(GenAIRoutingPolicy(emitter_instance_id="me"), clock=clock)
         _ingest(store, _request([_span()], _named("s1")))
-        results = _ingest_logs(store, _log_request([_log()], [_attr("service.instance.id", "me")]))
+        record = _log(event="gen_ai.evaluation.result")
+        results = _ingest_logs(store, _log_request([record], [_attr("service.instance.id", "me")]))
         assert results[0].rejected == 1
 
     def test_third_party_evaluation_results_are_kept(self):

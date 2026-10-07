@@ -7,9 +7,9 @@ import logging
 import pytest
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 
+from agentevals import evaluation_events as emit
 from agentevals.config import BuiltinMetricDef, CodeEvaluatorDef
 from agentevals.genai.extract import extract_conversation
-from agentevals.otel import emit
 from agentevals.otel.decode import decode_json_document
 from agentevals.otel.model import build_traces
 from agentevals.runner import MetricResult
@@ -219,7 +219,7 @@ class TestFailures:
 
         emitter._record = broken
         metric = MetricResult(metric_name="judge", score=1.0)
-        with caplog.at_level(logging.WARNING, logger="agentevals.otel.emit"):
+        with caplog.at_level(logging.WARNING, logger="agentevals.evaluation_events"):
             for _ in range(3):
                 assert (
                     emitter.emit(

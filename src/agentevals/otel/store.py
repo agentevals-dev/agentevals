@@ -5,19 +5,21 @@ point, so concurrent HTTP and gRPC exports cannot interleave inside a routing de
 check. The caller (``streaming.manager``) owns the event loop, timers and recompute; this module
 only records what happened in :attr:`TelemetryStore.events`.
 
-Routing (``otel_native_core_202610.md`` 16.2), for spans of trace T with identity key K:
+What the telemetry means is the :class:`RoutingPolicy`'s business (``genai.routing`` for GenAI);
+this module holds only the mechanics. Routing (``otel_native_core_202610.md`` 16.2), for spans of
+trace T with session key K from the policy:
 
 * R1, membership first: a trace already in a session stays there. A provisional session that
   learns its key is promoted into the head session for that key. Spans reopen a complete session;
   logs never do.
 * R2, a new trace with a key joins the head session for the key. A new SDK run id starts a new
-  generation (``name-2``) at once. A complete ``agentevals.session_name`` head starts a new
+  generation (``name-2``) at once. A complete head whose key kind splits on reruns starts a new
   generation for a rerun: a different ``service.instance.id`` when both sides carry one, otherwise
   a trace arriving once the head has been complete for the rerun window. Turns of one run that
-  are further apart than the completion grace therefore stay together. Complete conversation and
-  ``session.id`` heads are always joined again.
-* R3, a new trace without a key becomes a provisional session if it has a GenAI span, otherwise
-  it is staged (not listed) until a GenAI span or a key arrives for it.
+  are further apart than the completion grace therefore stay together. Heads of other key kinds
+  are always joined again.
+* R3, a new trace without a key becomes a provisional session if the policy says it opens one,
+  otherwise it is staged (not listed) until such a span or a key arrives for it.
 """
 
 from __future__ import annotations
@@ -29,19 +31,38 @@ from collections import Counter, OrderedDict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol
 
-from ..genai.extract import IGNORED, NON_GENAI, classify
-from ..genai.grouping import KeyKind, coerce_key, identity_key
-from ..genai.overlay import overlay
-from ..genai.semconv import EVENT_EVALUATION_RESULT
-from .identity import EVAL_SET_ID, METADATA_PREFIX, SESSION_RUN_ID
+from .identity import EVAL_SET_ID, METADATA_PREFIX, SESSION_RUN_ID, coerce_key
 from .model import LogRecord, Span
 
-SessionKey = tuple[KeyKind, str]
+SessionKey = tuple[str, str]
 
 SERVICE_INSTANCE_ID = "service.instance.id"
-EMITTER_SCOPE = "agentevals"
+
+
+class RoutingPolicy(Protocol):
+    """What the store asks about the telemetry it routes."""
+
+    rerun_kinds: frozenset[str]
+    """Key kinds whose complete sessions split into ``name-2`` on a rerun instead of rejoining."""
+
+    def session_key(self, items: Iterable[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> SessionKey | None:
+        """The key of spans or log records given as ``(attributes, resource attributes)``."""
+        ...
+
+    def opens_session(self, spans: Sequence[Span]) -> bool:
+        """Whether a trace without a key is listed as a session, rather than staged."""
+        ...
+
+    def log_drop_reason(self, log: LogRecord) -> str | None:
+        """Why a log record is accepted but not stored, or ``None`` to store it."""
+        ...
+
+    def is_own_record(self, log: LogRecord) -> bool:
+        """A record agentevals emitted itself, refused so a pipeline loop cannot feed it back."""
+        ...
+
 
 REASON_TRACE_SPANS = "span(s) rejected: trace span limit reached"
 REASON_SESSION_SPANS = "span(s) rejected: session span limit reached"
@@ -225,10 +246,6 @@ def is_local_root(span: Span) -> bool:
     return not span.parent_span_id or span.has_remote_parent
 
 
-def has_genai_span(spans: Iterable[Span]) -> bool:
-    return any(classify(overlay(s)) not in (NON_GENAI, IGNORED) for s in spans)
-
-
 def session_metadata(resource_attrs: Mapping[str, Any]) -> dict[str, Any]:
     """Resource attributes shown with the session; ``agentevals.metadata.*`` is unprefixed."""
     out: dict[str, Any] = {}
@@ -289,13 +306,13 @@ class _PendingLogs:
 class TelemetryStore:
     def __init__(
         self,
+        policy: RoutingPolicy,
         limits: Limits | None = None,
         clock: Callable[[], float] = time.monotonic,
-        instance_id: str | None = None,
     ):
+        self.policy = policy
         self.limits = limits or Limits()
         self.clock = clock
-        self.instance_id = instance_id
         self.sessions: dict[str, LiveSession] = {}
         self.traces: dict[str, LiveTrace] = {}
         self.staged: OrderedDict[str, LiveTrace] = OrderedDict()
@@ -362,7 +379,7 @@ class TelemetryStore:
         return session
 
     def _is_rerun(self, head: LiveSession, resource: Mapping) -> bool:
-        if not head.is_complete or head.key is None or head.key[0] != "name":
+        if not head.is_complete or head.key is None or head.key[0] not in self.policy.rerun_kinds:
             return False
         instance = coerce_key(resource.get(SERVICE_INSTANCE_ID))
         if instance is not None and head.instance_id is not None:
@@ -457,7 +474,7 @@ class TelemetryStore:
         now = self.clock()
         trace_id = spans[0].trace_id
         resource = spans[0].resource.attributes
-        key = identity_key((s.attributes, resource) for s in spans)
+        key = self.policy.session_key((s.attributes, resource) for s in spans)
         run_id = coerce_key(resource.get(SESSION_RUN_ID))
 
         trace = self.traces.get(trace_id)
@@ -481,7 +498,7 @@ class TelemetryStore:
                 self.nbytes -= staged.nbytes
             if key is not None:
                 session = self._head(key, run_id, resource)
-            elif has_genai_span(spans):
+            elif self.policy.opens_session(spans):
                 session = self._new_session(f"otlp-{trace_id[:12]}", None, None, resource)
             else:
                 return self._stage(staged or LiveTrace(trace_id=trace_id), spans, now, result)
@@ -570,11 +587,6 @@ class TelemetryStore:
 
     # ------------------------------------------------------------ logs
 
-    def _is_feedback(self, log: LogRecord) -> bool:
-        if self.instance_id and log.resource.attributes.get(SERVICE_INSTANCE_ID) == self.instance_id:
-            return True
-        return log.event_name == EVENT_EVALUATION_RESULT and log.scope.name == EMITTER_SCOPE
-
     def _add_log(self, trace: LiveTrace, session: LiveSession | None, log: LogRecord, result: IngestResult) -> bool:
         key = log_fingerprint(log)
         if key in trace.log_keys:
@@ -606,11 +618,11 @@ class TelemetryStore:
         result = IngestResult()
         kept: list[LogRecord] = []
         for log in logs:
-            if self._is_feedback(log):
+            if self.policy.is_own_record(log):
                 result.reject(REASON_FEEDBACK)
-            elif not log.event_name or not log.event_name.startswith("gen_ai."):
+            elif reason := self.policy.log_drop_reason(log):
                 result.accepted += 1
-                result.dropped["not a gen_ai event"] += 1
+                result.dropped[reason] += 1
             elif not log.trace_id:
                 result.accepted += 1
                 result.dropped["no trace context"] += 1
@@ -631,7 +643,7 @@ class TelemetryStore:
             return result
         if trace is None:
             resource = kept[0].resource.attributes
-            key = identity_key((log.attributes, resource) for log in kept)
+            key = self.policy.session_key((log.attributes, resource) for log in kept)
             if key is None:
                 for log in kept:
                     if self.pending.add(trace_id, log, now):

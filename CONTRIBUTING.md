@@ -159,8 +159,11 @@ Telemetry flows through four layers. Each is plain Python with no ADK dependency
 | `genai/extract.py`, `genai/model.py` | Turns, logical model calls and tool calls extracted from traces (`extract_conversation`) |
 | `genai/matching.py`, `genai/grouping.py` | Grouping traces into conversations and matching them to eval cases |
 | `adk_bridge.py` | The only place that converts to ADK types (eval sets, built in metrics) |
-| `otel/store.py`, `streaming/manager.py` | Live sessions: routing, limits, completion, recompute and UI updates |
-| `otel/emit.py` | Evaluation results as `gen_ai.evaluation.result` events |
+| `otel/store.py`, `streaming/manager.py` | Live sessions: routing mechanics, limits, completion, recompute and UI updates |
+| `genai/routing.py` | What the live store routes on: session keys, which traces and logs to keep, agentevals' own records |
+| `evaluation_events.py` | Evaluation results as `gen_ai.evaluation.result` events |
+
+Imports point down only: `otel/` imports nothing from `genai/`, and neither imports the runner, the evaluators or `evaluation_events.py`.
 
 ### Supporting a new producer
 

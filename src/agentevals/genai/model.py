@@ -54,9 +54,13 @@ class LlmCall(BaseModel):
 
 
 class ToolCall(BaseModel):
+    """One logical tool call. ``ref`` is its outermost tool span; ``inner_refs`` are the tool spans
+    nested in it for the same call (MCP client and server spans, say)."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     ref: SpanRef | None = None
+    inner_refs: list[SpanRef] = Field(default_factory=list)
     agent_name: str | None = None
     name: str
     call_id: str | None = None

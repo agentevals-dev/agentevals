@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from agentevals import __version__
 
-from ..otel import emit
+from .. import evaluation_events as emit
 from ..run.service import RunService
 from ..run.sinks import log_registered_sinks
 from ..run.worker import AsyncRunWorker

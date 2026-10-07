@@ -20,8 +20,8 @@ from pydantic import BaseModel
 
 from agentevals import __version__
 
-from ..genai.grouping import coerce_key
 from ..otel.decode import decode_bare_spans_json, decode_json_document
+from ..otel.identity import coerce_key
 from ..otel.model import EMPTY_SCOPE, LogRecord, Resource, Scope, Span
 from ..utils.log_buffer import log_buffer
 from .dependencies import get_trace_manager, require_trace_manager

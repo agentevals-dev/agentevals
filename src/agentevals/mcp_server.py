@@ -137,12 +137,13 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
             raise RuntimeError(f"API error: {response_json['error']}")
         return response_json["data"]
 
-    async def _get(path: str) -> Any:
+    async def _get(path: str, *, envelope: bool = True) -> Any:
+        """``envelope=False`` for routes that return a bare document, such as the OTLP export."""
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 r = await client.get(f"{_url}{path}")
                 r.raise_for_status()
-                return _unwrap(r.json())
+                return _unwrap(r.json()) if envelope else r.json()
         except httpx.ConnectError as exc:
             raise RuntimeError(
                 f"Cannot reach agentevals server at {_url}. Start it with: uv run agentevals serve --dev"
@@ -378,7 +379,7 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
         from agentevals.otel.decode import decode_json_document
         from agentevals.otel.model import build_traces
 
-        document = await _get(f"/api/streaming/sessions/{quote(session_id, safe='')}/otlp")
+        document = await _get(f"/api/streaming/sessions/{quote(session_id, safe='')}/otlp", envelope=False)
         decoded = decode_json_document(document, strict=False)
         traces, _ = build_traces(decoded.spans, decoded.logs)
         conversation = extract_conversation(traces, session_id)

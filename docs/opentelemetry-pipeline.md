@@ -29,6 +29,8 @@ service:
 
 The `otlphttp` exporter uses gzip by default, which agentevals accepts. Send logs as well as traces: several instrumentations put message content in log events.
 
+Send to one agentevals instance. Live sessions are kept in the memory of the process that receives them, so behind a load balancer with several replicas a session is split between them. The Helm chart keeps `replicaCount: 1` for this reason.
+
 ## Production: backend and agentevals side by side
 
 One Collector, two branches:

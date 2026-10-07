@@ -18,9 +18,9 @@ import socket
 from datetime import timedelta
 from uuid import UUID
 
+from .. import evaluation_events as emit
 from ..adk_bridge import EvalSet, load_eval_set_from_dict
 from ..config import EvalParams
-from ..otel import emit
 from ..resolvers import (
     reset_resolved_credentials,
     resolve_credential_refs,

@@ -29,17 +29,18 @@ import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
-from .model import Span, attr_str
+from .otel.identity import EMITTER_SCOPE
+from .otel.model import Span, attr_str
 
 if TYPE_CHECKING:
-    from ..config import EvaluatorDef
-    from ..genai.model import Conversation, Turn
-    from ..runner import MetricResult
+    from .config import EvaluatorDef
+    from .genai.model import Conversation, Turn
+    from .runner import MetricResult
 
 logger = logging.getLogger(__name__)
 
 EVENT_NAME = "gen_ai.evaluation.result"
-SCOPE_NAME = "agentevals"
+SCOPE_NAME = EMITTER_SCOPE
 ENABLE_ENV = "AGENTEVALS_EVALUATION_EVENTS"
 EXPLANATION_ENV = "AGENTEVALS_EVALUATION_EVENTS_EXPLANATION"
 MAX_EXPLANATION_CHARS = 2048
@@ -92,7 +93,7 @@ def enabled() -> bool:
 
 
 def _package_version() -> str:
-    from .. import __version__
+    from . import __version__
 
     return __version__
 
@@ -140,7 +141,7 @@ def _exporter_from_env() -> Any:
 def _evaluator_type(evaluator: EvaluatorDef | None) -> str | None:
     if evaluator is None or evaluator.type != "builtin":
         return None
-    from ..builtin_metrics import METRICS_NEEDING_GCP, METRICS_NEEDING_LLM
+    from .builtin_metrics import METRICS_NEEDING_GCP, METRICS_NEEDING_LLM
 
     return "llm_judge" if evaluator.name in METRICS_NEEDING_LLM | METRICS_NEEDING_GCP else "deterministic"
 

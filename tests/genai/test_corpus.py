@@ -14,6 +14,7 @@ import pytest
 from agentevals.genai.extract import extract_conversation
 from agentevals.genai.grouping import group_traces
 from agentevals.genai.messages import text_of
+from agentevals.genai.routing import GenAIRoutingPolicy
 from agentevals.loader import load_telemetry
 from agentevals.otel.decode import decode_json_document
 from agentevals.otel.encode import encode_traces
@@ -125,7 +126,7 @@ def _ingest_by_unit(items, apply):
 
 def _live_turns(document: dict, logs_first: bool) -> Counter:
     clock = _Clock()
-    store = TelemetryStore(Limits(), clock=clock)
+    store = TelemetryStore(GenAIRoutingPolicy(), Limits(), clock=clock)
     decoded = decode_json_document(document, strict=True)
     assert decoded.rejected_spans == decoded.rejected_logs == 0
     steps = [(decoded.spans, store.ingest_spans), (decoded.logs, store.ingest_logs)]

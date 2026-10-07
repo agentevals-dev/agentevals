@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from . import evaluation_events as emit
 from .adk_bridge import (
     EvalSet,
     expected_conversations,
@@ -20,11 +21,11 @@ from .adk_bridge import (
 )
 from .config import EvalParams, EvalRunConfig, EvaluatorDef
 from .genai.extract import extract_conversation
-from .genai.grouping import coerce_key, group_traces, has_session_name
+from .genai.grouping import group_traces, has_session_name
 from .genai.matching import EVAL_CASE_ID, ExpectedConversation, select_case
 from .genai.model import Conversation
 from .loader import load_traces
-from .otel import emit
+from .otel.identity import coerce_key
 from .otel.model import Trace
 from .trace_metrics import _calc_percentiles, extract_agent_identity, extract_performance_metrics
 
@@ -135,7 +136,7 @@ async def run_evaluation_from_traces(
 ) -> RunResult:
     """Evaluate already loaded traces. ``group_key`` evaluates all of them as one conversation.
 
-    When evaluation result events are on (:mod:`agentevals.otel.emit`), each group's results are
+    When evaluation result events are on (:mod:`agentevals.evaluation_events`), each group's results are
     emitted as ``gen_ai.evaluation.result`` events parented to the evaluated spans; ``run_id`` is
     attached to them when known.
     """

@@ -15,23 +15,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any, Literal
 
-from ..otel.identity import SESSION_NAME
+from ..otel.identity import SESSION_NAME, coerce_key
 from ..otel.model import Trace
 from .semconv import CONVERSATION_ID, SESSION_ID
 
-MAX_KEY_LENGTH = 256
-
 KeyKind = Literal["name", "conversation", "session_id", "trace"]
-
-
-def coerce_key(value: Any) -> str | None:
-    """A usable identity value: scalar, printable, at most 256 characters; otherwise ``None``."""
-    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
-        return None
-    text = str(value).strip()
-    if not text or len(text) > MAX_KEY_LENGTH or not text.isprintable():
-        return None
-    return text
 
 
 def _first(attr_maps: Iterable[Mapping[str, Any]], key: str) -> str | None:

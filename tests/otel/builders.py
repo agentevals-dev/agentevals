@@ -6,6 +6,7 @@ import hashlib
 import json
 from typing import Any
 
+from agentevals.genai.routing import GenAIRoutingPolicy
 from agentevals.otel.decode import DecodeResult, decode_json_document
 from agentevals.otel.store import IngestResult, Limits, TelemetryStore
 
@@ -164,7 +165,7 @@ class FakeClock:
 
 def make_store(**limits: Any) -> tuple[TelemetryStore, FakeClock]:
     clock = FakeClock()
-    return TelemetryStore(Limits(**limits), clock=clock), clock
+    return TelemetryStore(GenAIRoutingPolicy(), Limits(**limits), clock=clock), clock
 
 
 def _units(items) -> list[list]:

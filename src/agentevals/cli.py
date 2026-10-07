@@ -214,7 +214,7 @@ def run(
     if group_by is not None:
         config.group_by = group_by
 
-    from .otel import emit
+    from . import evaluation_events as emit
 
     try:
         emit.validate_env()
@@ -555,9 +555,9 @@ async def _run_servers(
         "log_level": log_level,
     }
 
-    from .otel import emit
+    from . import evaluation_events as emit
 
-    mgr = LiveManager(instance_id=emit.instance_id())
+    mgr = LiveManager(emitter_instance_id=emit.instance_id() if emit.enabled() else None)
     main_app = create_app(trace_manager=mgr, enable_streaming=True)
     otlp_app = create_otlp_app(trace_manager=mgr)
 
@@ -688,7 +688,7 @@ def serve(
         os.environ["AGENTEVALS_HEADLESS"] = "1"
     if emit_otel:
         os.environ["AGENTEVALS_EVALUATION_EVENTS"] = "true"
-    from .otel import emit
+    from . import evaluation_events as emit
 
     try:
         emit.validate_env()

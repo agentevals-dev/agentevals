@@ -31,7 +31,8 @@ from ..api.models import (
 from ..genai.extract import conversation_from_turns, extract_turns
 from ..genai.grouping import SESSION_NAME
 from ..genai.messages import has_text, text_of, user_turn_messages
-from ..genai.model import Conversation, Turn
+from ..genai.model import Conversation, ToolCall, Turn
+from ..genai.routing import GenAIRoutingPolicy
 from ..otel.decode import DecodeResult
 from ..otel.encode import encode_traces
 from ..otel.model import LogRecord, Span, SpanRef, Trace, attr_float, attr_int, build_traces
@@ -150,6 +151,26 @@ def _ref_key(kind: str, ref: SpanRef | None) -> tuple | None:
     return (kind, ref.trace_id, ref.span_id) if ref else None
 
 
+def _tool_idents(tool: ToolCall) -> list[str]:
+    """Every identity a tool call has had so far: its call id, then each of its spans.
+
+    The layers of one call (framework tool span, MCP client, MCP server) can arrive in separate
+    exports, so the call's outermost span, and with it ``ref``, changes as they come in.
+    """
+    idents = [tool.call_id] if tool.call_id else []
+    idents += [r.span_id for r in (tool.ref, *tool.inner_refs) if r is not None]
+    return idents or [f"{tool.name}@{tool.start_ns}"]
+
+
+def _first_sighting(state: LiveState, keys: list) -> bool:
+    """True the first time any of ``keys`` is seen. Later sightings record the keys they add, so
+    an element that gains an identity is still recognized under it."""
+    if any(state.seen(k) for k in keys):
+        state.mark(*(k for k in keys if not state.seen(k)))
+        return False
+    return state.mark(*keys)
+
+
 def live_events(session_id: str, conversation: Conversation, state: LiveState, incomplete: set[str]) -> list[dict]:
     """Elements of ``conversation`` not sent yet, as the SSE events the live UI consumes."""
     events: list[dict] = []
@@ -192,17 +213,18 @@ def live_events(session_id: str, conversation: Conversation, state: LiveState, i
                 events.append({"type": "agent_response", **base, "text": final, "timestamp": turn.end_ns / 1e9})
 
         for tool in turn.tool_calls:
-            ident = tool.call_id or (tool.ref.span_id if tool.ref else f"{tool.name}@{tool.start_ns}")
-            if not state.seen(("tool", ident)) and state.mark(("tool", ident)):
+            idents = _tool_idents(tool)
+            ident = idents[0]
+            if _first_sighting(state, [("tool", i) for i in idents]):
                 events.append(
                     {
                         "type": "tool_call",
                         **base,
-                        "toolCall": {"id": tool.call_id or ident, "name": tool.name, "args": tool.arguments or {}},
+                        "toolCall": {"id": ident, "name": tool.name, "args": tool.arguments or {}},
                         "timestamp": (tool.start_ns or turn.start_ns) / 1e9,
                     }
                 )
-            if tool.result is not None and not state.seen(("result", ident)) and state.mark(("result", ident)):
+            if tool.result is not None and _first_sighting(state, [("result", i) for i in idents]):
                 events.append(
                     {
                         "type": "tool_result",
@@ -259,7 +281,7 @@ class LiveManager:
         completion_grace_seconds: float | None = None,
         idle_timeout_seconds: float | None = None,
         rerun_window_seconds: float | None = None,
-        instance_id: str | None = None,
+        emitter_instance_id: str | None = None,
     ):
         overrides = {
             name: value
@@ -275,7 +297,7 @@ class LiveManager:
             if budget is not None:
                 overrides["max_bytes"] = budget
         limits = dataclasses.replace(limits or Limits(), **overrides)
-        self.store = TelemetryStore(limits, instance_id=instance_id)
+        self.store = TelemetryStore(GenAIRoutingPolicy(emitter_instance_id), limits)
         self.clients: list[SseClient] = []
         self._states: dict[str, LiveState] = {}
         self._pending: dict[str, _Pending] = {}

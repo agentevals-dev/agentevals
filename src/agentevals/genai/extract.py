@@ -10,6 +10,10 @@ Rules, in brief (``otel_native_core_202610.md`` sections 4.5 and 16):
 * Inference spans nested without an agent or tool in between collapse into one logical call
   when the chain has exactly one leaf (wrapper spans over provider spans); with several leaves
   each leaf is its own call. Usage is counted once per logical call.
+* Tool spans nested in a tool span of the same call (the same ``gen_ai.tool.call.id`` when both
+  carry one, else the same tool name) with no agent or model call between are one logical call:
+  a framework tool span over the MCP client and MCP server spans of the call it makes. The
+  outermost span is the call's ref, since it covers what the agent observed.
 * The trajectory comes from tool spans when the turn has any, otherwise from ``tool_call``
   parts of the model outputs, with results joined from later ``tool_call_response`` parts.
   Tool spans without arguments or result are completed from those parts (by call id, else by
@@ -65,6 +69,7 @@ IGNORED = "ignored"
 
 AGENTIC = frozenset({AGENT, WORKFLOW})
 BREAKS_INFERENCE_CHAIN = frozenset({AGENT, WORKFLOW, TOOL})
+BREAKS_TOOL_CHAIN = frozenset({AGENT, WORKFLOW, INFERENCE})
 
 TOOL_FINISH_REASONS = frozenset({"tool_calls", "tool_call", "tool_use", "function_call"})
 
@@ -92,6 +97,7 @@ class _Info:
     view: SpanView
     covered: bool = False
     inference_parent: str | None = None
+    tool_parent: str | None = None
     agent_name: str | None = None
     under_tool: bool = False
     anchor: str | None = None
@@ -126,13 +132,14 @@ def analyze(trace: Trace) -> TraceAnalysis:
     info = {sid: _Info(kind=classify(v), view=v) for sid, v in views.items()}
 
     agentic_anchors: set[str] = set()
-    stack: list[tuple[str, bool, str | None, str | None, bool]] = [
-        (r, False, None, None, False) for r in reversed(trace.roots)
+    stack: list[tuple[str, bool, str | None, str | None, bool, str | None]] = [
+        (r, False, None, None, False, None) for r in reversed(trace.roots)
     ]
     while stack:
-        sid, covered, inf_parent, agent_name, under_tool = stack.pop()
+        sid, covered, inf_parent, agent_name, under_tool, tool_parent = stack.pop()
         node = info[sid]
         node.covered, node.inference_parent, node.under_tool = covered, inf_parent, under_tool
+        node.tool_parent = tool_parent
         own_agent = attr_str(node.view.attrs, sc.AGENT_NAME)
         if node.kind in AGENTIC and own_agent:
             agent_name = own_agent
@@ -147,8 +154,14 @@ def analyze(trace: Trace) -> TraceAnalysis:
         else:
             child_inf = inf_parent
         child_tool = under_tool or node.kind == TOOL
+        if node.kind == TOOL:
+            child_tool_parent = sid
+        elif node.kind in BREAKS_TOOL_CHAIN:
+            child_tool_parent = None
+        else:
+            child_tool_parent = tool_parent
         for child in reversed(trace.children.get(sid, ())):
-            stack.append((child, child_covered, child_inf, agent_name, child_tool))
+            stack.append((child, child_covered, child_inf, agent_name, child_tool, child_tool_parent))
 
     for root in trace.roots:
         default_anchor = None if root in agentic_anchors else root
@@ -323,26 +336,63 @@ def _json_or_raw(value: Any) -> Any:
     return value
 
 
-def _tool_calls_from_spans(analysis: TraceAnalysis, tool_ids: list[str], warnings: list[str]) -> list[ToolCall]:
+def _same_tool_call(outer: SpanView, inner: SpanView) -> bool:
+    outer_id, inner_id = attr_str(outer.attrs, sc.TOOL_CALL_ID), attr_str(inner.attrs, sc.TOOL_CALL_ID)
+    if outer_id and inner_id:
+        return outer_id == inner_id
+    name = attr_str(outer.attrs, sc.TOOL_NAME)
+    return name is not None and name == attr_str(inner.attrs, sc.TOOL_NAME)
+
+
+def _tool_chains(analysis: TraceAnalysis, ordered: list[str]) -> list[list[str]]:
+    """Tool spans of a turn grouped into logical calls, outermost span first.
+
+    ``ordered`` is depth first, so a span's enclosing tool span is resolved before the span itself
+    and the grouping stays linear however deep the nesting. Calls come back in start order of their
+    outermost span.
+    """
+    info = analysis.info
+    outermost: dict[str, str] = {}
+    chains: dict[str, list[str]] = {}
+    for sid in ordered:
+        if info[sid].kind != TOOL:
+            continue
+        parent = info[sid].tool_parent
+        if parent in outermost and _same_tool_call(info[parent].view, info[sid].view):
+            outermost[sid] = outermost[parent]
+        else:
+            outermost[sid] = sid
+        chains.setdefault(outermost[sid], []).append(sid)
+    spans = analysis.trace.spans
+    return sorted(chains.values(), key=lambda chain: (spans[chain[0]].start_time_unix_nano, chain[0]))
+
+
+def _present(views: Sequence[SpanView], key: str) -> Any:
+    return next((v.attrs[key] for v in views if v.attrs.get(key) is not None), None)
+
+
+def _tool_calls_from_spans(analysis: TraceAnalysis, chains: list[list[str]], warnings: list[str]) -> list[ToolCall]:
     out = []
-    for sid in tool_ids:
-        node = analysis.info[sid]
-        view, span = node.view, node.view.span
-        name = attr_str(view.attrs, sc.TOOL_NAME)
+    for chain in chains:
+        views = [analysis.info[s].view for s in chain]
+        span = views[0].span
+        name = _first(views, lambda v: attr_str(v.attrs, sc.TOOL_NAME))
         if not name:
             tokens = span.name.split()
             name = tokens[1] if len(tokens) >= 2 and tokens[0] == sc.OP_EXECUTE_TOOL else span.name
-            warnings.append(f"tool span {sid} has no gen_ai.tool.name; used span name token {name!r}")
-        error_type = attr_str(view.attrs, sc.ERROR_TYPE)
-        is_error = span.status_code == STATUS_ERROR or error_type is not None
+            warnings.append(f"tool span {chain[0]} has no gen_ai.tool.name; used span name token {name!r}")
+        status = _first(views, lambda v: _status(v.span) if _status(v.span) != "unset" else None)
+        error_type = _first(views, lambda v: attr_str(v.attrs, sc.ERROR_TYPE))
+        is_error = status == "error" or error_type is not None
         out.append(
             ToolCall(
                 ref=span.ref,
-                agent_name=node.agent_name,
+                inner_refs=[v.span.ref for v in views[1:]],
+                agent_name=analysis.info[chain[0]].agent_name,
                 name=name,
-                call_id=attr_str(view.attrs, sc.TOOL_CALL_ID),
-                arguments=_json_or_raw(view.attrs.get(sc.TOOL_CALL_ARGUMENTS)),
-                result=_json_or_raw(view.attrs.get(sc.TOOL_CALL_RESULT)),
+                call_id=_first(views, lambda v: attr_str(v.attrs, sc.TOOL_CALL_ID)),
+                arguments=_json_or_raw(_present(views, sc.TOOL_CALL_ARGUMENTS)),
+                result=_json_or_raw(_present(views, sc.TOOL_CALL_RESULT)),
                 is_error=is_error,
                 error_type=error_type or (sc.ERROR_TYPE_OTHER if is_error else None),
                 start_ns=span.start_time_unix_nano,
@@ -488,12 +538,9 @@ def _turn(analysis: TraceAnalysis, anchor: str) -> Turn:
     warnings: list[str] = []
 
     calls = _llm_calls(analysis, ordered)
-    tool_ids = sorted(
-        (m for m in ordered if info[m].kind == TOOL),
-        key=lambda s: (trace.spans[s].start_time_unix_nano, s),
-    )
-    if tool_ids:
-        tools = _tool_calls_from_spans(analysis, tool_ids, warnings)
+    tool_chains = _tool_chains(analysis, ordered)
+    if tool_chains:
+        tools = _tool_calls_from_spans(analysis, tool_chains, warnings)
         _fill_from_parts(tools, calls, warnings)
     else:
         tools = _tool_calls_from_parts(calls, warnings)
