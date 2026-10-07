@@ -216,6 +216,30 @@ Not all evaluators require an eval set. Use `agentevals evaluator list --source 
 | `hallucinations_v1` | no | N/A |
 | `safety_v1` | no | N/A |
 
+## How traces are matched to cases
+
+Each trace, or each conversation when traces are grouped, is compared with one eval case:
+
+1. The case named by an `agentevals.eval.case.id` attribute (on a span or the resource).
+2. Otherwise the case whose first user message equals the trace's first user message (case and spacing ignored). If several cases match, the one with the same number of turns.
+3. Otherwise, when the eval set has exactly one case and you evaluate exactly one trace or conversation, that case.
+
+If nothing matches, metrics that need a golden report `NOT_EVALUATED` with the reason in `details.reason`. agentevals never falls back to the first case.
+
+Turns are compared in order. Extra or missing turns are reported as `unexpected_turns` / `missing_turns` in the metric details.
+
+### Grouping traces into conversations
+
+`--group-by` (CLI) or `group_by` (API config) decides what one evaluated unit is:
+
+| Value | Unit |
+|---|---|
+| `auto` (default) | A conversation when a trace carries `agentevals.session_name` or the eval set has a case with more than one invocation; otherwise each trace |
+| `conversation` | Traces that share `agentevals.session_name`, `gen_ai.conversation.id` or `session.id` |
+| `trace` | Each trace |
+
+Use `conversation` when each turn of a multi turn conversation is its own trace.
+
 ## Usage
 
 ### CLI

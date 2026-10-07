@@ -14,6 +14,7 @@ import asyncio
 import contextlib
 import dataclasses
 import logging
+import os
 import threading
 import time
 from collections import OrderedDict
@@ -49,6 +50,19 @@ MAX_TICK_SECONDS = 1.0
 # A recompute can produce thousands of elements at once; handing the loop back between batches
 # lets SSE writers drain, so the queue bound drops only clients that are really behind.
 BROADCAST_BATCH = 100
+
+
+MAX_BYTES_ENV = "AGENTEVALS_LIVE_MAX_BYTES"
+
+
+def _max_bytes_from_env() -> int | None:
+    """The live store memory budget in bytes, from ``AGENTEVALS_LIVE_MAX_BYTES``."""
+    raw = os.environ.get(MAX_BYTES_ENV, "").strip()
+    if not raw:
+        return None
+    if not raw.isdigit() or int(raw) <= 0:
+        raise ValueError(f"{MAX_BYTES_ENV} must be a positive number of bytes (got: {raw!r})")
+    return int(raw)
 
 
 def _resource_groups(items: Iterable[Any]) -> list[list[Any]]:
@@ -256,6 +270,10 @@ class LiveManager:
             )
             if value is not None
         }
+        if limits is None and "max_bytes" not in overrides:
+            budget = _max_bytes_from_env()
+            if budget is not None:
+                overrides["max_bytes"] = budget
         limits = dataclasses.replace(limits or Limits(), **overrides)
         self.store = TelemetryStore(limits, instance_id=instance_id)
         self.clients: list[SseClient] = []

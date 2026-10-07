@@ -150,34 +150,23 @@ docs/                 # Documentation
 
 ## Trace Processing Architecture
 
-agentevals converts OTel traces from agent frameworks into a common `Invocation` format for evaluation. If you're adding support for a new framework or changing how we extract data from spans, this section will help you find your way around.
-
-### Key Modules
+Telemetry flows through four layers. Each is plain Python with no ADK dependency except the bridge.
 
 | Module | What it does |
 |--------|--------------|
-| `trace_attrs.py` | Single source of truth for OTel attribute key constants (`OTEL_GENAI_*` for standard semconv, `ADK_*` for Google ADK) |
-| `extraction.py` | Shared extraction functions, span classifiers, and the `TraceFormatExtractor` protocol with `AdkExtractor` / `GenAIExtractor` |
-| `converter.py` | Batch conversion orchestration, turns ADK traces into `Invocation` objects |
-| `genai_converter.py` | Batch conversion for GenAI semconv traces (single-turn and multi-turn) |
-| `streaming/incremental_processor.py` | Real-time span processing for the live UI, uses the same shared extraction functions |
-| `utils/log_enrichment.py` | Reconstructs `gen_ai.input/output.messages` from OTel log records into span attributes |
+| `otel/model.py`, `otel/decode.py`, `otel/encode.py` | Lossless OTLP envelopes (spans, logs, resources, scopes) decoded from protobuf, JSON or Jaeger files, and encoded back |
+| `genai/overlay.py`, `genai/semconv.py` | Read only view of a span in current GenAI conventions, with fallbacks for deprecated keys, events, ADK and OpenLLMetry attributes |
+| `genai/extract.py`, `genai/model.py` | Turns, logical model calls and tool calls extracted from traces (`extract_conversation`) |
+| `genai/matching.py`, `genai/grouping.py` | Grouping traces into conversations and matching them to eval cases |
+| `adk_bridge.py` | The only place that converts to ADK types (eval sets, built in metrics) |
+| `otel/store.py`, `streaming/manager.py` | Live sessions: routing, limits, completion, recompute and UI updates |
+| `otel/emit.py` | Evaluation results as `gen_ai.evaluation.result` events |
 
-### Adding a new attribute constant
+### Supporting a new producer
 
-Add it to `trace_attrs.py` and import from there. Don't use hardcoded attribute key strings elsewhere.
-
-### Adding or modifying extraction logic
-
-The extraction functions in `extraction.py` accept flat `dict[str, Any]` attribute maps. This means they work with both `Span`-based batch converters (via `span.tags`) and the raw OTLP dict incremental processor. When extracting data, check ADK-specific attributes first (they contain richer data), then fall back to GenAI semconv.
-
-### Supporting a new trace format
-
-1. Add a new `TraceFormatExtractor` implementation in `extraction.py` with `detect()`, `find_invocation_spans()`, `find_llm_spans_in()`, `find_tool_spans_in()`, and `classify_span()`
-2. Register it in the `_EXTRACTORS` list. Order matters here: more specific formats should come first so they get detected before the generic GenAI fallback
-3. If the format introduces new attribute keys, add them to `trace_attrs.py`
-4. If you need conversion logic that the shared extraction functions don't cover, add a dedicated converter module (see `genai_converter.py` for an example)
-5. Add tests to `tests/test_extraction.py` for detection and span classification
+1. Record a few real traces and add them as fixtures with the turns you expect.
+2. If the producer uses standard GenAI attributes, it should already work. Check with `agentevals run`.
+3. If it uses its own attribute names, add a fallback in `genai/overlay.py`. Never change span classification for one producer; it keys on `gen_ai.operation.name`.
 
 ### Adding an SDK example
 

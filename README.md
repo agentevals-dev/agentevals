@@ -168,18 +168,18 @@ agentevals serve --dev
 
 # Terminal 2
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent"
+export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent,service.instance.id=$(uuidgen)"
 python your_agent.py
 ```
 
 For OTLP/gRPC exporters, use:
 
 ```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 ```
 
-Traces stream to the UI in real-time. Works with LangChain, Strands, Google ADK, OpenAI Agents SDK, or any framework that emits OTel spans (`http/protobuf`, `http/json`, and OTLP/gRPC supported; gzip request compression supported). Sessions are auto-created and grouped by `agentevals.session_name`. Set `agentevals.eval_set_id` to associate traces with an eval set.
+Traces stream to the UI in real time. Works with LangChain, Strands, Google ADK, OpenAI Agents SDK, or any framework that emits OTel GenAI spans (`http/protobuf`, `http/json` and gRPC, gzip supported). Sessions are grouped by `agentevals.session_name` (or `gen_ai.conversation.id` / `session.id`); `service.instance.id` tells a rerun from the next turn. Set `agentevals.eval_set_id` to associate traces with an eval set. Per framework settings: [OpenTelemetry Compatibility](docs/otel-compatibility.md).
 
 See [examples/zero-code-examples/](examples/zero-code-examples/) for working examples.
 
@@ -196,7 +196,7 @@ with app.session(eval_set_id="my-eval"):
     agent.invoke("Roll a 20-sided die for me")
 ```
 
-Requires `pip install "agentevals-cli[streaming]"`. See [examples/sdk_example/](examples/sdk_example/) for framework-specific patterns.
+The session's spans and GenAI log events go to the agentevals receiver over OTLP, tagged with the session name, eval set id and a run id; your own exporters are not affected. The SDK sends to `http://localhost:4318`, or to `endpoint=` / `AGENTEVALS_OTLP_ENDPOINT`, and never reads `OTEL_EXPORTER_OTLP_*`, so credentials meant for another backend are not sent to agentevals. Entering a session raises `ConnectionError` if the receiver is not reachable. See [examples/sdk_example/](examples/sdk_example/) for framework specific patterns.
 
 ## CLI
 
@@ -360,9 +360,9 @@ Working examples are in the [`examples/`](examples/) directory:
 |-------|-------------|
 | [Eval Set Format](docs/eval-set-format.md) | Schema, field reference, and examples for golden eval set JSON files |
 | [Custom Evaluators](docs/custom-evaluators.md) | Write your own scoring logic in Python, JavaScript, or any language |
-| [Live Streaming](docs/streaming.md) | Real-time trace streaming, dev server setup, and session management |
+| [OpenTelemetry Pipelines](docs/opentelemetry-pipeline.md) | Collector recipes, and evaluation results as OpenTelemetry events |
 | [Run History](docs/run-history.md) | Persisting evaluations to Postgres and exploring them over time in the UI |
-| [OpenTelemetry Compatibility](docs/otel-compatibility.md) | Supported OTel conventions, message delivery mechanisms, and OTLP receiver |
+| [OpenTelemetry Compatibility](docs/otel-compatibility.md) | What to send, per framework setup, live sessions and evaluating them, receiver limits |
 
 ## Development
 
@@ -398,7 +398,7 @@ Yes. A custom evaluator is any program that reads JSON from stdin and writes a s
 
 **Can I plug agentevals into an existing OTel pipeline?**
 
-Yes. The OTLP receiver on port 4318 accepts standard `http/protobuf` and `http/json` trace exports, including gzip-compressed request bodies — so a default-configured OTel Collector works without setting `compression: none`. It slots into any OpenTelemetry pipeline as just another exporter destination. If your pipeline uses gRPC (port 4317), place an [OTel Collector](https://opentelemetry.io/docs/collector/) in front to bridge gRPC to HTTP. The [Kubernetes example](examples/kubernetes/README.md) shows this pattern.
+Yes. agentevals is an OTLP destination like any other: HTTP on port 4318 (`http/protobuf` or `http/json`, gzip included, so a default Collector exporter works) and gRPC on port 4317. It can also send its evaluation results back into your pipeline as `gen_ai.evaluation.result` events (`--emit-otel`). See [OpenTelemetry Pipelines](docs/opentelemetry-pipeline.md) and the [Kubernetes example](examples/kubernetes/README.md).
 
 **Can I use agentevals to evaluate Claude Code, Codex, or OpenCode?**
 

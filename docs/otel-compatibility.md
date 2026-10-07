@@ -1,259 +1,122 @@
-# OpenTelemetry Compatibility
+# Sending telemetry to agentevals
 
-agentevals consumes OpenTelemetry traces to evaluate AI agents. This document covers which OTel conventions we support, how we handle the ongoing migration from span events to log-based events, and guidance for instrumenting your own agents.
+agentevals reads standard OpenTelemetry GenAI telemetry: spans, plus log events for message content. Any producer that follows the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) works. This page says what agentevals needs, how to set up common producers, and what the receiver accepts.
 
-## Supported Semantic Conventions
+## What agentevals needs
 
-### OTel GenAI Semantic Conventions (recommended)
+| To get | Send |
+|---|---|
+| Turns | An `invoke_agent` or `invoke_workflow` span per user turn. Without one, each root span with model calls becomes a turn. |
+| User input and final answer | `gen_ai.input.messages` / `gen_ai.output.messages` on the agent span or the model call spans (as attributes or as log events). |
+| Tool trajectory | `execute_tool` spans with `gen_ai.tool.name`, ideally `gen_ai.tool.call.id`. |
+| Tool arguments and results | `gen_ai.tool.call.arguments` / `gen_ai.tool.call.result`, or `tool_call` / `tool_call_response` message parts. |
+| Tokens and model | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.request.model` on model call spans. |
+| Errors | Span status ERROR and `error.type`. |
+| Sessions | One of the keys in [Sessions](#sessions). |
 
-The [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) define standard span attributes for LLM interactions. agentevals auto-detects this format when spans contain `gen_ai.request.model` or `gen_ai.input.messages`.
+Message content is optional. Without it you still get tools, tokens, errors and latency, but text based metrics have nothing to score.
 
-This format works with LangChain, Strands, OpenAI instrumentation, Anthropic instrumentation, and any framework that follows the GenAI semantic conventions.
+## Producer setup
 
-#### Core attributes
+| Producer | Set |
+|---|---|
+| Google ADK (Python) | Nothing for the defaults. For the latest conventions: `ADK_TELEMETRY_SCHEMA_VERSION_OPT_IN=2` and `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`, with `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY` (or `EVENT_ONLY` plus a log exporter). |
+| adk-go | Nothing. The root `invoke_agent` span marks the turn. |
+| Official OpenTelemetry GenAI packages (`opentelemetry-instrumentation-genai-*`, 1.2b0+) | `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_AND_EVENT` for content. They always use the latest conventions. |
+| `opentelemetry-instrumentation-openai-v2` (LangChain, plain OpenAI) | `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true`, and export logs too: content arrives as log events. |
+| Strands | `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`. |
+| OpenAI Agents SDK | `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=span_and_event` and `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`. Tool spans carry no call id, so tools match by name. |
+| kagent (OpenLLMetry `gen_ai.prompt.N.*` attributes) | Nothing. These are read as a legacy fallback. |
 
-| Attribute | Description |
-|-----------|-------------|
-| `gen_ai.request.model` | Model name (e.g. `gpt-4o`, `claude-sonnet-4-6`) |
-| `gen_ai.input.messages` | JSON array of input messages |
-| `gen_ai.output.messages` | JSON array of output messages |
-| `gen_ai.response.finish_reasons` | Why the model stopped generating |
-| `gen_ai.usage.input_tokens` | Input token count |
-| `gen_ai.usage.output_tokens` | Output token count |
+Working setups for each are in [examples/zero-code-examples](../examples/zero-code-examples/).
 
-#### Provider and response metadata (v1.37.0+)
+If a framework only instruments the model client (each model call is its own trace), agentevals joins a call that answers a tool result to the turn before it. This needs message content.
 
-| Attribute | Description |
-|-----------|-------------|
-| `gen_ai.provider.name` | LLM provider (e.g. `openai`, `anthropic`). Replaces the deprecated `gen_ai.system`. |
-| `gen_ai.response.model` | Model name returned in the response |
-| `gen_ai.response.id` | Unique response identifier |
+## Sessions
 
-#### Request parameters (v1.40.0)
+Live traces are grouped into sessions by the first key present:
 
-| Attribute | Description |
-|-----------|-------------|
-| `gen_ai.request.temperature` | Temperature sampling parameter |
-| `gen_ai.request.max_tokens` | Maximum output tokens limit |
-| `gen_ai.request.top_p` | Top-P (nucleus) sampling parameter |
-| `gen_ai.request.top_k` | Top-K sampling parameter |
+1. resource `agentevals.session_name`
+2. `gen_ai.conversation.id` (span, then resource)
+3. `session.id` (span, then resource)
 
-#### Cache token usage
+Traces with none of these become a session of their own when they contain GenAI spans. Traces with no GenAI span at all are held back for two minutes and shown only if a GenAI span or a key arrives for them.
 
-| Attribute | Description |
-|-----------|-------------|
-| `gen_ai.usage.cache_creation.input_tokens` | Tokens spent creating a prompt cache entry |
-| `gen_ai.usage.cache_read.input_tokens` | Tokens served from an existing cache entry |
+Reruns with the same `agentevals.session_name` become `name-2`, `name-3`. A rerun is recognized by a different `service.instance.id`, so set one per process:
 
-These are relevant for providers that support prompt caching (Anthropic, OpenAI). agentevals aggregates these across LLM spans and displays them in the performance summary.
-
-#### Agent and tool metadata (v1.31.0+)
-
-| Attribute | Description |
-|-----------|-------------|
-| `gen_ai.agent.id` | Unique agent identifier |
-| `gen_ai.agent.description` | Agent description |
-| `gen_ai.tool.description` | Tool description |
-| `gen_ai.tool.type` | Tool type classification |
-
-#### Opt-in attributes (v1.37.0+)
-
-These may contain large payloads and are typically gated behind instrumentation flags:
-
-| Attribute | Description |
-|-----------|-------------|
-| `gen_ai.system_instructions` | System prompt text |
-| `gen_ai.tool.definitions` | Tool schema definitions (JSON) |
-| `gen_ai.output.type` | Classification of output content |
-
-### Google ADK (framework-native)
-
-Google ADK emits spans under the `gcp.vertex.agent` OTel scope with proprietary attributes (`gcp.vertex.agent.llm_request`, `gcp.vertex.agent.llm_response`, etc.). agentevals has a dedicated converter that auto-detects this format. No GenAI semconv configuration is needed.
-
-### Format Detection
-
-Format detection is automatic. When a trace contains both ADK and GenAI attributes, ADK takes priority because it provides richer structured data. The detection logic lives in `src/agentevals/converter.py` (`get_extractor()`).
-
-## Message Formats
-
-GenAI message content (`gen_ai.input.messages`, `gen_ai.output.messages`) can use two JSON schemas. agentevals supports both and normalizes them internally.
-
-### Content-based format
-
-Used by OpenAI and LangChain instrumentors (v2):
-
-```json
-{"role": "user", "content": "Hello"}
-{"role": "assistant", "content": "...", "tool_calls": [{"type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"NYC\"}"}}]}
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent,service.instance.id=$(uuidgen)"
 ```
 
-### Parts-based format (v1.36.0+)
+Without `service.instance.id`, a new trace counts as a rerun once the previous session has been finished for 30 seconds. Sessions keyed by a conversation or session id never split.
 
-Used by newer instrumentors that follow the GenAI semconv parts schema:
+A trace is finished 3 seconds after its root span arrives (30 seconds if no root ever arrives), and a session when all its traces are. New spans reopen a finished session; logs that arrive late update it without reopening. Finished sessions stay in memory for 2 hours.
 
-```json
-{"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
-{"role": "assistant", "parts": [{"type": "tool_call", "name": "get_weather", "arguments": {"city": "NYC"}}]}
-```
+Anyone who can reach the receiver can add traces to a session by reusing its key, and the server has no authentication. Bind it to 127.0.0.1 (`agentevals serve --host 127.0.0.1`) on shared machines, and do not expose it to untrusted networks.
 
-Both formats are auto-detected per message. Tool calls are normalized to `{name, id, arguments}` regardless of source format.
+### Evaluate live sessions
 
-## Message Content Delivery
+In the UI, pick a golden session and evaluate the others against it; each session is scored as one conversation. From scripts:
 
-GenAI message content can arrive through three mechanisms. agentevals supports all of them:
+| Endpoint | Use |
+|---|---|
+| `GET /api/streaming/sessions` | List sessions with their turns |
+| `GET /api/streaming/sessions/{id}/otlp` | The session as an OTLP/JSON document; `agentevals run` reads it back |
+| `POST /api/streaming/create-eval-set` | Build an eval set from a session |
+| `POST /api/streaming/evaluate-sessions` | Score every finished session against a golden session |
 
-### 1. Span attributes (simplest)
+## Sampling
 
-Message content is stored directly as span attributes. This is the most straightforward approach and requires no special handling.
+agentevals needs whole traces. Keep the SDK sampler at its default (always on). If you sample in a Collector, sample whole traces (tail sampling) and keep the logs of the traces you keep. A trace with missing spans gives missing turns or tools.
 
-### 2. Log records (recommended for new instrumentation)
+## What agentevals ignores
 
-Message content is emitted as OTel log records correlated with spans via trace context. This is the pattern used by `opentelemetry-instrumentation-openai-v2` and LangChain's GenAI instrumentation.
+* Span names. Spans are classified by `gen_ai.operation.name`.
+* `schema_url`.
+* Log records that are not `gen_ai.*` events, and logs without trace context.
+* Its own `gen_ai.evaluation.result` events, so a pipeline that loops back does not feed results in again.
 
-Requires both `OTLPSpanExporter` and `OTLPLogExporter` (or their streaming equivalents). Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` to enable content capture.
+Vendor attributes (`gcp.vertex.agent.*`) are read as a fallback, never required.
 
-### 3. Span events (deprecated, supported for backward compatibility)
+## Receiver
 
-Message content is emitted as attributes on span events. agentevals promotes these to span-level attributes during normalization so downstream processing sees a uniform shape.
-
-This promotion happens in three processing layers:
-- `streaming/processor.py` for live WebSocket spans
-- `api/otlp_routes.py` for OTLP HTTP reception
-- `loader/otlp.py` for loading OTLP JSON files
-
-## Span Events Deprecation
-
-The OTel community is [deprecating the Span Event API](https://opentelemetry.io/blog/2026/deprecating-span-events/) (`Span.AddEvent`, `Span.RecordException`) in favor of emitting events as log records via the Logs API. The core idea: "events are logs with names," correlated with traces through context.
-
-### What this means for agentevals users
-
-**No immediate action required.** Existing instrumentation continues to work. The deprecation is about providing a single recommended path for new code, not about removing support for existing span event data.
-
-**For new instrumentation**, prefer the logs-based pattern. Configure both `OTLPSpanExporter` and `OTLPLogExporter`, and use instrumentation libraries that emit message content as log records.
-
-**For existing span-event instrumentation** (e.g. Strands with `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`), everything continues to work. When your framework releases a version that migrates to log-based events, update your exporter configuration to include `OTLPLogExporter` and follow the logs-based pattern.
-
-### What this means for agentevals internals
-
-agentevals already supports both content delivery mechanisms. The span event promotion logic will remain for backward compatibility with older instrumentation versions. As frameworks migrate, the log-based path (already fully supported) will become the primary path.
-
-### Migration checklist for framework authors
-
-If you maintain an OTel-instrumented agent framework and want to align with the deprecation:
-
-1. Emit `gen_ai.input.messages` and `gen_ai.output.messages` as log records instead of span events
-2. Correlate logs with spans via trace context (the OTel SDK handles this automatically)
-3. Document that users need both `OTLPSpanExporter` and `OTLPLogExporter`
-4. Consider an opt-in flag (similar to `OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN`) during the transition
-
-## OTLP Receiver
-
-agentevals runs two OTLP receivers:
-
-- **gRPC** on port 4317 (standard OTLP gRPC port, configurable via `--otlp-grpc-port`)
-- **HTTP** on port 4318 (standard OTLP HTTP port)
-
-Both accept traces and logs and feed into the same session manager.
-
-### OTLP HTTP
-
-| Endpoint | Content Types | Request compression |
-|----------|--------------|---------------------|
-| `/v1/traces` | `application/json`, `application/x-protobuf` | `gzip`, `identity` |
-| `/v1/logs` | `application/json`, `application/x-protobuf` | `gzip`, `identity` |
-
-Responses mirror the request's `Content-Type` and are never compressed: an Export response is only a
-few bytes (a full success serializes to zero bytes), and gzip framing would inflate it. A stock OTel
-Collector needs no configuration for requests: its OTLP exporter gzip-compresses by default and that
-is supported here.
-
-#### Conformance
-
-| Condition | Response |
-|-----------|----------|
-| Payload undecodable (bad JSON, bad protobuf, corrupt or truncated gzip) | `400` — permanent, clients must not retry |
-| Payload decodable but structurally invalid (e.g. `resourceSpans` is not a list of objects) | `400` |
-| Unsupported `Content-Encoding` (`br`, `deflate`, `zstd`, `snappy`, …) | `415` — set `compression: gzip` or `none` on the exporter |
-| Body exceeds 64 MiB on the wire | `413` |
-| Body exceeds 64 MiB after decompression | `413` |
-| gzip body exceeds 8 MiB compressed | `413` |
-| gzip body has more than 32 concatenated members | `400` |
-| Unrecognized `Content-Type` | `415` (a missing header is treated as JSON) |
-| Success, nothing dropped | `200` with `partial_success` unset |
-| Success, some records dropped | `200` with `partial_success` populated |
-
-Request bodies are bounded on both paths and in both directions: the wire body at 64 MiB
-(compressed or not) and the decompressed output at 64 MiB, with a tighter 8 MiB cap on compressed
-input. The wire cap holds during the upload — `Content-Length` is checked before the body is read,
-and the bytes are counted as they arrive, so an oversized chunked upload is stopped partway rather
-than buffered first. Concatenated gzip members are counted as well, because decoding cost scales
-with member count rather than output — a body of 20-byte empty members costs CPU in proportion to its
-size while producing nothing, so a member cap is what actually bounds the work. Real exporters emit a
-single member; 32 is generous headroom.
-
-Decompression and decoding both run off the event loop, which this process shares with the dashboard
-API, the UI streams and the gRPC receiver; parsing dominates at roughly 40 ms per MiB.
-
-Because `413` is permanent, a collector drops the whole batch rather than retrying or splitting it —
-so if you export large batches (full prompts in span attributes add up), cap the batch size in bytes
-on the exporter's sending queue, e.g. the Collector's `sending_queue`/`batch` settings.
-
-Every `4xx`/`5xx` body is a `google.rpc.Status` message, with `Status.code` populated
-(`INVALID_ARGUMENT` for `400`/`415`, `RESOURCE_EXHAUSTED` for `413`, `INTERNAL` for `500`,
-`UNAVAILABLE` for `503`). Its encoding
-mirrors the request, so the response's own `Content-Type` stays honest — the same choice the
-reference Go OTLP receiver makes. The specification's literal wording ("the response body for all
-`HTTP 4xx` and `HTTP 5xx` responses MUST be a Protobuf-encoded `Status` message") carries no JSON
-exemption; mirroring is the reading that does not also violate the Content-Type rule.
-
-#### Partial success
-
-When records are dropped the receiver still returns `200`, but populates `partial_success` with
-`rejected_spans` / `rejected_log_records` and an English `error_message`. Per the specification,
-clients must not retry such a response.
-
-Counted as rejected:
-
-- Spans and logs dropped at the per-session caps (10,000 spans / 5,000 logs — see
-  [streaming.md](streaming.md))
-- Records with no `trace_id`, which cannot be routed to a session
-
-Not counted as rejected:
-
-- Log records that are not `gen_ai.*` events. These are filtered by design: agentevals ingests
-  GenAI-semconv telemetry, and an application instrumented with many libraries emits far more
-  non-GenAI logs than GenAI ones. Reporting them would attach a permanent warning to every export
-  with no action a user could take.
-- Log records buffered for orphan replay. Those are deferred, not rejected — they may still be
-  attached to a session, or expire.
-
-### OTLP gRPC
-
-Implements the standard `TraceService/Export` and `LogsService/Export` RPCs. Configuration:
-
-| Setting | Default |
-|---------|---------|
-| Max message size | 8 MB |
-| Max concurrent RPCs | 32 |
-| Compression | gzip |
-| TLS | off (insecure) |
-
-Dropped records are reported through `partial_success` exactly as over OTLP HTTP — see
-[Partial success](#partial-success) above.
-
-### Client configuration
-
-For HTTP exporters:
+| Port | Protocol |
+|---|---|
+| 4318 | OTLP/HTTP: `/v1/traces`, `/v1/logs`, JSON or protobuf, gzip or no compression |
+| 4317 | OTLP/gRPC: trace and log export, gzip |
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-```
-
-For gRPC exporters:
-
-```bash
+# or, for gRPC
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 ```
 
-Traces and logs stream into agentevals automatically. See [examples/README.md](../examples/README.md) for zero-code setup instructions.
+Trace and span ids must be valid hex (32 and 16 characters). Records with bad ids are rejected one by one.
+
+### Responses
+
+| Situation | Response |
+|---|---|
+| Everything accepted | `200`, no `partialSuccess` |
+| Some records refused (bad ids, a trace or session limit, full log buffer) | `200` with `partialSuccess` counts and a reason. Do not retry. |
+| Everything refused because the server is full (memory or session slots) | `503` with `Retry-After` (gRPC `UNAVAILABLE`). Retry later. |
+| Body cannot be decoded | `400` |
+| Unsupported `Content-Type` or `Content-Encoding` | `415`. Use `compression: gzip` or `none`. |
+| Body over 64 MiB, compressed body over 8 MiB, or more than 32 gzip members | `413` / `400` |
+
+Error bodies are `google.rpc.Status` messages in the request's content type.
+
+### Limits
+
+| Limit | Value |
+|---|---|
+| Spans per trace / per session | 10,000 / 50,000 |
+| Logs per trace / per session | 5,000 / 20,000 |
+| Traces per session | 1,000 |
+| Sessions | 100 (the oldest finished session is evicted first) |
+| Memory | 1 GiB of decoded telemetry (`AGENTEVALS_LIVE_MAX_BYTES`) |
+| Finished session kept for | 2 hours |
+| Logs that arrive before their spans | kept for 5 minutes |
+
+A Collector sending large batches should cap batch size so a request stays under 64 MiB.
