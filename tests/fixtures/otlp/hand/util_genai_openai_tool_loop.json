@@ -1,0 +1,214 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "fixture-agent"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.0"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.genai.openai",
+      "version": "1.2b0"
+     },
+     "spans": [
+      {
+       "traceId": "461bd02aa7271d9685c3552485eccc79",
+       "spanId": "a6735a8e1e04bcf0",
+       "name": "handle_request",
+       "kind": 2,
+       "startTimeUnixNano": "1760000000000000000",
+       "endTimeUnixNano": "1760000000100000000",
+       "attributes": [
+        {
+         "key": "http.request.method",
+         "value": {
+          "stringValue": "POST"
+         }
+        },
+        {
+         "key": "http.route",
+         "value": {
+          "stringValue": "/ask"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "461bd02aa7271d9685c3552485eccc79",
+       "spanId": "23a6bb157382841e",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000001000000",
+       "endTimeUnixNano": "1760000000030000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini-2025-04-14"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "chatcmpl-1"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "40"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"type\":\"text\",\"content\":\"You answer weather questions.\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"What is the weather in Paris?\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"tool_call\",\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"},\"id\":\"call_1\"}],\"finish_reason\":\"tool_calls\"}]"
+         }
+        }
+       ],
+       "parentSpanId": "a6735a8e1e04bcf0"
+      },
+      {
+       "traceId": "461bd02aa7271d9685c3552485eccc79",
+       "spanId": "e43d2f49cf5ee8c6",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000040000000",
+       "endTimeUnixNano": "1760000000090000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini-2025-04-14"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "chatcmpl-2"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "80"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "11"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"What is the weather in Paris?\"}]},{\"role\":\"assistant\",\"parts\":[{\"type\":\"tool_call\",\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"},\"id\":\"call_1\"}]},{\"role\":\"tool\",\"parts\":[{\"type\":\"tool_call_response\",\"response\":{\"city\":\"Paris\",\"forecast\":\"sunny\",\"temp_c\":21},\"id\":\"call_1\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"It is sunny and 21C in Paris.\"}],\"finish_reason\":\"stop\"}]"
+         }
+        }
+       ],
+       "parentSpanId": "a6735a8e1e04bcf0"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

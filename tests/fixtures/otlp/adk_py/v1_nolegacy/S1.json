@@ -1,0 +1,398 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_nolegacy"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "26c147db4603488e09fc23592f2dc61d",
+       "spanId": "77fc678d9ee1dfeb",
+       "parentSpanId": "986c4c252ee24ab2",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509218892557",
+       "endTimeUnixNano": "1790607509219565807",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S1-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "58ae8736-b6ba-4263-aea4-f240f31b8b69"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-0d82cd63-6267-4657-b0a3-ab5e145d6fed"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "26c147db4603488e09fc23592f2dc61d",
+       "spanId": "986c4c252ee24ab2",
+       "parentSpanId": "12475266ce17622e",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509218775150",
+       "endTimeUnixNano": "1790607509219773259",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-0d82cd63-6267-4657-b0a3-ab5e145d6fed"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S1-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "58ae8736-b6ba-4263-aea4-f240f31b8b69"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "26c147db4603488e09fc23592f2dc61d",
+       "spanId": "12475266ce17622e",
+       "parentSpanId": "a5d4c2290aa178ff",
+       "name": "invoke_agent assistant",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509207335977",
+       "endTimeUnixNano": "1790607509219807619",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S1-v1_nolegacy"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "26c147db4603488e09fc23592f2dc61d",
+       "spanId": "a5d4c2290aa178ff",
+       "name": "invocation",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509206493467",
+       "endTimeUnixNano": "1790607509219873174",
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_nolegacy"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "logRecords": [
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "26c147db4603488e09fc23592f2dc61d",
+       "spanId": "77fc678d9ee1dfeb",
+       "observedTimeUnixNano": "1790607509218909508",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "26c147db4603488e09fc23592f2dc61d",
+       "spanId": "77fc678d9ee1dfeb",
+       "observedTimeUnixNano": "1790607509218966817",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          },
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "26c147db4603488e09fc23592f2dc61d",
+       "spanId": "77fc678d9ee1dfeb",
+       "observedTimeUnixNano": "1790607509219546691",
+       "eventName": "gen_ai.choice"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ]
+}

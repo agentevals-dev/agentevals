@@ -380,3 +380,60 @@ class TestLazyImport:
 
         with pytest.raises(AttributeError, match="has no attribute"):
             agentevals.DoesNotExist  # noqa: B018
+
+
+# ---------------------------------------------------------------------------
+# Log export
+# ---------------------------------------------------------------------------
+
+
+class TestLogExport:
+    def _providers(self, monkeypatch):
+        from opentelemetry.sdk._logs import LoggerProvider
+        from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
+
+        logs = InMemoryLogRecordExporter()
+        monkeypatch.setattr(sdk_export, "_log_exporter", lambda endpoint: logs)
+        tracer_provider, logger_provider = TracerProvider(), LoggerProvider()
+        export = sdk_export.install(tracer_provider, "http://localhost:4318", logger_provider)
+        return tracer_provider, logger_provider.get_logger("app"), export, logs
+
+    def _emit(self, otel_logger, text: str) -> None:
+        from opentelemetry._logs import LogRecord
+
+        otel_logger.emit(LogRecord(event_name="gen_ai.user.message", body={"content": text}))
+
+    def test_logs_inside_a_session_are_exported(self, exported, monkeypatch):
+        tracer_provider, otel_logger, export, logs = self._providers(monkeypatch)
+        with AgentEvals(auto_instrument=False).session(session_name="s1", tracer_provider=tracer_provider):
+            with tracer_provider.get_tracer("t").start_as_current_span("work"):
+                self._emit(otel_logger, "inside")
+        sdk_export.flush(export)
+        assert [r.log_record.body for r in logs.get_finished_logs()] == [{"content": "inside"}]
+
+    def test_logs_outside_any_session_are_not_exported(self, exported, monkeypatch):
+        tracer_provider, otel_logger, export, logs = self._providers(monkeypatch)
+        self._emit(otel_logger, "outside")
+        sdk_export.flush(export)
+        assert logs.get_finished_logs() == ()
+
+    def test_logs_on_other_threads_follow_their_trace(self, exported, monkeypatch):
+        from opentelemetry import context as otel_context
+
+        tracer_provider, otel_logger, export, logs = self._providers(monkeypatch)
+        with AgentEvals(auto_instrument=False).session(session_name="s1", tracer_provider=tracer_provider):
+            with tracer_provider.get_tracer("t").start_as_current_span("work"):
+                ctx = otel_context.get_current()
+
+        def worker():
+            token = otel_context.attach(ctx)
+            try:
+                self._emit(otel_logger, "late, other thread")
+            finally:
+                otel_context.detach(token)
+
+        thread = threading.Thread(target=worker)
+        thread.start()
+        thread.join()
+        sdk_export.flush(export)
+        assert [r.log_record.body for r in logs.get_finished_logs()] == [{"content": "late, other thread"}]

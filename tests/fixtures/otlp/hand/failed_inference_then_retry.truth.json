@@ -1,0 +1,28 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/failed_inference_then_retry",
+ "source": "hand authored; first inference fails with no output (semconv #459), retry succeeds",
+ "turns": [
+  {
+   "user_text": "Summarize the release notes.",
+   "final_text": "Three bug fixes and one new flag.",
+   "intermediate_texts": [],
+   "agents": [
+    "summarizer"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 300,
+    "output": 40
+   }
+  }
+ ],
+ "notes": [
+  "no output is synthesized for the failed call"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 300,
+  "output": 40
+ }
+}

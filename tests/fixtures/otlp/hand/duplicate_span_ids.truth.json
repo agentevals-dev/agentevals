@@ -1,0 +1,28 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/duplicate_span_ids",
+ "source": "hand authored; the chat span is exported twice (exporter retry)",
+ "turns": [
+  {
+   "user_text": "Ping?",
+   "final_text": "Pong.",
+   "intermediate_texts": [],
+   "agents": [
+    "helper"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 12,
+    "output": 3
+   }
+  }
+ ],
+ "notes": [
+  "first copy wins; usage is counted once"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 12,
+  "output": 3
+ }
+}

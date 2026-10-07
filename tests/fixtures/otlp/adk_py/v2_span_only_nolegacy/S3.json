@@ -1,0 +1,1456 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_span_only_nolegacy"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "b4620420d40229dff0690b9378a59b71",
+       "spanId": "7dafafa2469b8672",
+       "parentSpanId": "fe280d9fc26be624",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513269399966",
+       "endTimeUnixNano": "1790607513269539905",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "6a75db48-5599-44bc-a1eb-e9e73902b974"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-ba8a8a0c-32e1-4a08-9a6a-52b65672770d"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"content\":\"Hi, my name is Ada.\",\"type\":\"text\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"content\":\"Answer weather questions using tools.\\n\\nYou are an agent. Your internal name is \\\"weather_agent\\\".\",\"type\":\"text\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"get_weather\",\"description\":\"Returns the current weather for a city.\",\"parameters\":{\"properties\":{\"city\":{\"title\":\"City\",\"type\":\"string\"}},\"required\":[\"city\"],\"title\":\"get_weatherParams\",\"type\":\"object\"},\"type\":\"function\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"content\":\"Nice to meet you, Ada! How can I help?\",\"type\":\"text\"}],\"finish_reason\":\"stop\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b4620420d40229dff0690b9378a59b71",
+       "spanId": "fe280d9fc26be624",
+       "parentSpanId": "d6e38544826155ec",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513269354028",
+       "endTimeUnixNano": "1790607513269654188",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-ba8a8a0c-32e1-4a08-9a6a-52b65672770d"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "6a75db48-5599-44bc-a1eb-e9e73902b974"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b4620420d40229dff0690b9378a59b71",
+       "spanId": "d6e38544826155ec",
+       "parentSpanId": "68f6e154c98ed616",
+       "name": "invoke_agent weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513269043955",
+       "endTimeUnixNano": "1790607513269676012",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b4620420d40229dff0690b9378a59b71",
+       "spanId": "68f6e154c98ed616",
+       "name": "invoke_workflow weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513268593361",
+       "endTimeUnixNano": "1790607513269727073",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "75625e97d737b8825a9643d6d9d382e7",
+       "spanId": "cb0d78d7f7799b01",
+       "parentSpanId": "380142bcfb639565",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513270897060",
+       "endTimeUnixNano": "1790607513271055324",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "90a3a832-cc25-49e8-8688-fe122947bb67"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-58f56645-20ab-4a85-9fc5-1b082a7edf53"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "30"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"content\":\"Hi, my name is Ada.\",\"type\":\"text\"}]},{\"role\":\"assistant\",\"parts\":[{\"content\":\"Nice to meet you, Ada! How can I help?\",\"type\":\"text\"}]},{\"role\":\"user\",\"parts\":[{\"content\":\"What is the weather in Rome?\",\"type\":\"text\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"content\":\"Answer weather questions using tools.\\n\\nYou are an agent. Your internal name is \\\"weather_agent\\\".\",\"type\":\"text\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"get_weather\",\"description\":\"Returns the current weather for a city.\",\"parameters\":{\"properties\":{\"city\":{\"title\":\"City\",\"type\":\"string\"}},\"required\":[\"city\"],\"title\":\"get_weatherParams\",\"type\":\"object\"},\"type\":\"function\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"id\":\"get_weather_0\",\"name\":\"get_weather\",\"arguments\":{\"city\":\"Rome\"},\"type\":\"tool_call\"}],\"finish_reason\":\"stop\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "75625e97d737b8825a9643d6d9d382e7",
+       "spanId": "b7f742f02076bbe5",
+       "parentSpanId": "eb518fe7d4e0bff0",
+       "name": "execute_tool get_weather",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513271189599",
+       "endTimeUnixNano": "1790607513271269022",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "Returns the current weather for a city."
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_weather"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "FunctionTool"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_call_args",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "adk-62abea5f-da5a-412c-bdc3-6d9ab6396d61"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "dd8797f1-8a06-441f-99f4-840bcd9fb3b2"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "75625e97d737b8825a9643d6d9d382e7",
+       "spanId": "380142bcfb639565",
+       "parentSpanId": "eb518fe7d4e0bff0",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513270850872",
+       "endTimeUnixNano": "1790607513271342990",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-58f56645-20ab-4a85-9fc5-1b082a7edf53"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "90a3a832-cc25-49e8-8688-fe122947bb67"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "30"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "75625e97d737b8825a9643d6d9d382e7",
+       "spanId": "4b9df6300e941a07",
+       "parentSpanId": "b38da30798e6ee06",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513271686090",
+       "endTimeUnixNano": "1790607513271827236",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "e98c0596-f159-40fd-a37e-ca36bc615cf3"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-58f56645-20ab-4a85-9fc5-1b082a7edf53"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "50"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"content\":\"Hi, my name is Ada.\",\"type\":\"text\"}]},{\"role\":\"assistant\",\"parts\":[{\"content\":\"Nice to meet you, Ada! How can I help?\",\"type\":\"text\"}]},{\"role\":\"user\",\"parts\":[{\"content\":\"What is the weather in Rome?\",\"type\":\"text\"}]},{\"role\":\"assistant\",\"parts\":[{\"id\":\"get_weather_0\",\"name\":\"get_weather\",\"arguments\":{\"city\":\"Rome\"},\"type\":\"tool_call\"}]},{\"role\":\"user\",\"parts\":[{\"id\":\"get_weather_0\",\"response\":{\"city\":\"Rome\",\"forecast\":\"cloudy\",\"temp_c\":17},\"type\":\"tool_call_response\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"content\":\"Answer weather questions using tools.\\n\\nYou are an agent. Your internal name is \\\"weather_agent\\\".\",\"type\":\"text\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"get_weather\",\"description\":\"Returns the current weather for a city.\",\"parameters\":{\"properties\":{\"city\":{\"title\":\"City\",\"type\":\"string\"}},\"required\":[\"city\"],\"title\":\"get_weatherParams\",\"type\":\"object\"},\"type\":\"function\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"content\":\"It is cloudy and 17C in Rome.\",\"type\":\"text\"}],\"finish_reason\":\"stop\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "75625e97d737b8825a9643d6d9d382e7",
+       "spanId": "b38da30798e6ee06",
+       "parentSpanId": "eb518fe7d4e0bff0",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513271636487",
+       "endTimeUnixNano": "1790607513271936605",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-58f56645-20ab-4a85-9fc5-1b082a7edf53"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "e98c0596-f159-40fd-a37e-ca36bc615cf3"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "50"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "75625e97d737b8825a9643d6d9d382e7",
+       "spanId": "eb518fe7d4e0bff0",
+       "parentSpanId": "766c90b53e3f8dfb",
+       "name": "invoke_agent weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513270550420",
+       "endTimeUnixNano": "1790607513271958596",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "75625e97d737b8825a9643d6d9d382e7",
+       "spanId": "766c90b53e3f8dfb",
+       "name": "invoke_workflow weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513270134977",
+       "endTimeUnixNano": "1790607513272008865",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b2a19161a156653c4df126b15ab6ddfc",
+       "spanId": "924f770ced2cb20a",
+       "parentSpanId": "c2f0a1056414aa80",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513273577095",
+       "endTimeUnixNano": "1790607513273734610",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "fa27358d-b088-418e-874e-ebf40f6f2d40"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-08a2c352-ba4b-4631-81e7-db257db5299c"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "70"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"content\":\"Hi, my name is Ada.\",\"type\":\"text\"}]},{\"role\":\"assistant\",\"parts\":[{\"content\":\"Nice to meet you, Ada! How can I help?\",\"type\":\"text\"}]},{\"role\":\"user\",\"parts\":[{\"content\":\"What is the weather in Rome?\",\"type\":\"text\"}]},{\"role\":\"assistant\",\"parts\":[{\"id\":\"get_weather_0\",\"name\":\"get_weather\",\"arguments\":{\"city\":\"Rome\"},\"type\":\"tool_call\"}]},{\"role\":\"user\",\"parts\":[{\"id\":\"get_weather_0\",\"response\":{\"city\":\"Rome\",\"forecast\":\"cloudy\",\"temp_c\":17},\"type\":\"tool_call_response\"}]},{\"role\":\"assistant\",\"parts\":[{\"content\":\"It is cloudy and 17C in Rome.\",\"type\":\"text\"}]},{\"role\":\"user\",\"parts\":[{\"content\":\"Thanks, bye!\",\"type\":\"text\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"content\":\"Answer weather questions using tools.\\n\\nYou are an agent. Your internal name is \\\"weather_agent\\\".\",\"type\":\"text\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"get_weather\",\"description\":\"Returns the current weather for a city.\",\"parameters\":{\"properties\":{\"city\":{\"title\":\"City\",\"type\":\"string\"}},\"required\":[\"city\"],\"title\":\"get_weatherParams\",\"type\":\"object\"},\"type\":\"function\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"content\":\"Goodbye, Ada!\",\"type\":\"text\"}],\"finish_reason\":\"stop\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b2a19161a156653c4df126b15ab6ddfc",
+       "spanId": "c2f0a1056414aa80",
+       "parentSpanId": "aebe92b14a815dbf",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513273214296",
+       "endTimeUnixNano": "1790607513273854724",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-08a2c352-ba4b-4631-81e7-db257db5299c"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "fa27358d-b088-418e-874e-ebf40f6f2d40"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "70"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b2a19161a156653c4df126b15ab6ddfc",
+       "spanId": "aebe92b14a815dbf",
+       "parentSpanId": "11816a186b65ab84",
+       "name": "invoke_agent weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513272908721",
+       "endTimeUnixNano": "1790607513273877172",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b2a19161a156653c4df126b15ab6ddfc",
+       "spanId": "11816a186b65ab84",
+       "name": "invoke_workflow weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513272516810",
+       "endTimeUnixNano": "1790607513273928150",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_span_only_nolegacy"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "logRecords": [
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "6a75db48-5599-44bc-a1eb-e9e73902b974"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-ba8a8a0c-32e1-4a08-9a6a-52b65672770d"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "get_weather"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Returns the current weather for a city."
+                }
+               },
+               {
+                "key": "parameters"
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "b4620420d40229dff0690b9378a59b71",
+       "spanId": "7dafafa2469b8672",
+       "observedTimeUnixNano": "1790607513269506669",
+       "eventName": "gen_ai.client.inference.operation.details"
+      },
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "90a3a832-cc25-49e8-8688-fe122947bb67"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-58f56645-20ab-4a85-9fc5-1b082a7edf53"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "30"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "get_weather"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Returns the current weather for a city."
+                }
+               },
+               {
+                "key": "parameters"
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "75625e97d737b8825a9643d6d9d382e7",
+       "spanId": "cb0d78d7f7799b01",
+       "observedTimeUnixNano": "1790607513271023505",
+       "eventName": "gen_ai.client.inference.operation.details"
+      },
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "e98c0596-f159-40fd-a37e-ca36bc615cf3"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-58f56645-20ab-4a85-9fc5-1b082a7edf53"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "50"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "get_weather"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Returns the current weather for a city."
+                }
+               },
+               {
+                "key": "parameters"
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "75625e97d737b8825a9643d6d9d382e7",
+       "spanId": "4b9df6300e941a07",
+       "observedTimeUnixNano": "1790607513271792502",
+       "eventName": "gen_ai.client.inference.operation.details"
+      },
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v2_span_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "fa27358d-b088-418e-874e-ebf40f6f2d40"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-08a2c352-ba4b-4631-81e7-db257db5299c"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "70"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "get_weather"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Returns the current weather for a city."
+                }
+               },
+               {
+                "key": "parameters"
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "b2a19161a156653c4df126b15ab6ddfc",
+       "spanId": "924f770ced2cb20a",
+       "observedTimeUnixNano": "1790607513273697584",
+       "eventName": "gen_ai.client.inference.operation.details"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ]
+}

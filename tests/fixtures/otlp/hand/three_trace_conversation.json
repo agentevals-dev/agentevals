@@ -1,0 +1,292 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "fixture-agent"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.0"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "fixture.agent"
+     },
+     "spans": [
+      {
+       "traceId": "38461a0164862aa3615b130f6144ee35",
+       "spanId": "88805fcb75bbf23f",
+       "name": "invoke_agent assistant",
+       "kind": 1,
+       "startTimeUnixNano": "1760000000000000000",
+       "endTimeUnixNano": "1760000000050000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "conv-ada-1"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Hi, my name is Ada.\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"Nice to meet you, Ada!\"}]}]"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "38461a0164862aa3615b130f6144ee35",
+       "spanId": "85a6a56b68365c41",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000001000000",
+       "endTimeUnixNano": "1760000000049000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "conv-ada-1"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        }
+       ],
+       "parentSpanId": "88805fcb75bbf23f"
+      },
+      {
+       "traceId": "c19e995f47264a6ae830814dc1ce7d8b",
+       "spanId": "a4fbc8514dab990e",
+       "name": "invoke_agent assistant",
+       "kind": 1,
+       "startTimeUnixNano": "1760000001000000000",
+       "endTimeUnixNano": "1760000001050000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "conv-ada-1"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"What is the weather in Rome?\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"It is cloudy and 17C in Rome.\"}]}]"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "c19e995f47264a6ae830814dc1ce7d8b",
+       "spanId": "23a6bb157382841e",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000001001000000",
+       "endTimeUnixNano": "1760000001049000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "conv-ada-1"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "30"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        }
+       ],
+       "parentSpanId": "a4fbc8514dab990e"
+      },
+      {
+       "traceId": "2cd29dc58c6d40d6cfdb36a73d57bd42",
+       "spanId": "f1e64ba07d409bba",
+       "name": "invoke_agent assistant",
+       "kind": 1,
+       "startTimeUnixNano": "1760000002000000000",
+       "endTimeUnixNano": "1760000002050000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "conv-ada-1"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Thanks, bye!\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"Goodbye, Ada!\"}]}]"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "2cd29dc58c6d40d6cfdb36a73d57bd42",
+       "spanId": "e43d2f49cf5ee8c6",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000002001000000",
+       "endTimeUnixNano": "1760000002049000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "conv-ada-1"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "50"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "4"
+         }
+        }
+       ],
+       "parentSpanId": "f1e64ba07d409bba"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

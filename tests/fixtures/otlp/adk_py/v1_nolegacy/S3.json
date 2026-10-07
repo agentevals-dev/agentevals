@@ -1,0 +1,1648 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_nolegacy"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "2d70c4448757493456343d41555b6335",
+       "spanId": "dcaddbd43659cef2",
+       "parentSpanId": "2b4b561c4fc64557",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509234911914",
+       "endTimeUnixNano": "1790607509235010371",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "a9c1b9a1-6158-474c-bfe5-a87a020d7d33"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-05583012-c752-4d24-a8f1-0dcbcbfc9b36"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2d70c4448757493456343d41555b6335",
+       "spanId": "2b4b561c4fc64557",
+       "parentSpanId": "3f8fbbddd60ac41d",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509234856105",
+       "endTimeUnixNano": "1790607509235125904",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-05583012-c752-4d24-a8f1-0dcbcbfc9b36"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "a9c1b9a1-6158-474c-bfe5-a87a020d7d33"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2d70c4448757493456343d41555b6335",
+       "spanId": "3f8fbbddd60ac41d",
+       "parentSpanId": "2b0e705b15ed36bd",
+       "name": "invoke_agent weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509234530829",
+       "endTimeUnixNano": "1790607509235148103",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2d70c4448757493456343d41555b6335",
+       "spanId": "2b0e705b15ed36bd",
+       "name": "invocation",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509234048371",
+       "endTimeUnixNano": "1790607509235192251",
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "e02c3ec1eb8ccbe3",
+       "parentSpanId": "c4e698e99ab09452",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509236305352",
+       "endTimeUnixNano": "1790607509236412931",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "2318286d-4122-4b94-a2e3-ffa7937d7d74"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-5737b3c0-5797-43f5-89e0-b594230fe2be"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "30"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "5"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "e1c586c9ee9b43be",
+       "parentSpanId": "1a2d00f17ae9f036",
+       "name": "execute_tool get_weather",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509236546789",
+       "endTimeUnixNano": "1790607509236627338",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "Returns the current weather for a city."
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_weather"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "FunctionTool"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_call_args",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "adk-420ec2b5-bbe9-4540-8fa1-ba12f498f542"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "32b2934a-761f-4c44-81c8-dcb953bdb8ee"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "c4e698e99ab09452",
+       "parentSpanId": "1a2d00f17ae9f036",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509236256040",
+       "endTimeUnixNano": "1790607509236696516",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-5737b3c0-5797-43f5-89e0-b594230fe2be"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "2318286d-4122-4b94-a2e3-ffa7937d7d74"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "30"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "630f6d7218582f51",
+       "parentSpanId": "5b7aab0936a2be97",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509237108213",
+       "endTimeUnixNano": "1790607509237216999",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "67cc3f0e-6002-438a-99d4-681db5275ca2"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-5737b3c0-5797-43f5-89e0-b594230fe2be"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "50"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "5b7aab0936a2be97",
+       "parentSpanId": "1a2d00f17ae9f036",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509237061941",
+       "endTimeUnixNano": "1790607509237320080",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-5737b3c0-5797-43f5-89e0-b594230fe2be"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "67cc3f0e-6002-438a-99d4-681db5275ca2"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "50"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "1a2d00f17ae9f036",
+       "parentSpanId": "4447149bf3c1449b",
+       "name": "invoke_agent weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509235950089",
+       "endTimeUnixNano": "1790607509237341487",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "4447149bf3c1449b",
+       "name": "invocation",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509235542682",
+       "endTimeUnixNano": "1790607509237383469",
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "parentSpanId": "9e6b7fb99f7bcd7e",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509238954330",
+       "endTimeUnixNano": "1790607509239080151",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "6fb9c6f8-0cf0-428a-8ba9-db1427dc8603"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-2109c1b6-b65d-44d7-b21c-17e8e800e79b"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "70"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "4"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "9e6b7fb99f7bcd7e",
+       "parentSpanId": "70a204abece3c0fa",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509238568331",
+       "endTimeUnixNano": "1790607509239187438",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-2109c1b6-b65d-44d7-b21c-17e8e800e79b"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "6fb9c6f8-0cf0-428a-8ba9-db1427dc8603"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "70"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "70a204abece3c0fa",
+       "parentSpanId": "2dd47eaf2821e709",
+       "name": "invoke_agent weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509238260422",
+       "endTimeUnixNano": "1790607509239210511",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_nolegacy"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "2dd47eaf2821e709",
+       "name": "invocation",
+       "kind": 1,
+       "startTimeUnixNano": "1790607509237854806",
+       "endTimeUnixNano": "1790607509239253742",
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_nolegacy"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "logRecords": [
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2d70c4448757493456343d41555b6335",
+       "spanId": "dcaddbd43659cef2",
+       "observedTimeUnixNano": "1790607509234922409",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2d70c4448757493456343d41555b6335",
+       "spanId": "dcaddbd43659cef2",
+       "observedTimeUnixNano": "1790607509234936237",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          },
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2d70c4448757493456343d41555b6335",
+       "spanId": "dcaddbd43659cef2",
+       "observedTimeUnixNano": "1790607509234999209",
+       "eventName": "gen_ai.choice"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "e02c3ec1eb8ccbe3",
+       "observedTimeUnixNano": "1790607509236315015",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "e02c3ec1eb8ccbe3",
+       "observedTimeUnixNano": "1790607509236326551",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "e02c3ec1eb8ccbe3",
+       "observedTimeUnixNano": "1790607509236333965",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "e02c3ec1eb8ccbe3",
+       "observedTimeUnixNano": "1790607509236340379",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          },
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "e02c3ec1eb8ccbe3",
+       "observedTimeUnixNano": "1790607509236403351",
+       "eventName": "gen_ai.choice"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "630f6d7218582f51",
+       "observedTimeUnixNano": "1790607509237117376",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "630f6d7218582f51",
+       "observedTimeUnixNano": "1790607509237130745",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "630f6d7218582f51",
+       "observedTimeUnixNano": "1790607509237137284",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "630f6d7218582f51",
+       "observedTimeUnixNano": "1790607509237142906",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "630f6d7218582f51",
+       "observedTimeUnixNano": "1790607509237148321",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "630f6d7218582f51",
+       "observedTimeUnixNano": "1790607509237153443",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          },
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "2cdf628a307e13536b600e381db7dcb6",
+       "spanId": "630f6d7218582f51",
+       "observedTimeUnixNano": "1790607509237208086",
+       "eventName": "gen_ai.choice"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "observedTimeUnixNano": "1790607509238966034",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "observedTimeUnixNano": "1790607509238977945",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "observedTimeUnixNano": "1790607509238984984",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "observedTimeUnixNano": "1790607509238990773",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "observedTimeUnixNano": "1790607509238996146",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "observedTimeUnixNano": "1790607509239001518",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "observedTimeUnixNano": "1790607509239007391",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "observedTimeUnixNano": "1790607509239013180",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          },
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "4f0b1b8e259f6ecb10aa70b8a3790596",
+       "spanId": "cedbb4718f18c084",
+       "observedTimeUnixNano": "1790607509239071196",
+       "eventName": "gen_ai.choice"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ]
+}

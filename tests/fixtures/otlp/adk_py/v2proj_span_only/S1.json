@@ -1,0 +1,321 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2proj_span_only"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "600608f336544327941176111833fa5d",
+       "spanId": "00da1e7a9d44dcc4",
+       "parentSpanId": "2697c6e0ab241bde",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607514413327083",
+       "endTimeUnixNano": "1790607514414248304",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S1-v2proj_span_only"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "202bebef-6c3f-43de-b8fb-e5cdb2f3c1d6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-b6165f3f-eec7-401a-8219-40b8a3deaace"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"content\":\"Hello, who are you?\",\"type\":\"text\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"content\":\"You are a helpful assistant.\\n\\nYou are an agent. Your internal name is \\\"assistant\\\".\",\"type\":\"text\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"content\":\"I am a helpful assistant built with ADK.\",\"type\":\"text\"}],\"finish_reason\":\"stop\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "600608f336544327941176111833fa5d",
+       "spanId": "2697c6e0ab241bde",
+       "parentSpanId": "e70e3efc70ce9442",
+       "name": "invoke_agent assistant",
+       "kind": 1,
+       "startTimeUnixNano": "1790607514401746168",
+       "endTimeUnixNano": "1790607514414507940",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S1-v2proj_span_only"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "600608f336544327941176111833fa5d",
+       "spanId": "e70e3efc70ce9442",
+       "name": "invoke_workflow assistant",
+       "kind": 1,
+       "startTimeUnixNano": "1790607514400833943",
+       "endTimeUnixNano": "1790607514414577701",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S1-v2proj_span_only"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2proj_span_only"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "logRecords": [
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S1-v2proj_span_only"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "202bebef-6c3f-43de-b8fb-e5cdb2f3c1d6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-b6165f3f-eec7-401a-8219-40b8a3deaace"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "600608f336544327941176111833fa5d",
+       "spanId": "00da1e7a9d44dcc4",
+       "observedTimeUnixNano": "1790607514414176669",
+       "eventName": "gen_ai.client.inference.operation.details"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ]
+}

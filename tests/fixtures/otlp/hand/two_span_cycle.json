@@ -1,0 +1,212 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "fixture-agent"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.0"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "fixture.agent"
+     },
+     "spans": [
+      {
+       "traceId": "8d61fecc73fc5df57f4769a3deab7bd5",
+       "spanId": "eb86921785ed9606",
+       "name": "invoke_agent helper",
+       "kind": 1,
+       "startTimeUnixNano": "1760000000000000000",
+       "endTimeUnixNano": "1760000000050000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "helper"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "8d61fecc73fc5df57f4769a3deab7bd5",
+       "spanId": "23a6bb157382841e",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000001000000",
+       "endTimeUnixNano": "1760000000049000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "3"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Ping?\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"Pong.\"}]}]"
+         }
+        }
+       ],
+       "parentSpanId": "eb86921785ed9606"
+      },
+      {
+       "traceId": "9b7f26b6d527410ab3072a42d0212b4f",
+       "spanId": "e922e2f6beb12376",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000100000000",
+       "endTimeUnixNano": "1760000000101000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Loop?\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"Loop.\"}]}]"
+         }
+        }
+       ],
+       "parentSpanId": "127a2895e623e193"
+      },
+      {
+       "traceId": "9b7f26b6d527410ab3072a42d0212b4f",
+       "spanId": "127a2895e623e193",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000102000000",
+       "endTimeUnixNano": "1760000000103000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Loop?\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"Loop.\"}]}]"
+         }
+        }
+       ],
+       "parentSpanId": "e922e2f6beb12376"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

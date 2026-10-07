@@ -1,0 +1,28 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v1_default/S1",
+ "source": "adk-python 2.10 recording, mode v1_default, scenario S1",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "Hello, who are you?",
+   "final_text": "I am a helpful assistant built with ADK.",
+   "intermediate_texts": [],
+   "agents": [
+    "assistant"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 12,
+    "output": 9
+   }
+  }
+ ],
+ "tokens": {
+  "input": 12,
+  "output": 9
+ },
+ "notes": [
+  "single turn, no tools"
+ ]
+}

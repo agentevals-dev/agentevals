@@ -1,0 +1,36 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/ext_eval_span_event",
+ "source": "hand authored; third party gen_ai.evaluation.result as span_event",
+ "turns": [
+  {
+   "user_text": "Ping?",
+   "final_text": "Pong.",
+   "intermediate_texts": [],
+   "agents": [
+    "helper"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 12,
+    "output": 3
+   },
+   "external_evaluations": [
+    {
+     "name": "Relevance",
+     "score_value": 0.9,
+     "score_label": "relevant",
+     "ref": "c1"
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "external evaluation identified via span_event; attached to the evaluated chat span"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 12,
+  "output": 3
+ }
+}

@@ -1,0 +1,37 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v1_nolegacy/S6b",
+ "source": "adk-python 2.10 recording, mode v1_nolegacy, scenario S6b",
+ "content_captured": false,
+ "turns": [
+  {
+   "user_text": null,
+   "final_text": null,
+   "intermediate_texts": [],
+   "agents": [
+    "stock_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get_stock_price",
+     "args": null,
+     "result": null,
+     "is_error": true,
+     "error_type": "TOOL_ERROR"
+    }
+   ],
+   "tokens": {
+    "input": 58,
+    "output": 18
+   }
+  }
+ ],
+ "tokens": {
+  "input": 58,
+  "output": 18
+ },
+ "notes": [
+  "tool raises, on_tool_error_callback turns it into an error response",
+  "mode captures no message content; text, tool args and results must be absent"
+ ]
+}

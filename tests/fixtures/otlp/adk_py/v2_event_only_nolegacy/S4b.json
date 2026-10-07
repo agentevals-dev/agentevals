@@ -1,0 +1,1673 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_event_only_nolegacy"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "dd5f0932069e1757",
+       "parentSpanId": "26d330c0ea763f65",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513871919250",
+       "endTimeUnixNano": "1790607513872065895",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "d243e2a5-d44d-4e7a-a57f-65d35b042760"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1fad74e4-406d-43ec-be5c-5342231834b3"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "22"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"research_agent\",\"description\":\"Answers research questions.\",\"parameters\":null,\"type\":\"function\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "cd48b77f0aee68a1",
+       "parentSpanId": "ef223705fbf0bb7c",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513874133115",
+       "endTimeUnixNano": "1790607513874320741",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "96c42e29-7919-44e6-9b1b-68a88f03f9d2"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "4956856c-8571-4d73-8a1a-a1ee1466aa37"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-543c3d45-6484-44f1-a1e8-c7ea819a9013"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "15"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "7"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "ef223705fbf0bb7c",
+       "parentSpanId": "3aa96f35f8fb3b3e",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513874071975",
+       "endTimeUnixNano": "1790607513874471050",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-543c3d45-6484-44f1-a1e8-c7ea819a9013"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "96c42e29-7919-44e6-9b1b-68a88f03f9d2"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "4956856c-8571-4d73-8a1a-a1ee1466aa37"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "15"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "7"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "3aa96f35f8fb3b3e",
+       "parentSpanId": "40fee338a7310f3a",
+       "name": "invoke_agent research_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513873373281",
+       "endTimeUnixNano": "1790607513874496914",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": "Answers research questions."
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "96c42e29-7919-44e6-9b1b-68a88f03f9d2"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "40fee338a7310f3a",
+       "parentSpanId": "1a7f096a42cfd2d9",
+       "name": "invoke_workflow research_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513872841680",
+       "endTimeUnixNano": "1790607513874552806",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "96c42e29-7919-44e6-9b1b-68a88f03f9d2"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.nested",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "1a7f096a42cfd2d9",
+       "parentSpanId": "20ac2440eeaa525e",
+       "name": "execute_tool research_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513872203876",
+       "endTimeUnixNano": "1790607513874664382",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "Answers research questions."
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "AgentTool"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_call_args",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "adk-a677ceef-1380-48ed-bc2d-2ce514f10782"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "306609e9-af0a-4e18-bf6e-cceabbb8e2e7"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "26d330c0ea763f65",
+       "parentSpanId": "20ac2440eeaa525e",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513871874353",
+       "endTimeUnixNano": "1790607513874740557",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1fad74e4-406d-43ec-be5c-5342231834b3"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "d243e2a5-d44d-4e7a-a57f-65d35b042760"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "22"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "5d6d1a5a938f2a16",
+       "parentSpanId": "57b2e5e7b73b33b6",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513875081533",
+       "endTimeUnixNano": "1790607513875236881",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "d4dd7ea8-c57a-4a75-aa5b-4cd070ab71c5"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1fad74e4-406d-43ec-be5c-5342231834b3"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "45"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "11"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"research_agent\",\"description\":\"Answers research questions.\",\"parameters\":null,\"type\":\"function\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "57b2e5e7b73b33b6",
+       "parentSpanId": "20ac2440eeaa525e",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513875041467",
+       "endTimeUnixNano": "1790607513875349540",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1fad74e4-406d-43ec-be5c-5342231834b3"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "d4dd7ea8-c57a-4a75-aa5b-4cd070ab71c5"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "45"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "11"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "20ac2440eeaa525e",
+       "parentSpanId": "f29b25da96c2c174",
+       "name": "invoke_agent coordinator",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513871591227",
+       "endTimeUnixNano": "1790607513875373072",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only_nolegacy"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "f29b25da96c2c174",
+       "name": "invoke_workflow coordinator",
+       "kind": 1,
+       "startTimeUnixNano": "1790607513871173285",
+       "endTimeUnixNano": "1790607513875422633",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only_nolegacy"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_event_only_nolegacy"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "logRecords": [
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "d243e2a5-d44d-4e7a-a57f-65d35b042760"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1fad74e4-406d-43ec-be5c-5342231834b3"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "user-1"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "22"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "user"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "Please research the capital of France."
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "content",
+                "value": {
+                 "stringValue": "Use research_agent for research questions.\n\nYou are an agent. Your internal name is \"coordinator\"."
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "text"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "research_agent"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Answers research questions."
+                }
+               },
+               {
+                "key": "parameters",
+                "value": {
+                 "kvlistValue": {
+                  "values": [
+                   {
+                    "key": "type",
+                    "value": {
+                     "stringValue": "object"
+                    }
+                   },
+                   {
+                    "key": "properties",
+                    "value": {
+                     "kvlistValue": {
+                      "values": [
+                       {
+                        "key": "request",
+                        "value": {
+                         "kvlistValue": {
+                          "values": [
+                           {
+                            "key": "type",
+                            "value": {
+                             "stringValue": "string"
+                            }
+                           }
+                          ]
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    }
+                   },
+                   {
+                    "key": "required",
+                    "value": {
+                     "arrayValue": {
+                      "values": [
+                       {
+                        "stringValue": "request"
+                       }
+                      ]
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "assistant"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "id",
+                       "value": {
+                        "stringValue": "research_agent_0"
+                       }
+                      },
+                      {
+                       "key": "name",
+                       "value": {
+                        "stringValue": "research_agent"
+                       }
+                      },
+                      {
+                       "key": "arguments",
+                       "value": {
+                        "kvlistValue": {
+                         "values": [
+                          {
+                           "key": "request",
+                           "value": {
+                            "stringValue": "What is the capital of France?"
+                           }
+                          }
+                         ]
+                        }
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "tool_call"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "finish_reason",
+                "value": {
+                 "stringValue": "stop"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "dd5f0932069e1757",
+       "observedTimeUnixNano": "1790607513872032826",
+       "eventName": "gen_ai.client.inference.operation.details"
+      },
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "96c42e29-7919-44e6-9b1b-68a88f03f9d2"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "4956856c-8571-4d73-8a1a-a1ee1466aa37"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-543c3d45-6484-44f1-a1e8-c7ea819a9013"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "user-1"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "15"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "7"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "user"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "What is the capital of France?"
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "content",
+                "value": {
+                 "stringValue": "Answer research questions concisely.\n\nYou are an agent. Your internal name is \"research_agent\". The description about you is \"Answers research questions.\"."
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "text"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {}
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "assistant"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "The capital of France is Paris."
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "finish_reason",
+                "value": {
+                 "stringValue": "stop"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "cd48b77f0aee68a1",
+       "observedTimeUnixNano": "1790607513874260934",
+       "eventName": "gen_ai.client.inference.operation.details"
+      },
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only_nolegacy"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "d4dd7ea8-c57a-4a75-aa5b-4cd070ab71c5"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1fad74e4-406d-43ec-be5c-5342231834b3"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "user-1"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "45"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "11"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "user"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "Please research the capital of France."
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            },
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "assistant"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "id",
+                       "value": {
+                        "stringValue": "research_agent_0"
+                       }
+                      },
+                      {
+                       "key": "name",
+                       "value": {
+                        "stringValue": "research_agent"
+                       }
+                      },
+                      {
+                       "key": "arguments",
+                       "value": {
+                        "kvlistValue": {
+                         "values": [
+                          {
+                           "key": "request",
+                           "value": {
+                            "stringValue": "What is the capital of France?"
+                           }
+                          }
+                         ]
+                        }
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "tool_call"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            },
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "user"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "id",
+                       "value": {
+                        "stringValue": "research_agent_0"
+                       }
+                      },
+                      {
+                       "key": "response",
+                       "value": {
+                        "kvlistValue": {
+                         "values": [
+                          {
+                           "key": "result",
+                           "value": {
+                            "stringValue": "The capital of France is Paris."
+                           }
+                          }
+                         ]
+                        }
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "tool_call_response"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "content",
+                "value": {
+                 "stringValue": "Use research_agent for research questions.\n\nYou are an agent. Your internal name is \"coordinator\"."
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "text"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "research_agent"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Answers research questions."
+                }
+               },
+               {
+                "key": "parameters",
+                "value": {
+                 "kvlistValue": {
+                  "values": [
+                   {
+                    "key": "type",
+                    "value": {
+                     "stringValue": "object"
+                    }
+                   },
+                   {
+                    "key": "properties",
+                    "value": {
+                     "kvlistValue": {
+                      "values": [
+                       {
+                        "key": "request",
+                        "value": {
+                         "kvlistValue": {
+                          "values": [
+                           {
+                            "key": "type",
+                            "value": {
+                             "stringValue": "string"
+                            }
+                           }
+                          ]
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    }
+                   },
+                   {
+                    "key": "required",
+                    "value": {
+                     "arrayValue": {
+                      "values": [
+                       {
+                        "stringValue": "request"
+                       }
+                      ]
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "assistant"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "According to research: the capital of France is Paris."
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "finish_reason",
+                "value": {
+                 "stringValue": "stop"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "b7ef7f8ed8beb01722c7065df48d392b",
+       "spanId": "5d6d1a5a938f2a16",
+       "observedTimeUnixNano": "1790607513875196524",
+       "eventName": "gen_ai.client.inference.operation.details"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ]
+}

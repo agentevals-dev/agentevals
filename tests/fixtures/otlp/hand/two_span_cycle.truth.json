@@ -1,0 +1,39 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/two_span_cycle",
+ "source": "hand authored; two inference spans parent each other (crash shape from verify_20261006/s4.py)",
+ "turns": [
+  {
+   "user_text": "Ping?",
+   "final_text": "Pong.",
+   "intermediate_texts": [],
+   "agents": [
+    "helper"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 12,
+    "output": 3
+   }
+  },
+  {
+   "user_text": "Loop?",
+   "final_text": "Loop.",
+   "intermediate_texts": [],
+   "agents": [],
+   "tool_calls": [],
+   "tokens": {
+    "input": 5,
+    "output": 1
+   }
+  }
+ ],
+ "notes": [
+  "the cycle is broken deterministically (M1 rule: earliest start becomes the root); the pair collapses to one logical call"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 17,
+  "output": 4
+ }
+}

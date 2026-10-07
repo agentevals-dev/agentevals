@@ -1,0 +1,621 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_event_stable_contrib"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.google_genai",
+      "version": "0.7b1",
+      "attributes": [
+       {
+        "key": "gcp.client.name",
+        "value": {
+         "stringValue": "google.genai"
+        }
+       },
+       {
+        "key": "gcp.client.repo",
+        "value": {
+         "stringValue": "googleapis/python-genai"
+        }
+       },
+       {
+        "key": "gcp.client.version",
+        "value": {
+         "stringValue": "2.25.0"
+        }
+       },
+       {
+        "key": "pypi.package.name",
+        "value": {
+         "stringValue": "opentelemetry-instrumentation-google-genai"
+        }
+       }
+      ]
+     },
+     "spans": [
+      {
+       "traceId": "6e3b15a96576cd732bf7c75f7bca94b2",
+       "spanId": "1b9e391eaf47e3de",
+       "parentSpanId": "0588b0ef88b69d40",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839507365327",
+       "endTimeUnixNano": "1790607839514969941",
+       "attributes": [
+        {
+         "key": "code.function.name",
+         "value": {
+          "stringValue": "google.genai.AsyncModels.generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S1-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "7e72f6ee-5797-4710-8f4f-acad5bc765dc"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-8e7e23e8-941f-4732-9449-7655ff5e486c"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.30.0"
+    },
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "6e3b15a96576cd732bf7c75f7bca94b2",
+       "spanId": "0588b0ef88b69d40",
+       "parentSpanId": "719b16f57563d8d0",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839500442296",
+       "endTimeUnixNano": "1790607839515291921",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-8e7e23e8-941f-4732-9449-7655ff5e486c"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S1-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "7e72f6ee-5797-4710-8f4f-acad5bc765dc"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"http_options\": {}, \"system_instruction\": \"You are a helpful assistant.\\n\\nYou are an agent. Your internal name is \\\"assistant\\\".\"}, \"contents\": [{\"parts\": [{\"text\": \"Hello, who are you?\"}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"text\":\"I am a helpful assistant built with ADK.\"}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":9,\"prompt_token_count\":12,\"total_token_count\":21}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "6e3b15a96576cd732bf7c75f7bca94b2",
+       "spanId": "719b16f57563d8d0",
+       "parentSpanId": "75fc66303a74b955",
+       "name": "invoke_agent assistant",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839489130287",
+       "endTimeUnixNano": "1790607839515327961",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S1-v1_event_stable_contrib"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "6e3b15a96576cd732bf7c75f7bca94b2",
+       "spanId": "75fc66303a74b955",
+       "name": "invocation",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839488283339",
+       "endTimeUnixNano": "1790607839515391290",
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_event_stable_contrib"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.google_genai",
+      "version": "0.7b1",
+      "attributes": [
+       {
+        "key": "gcp.client.name",
+        "value": {
+         "stringValue": "google.genai"
+        }
+       },
+       {
+        "key": "gcp.client.repo",
+        "value": {
+         "stringValue": "googleapis/python-genai"
+        }
+       },
+       {
+        "key": "gcp.client.version",
+        "value": {
+         "stringValue": "2.25.0"
+        }
+       },
+       {
+        "key": "pypi.package.name",
+        "value": {
+         "stringValue": "opentelemetry-instrumentation-google-genai"
+        }
+       }
+      ]
+     },
+     "logRecords": [
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "You are a helpful assistant.\n\nYou are an agent. Your internal name is \"assistant\"."
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "6e3b15a96576cd732bf7c75f7bca94b2",
+       "spanId": "1b9e391eaf47e3de",
+       "observedTimeUnixNano": "1790607839507726513",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Hello, who are you?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "6e3b15a96576cd732bf7c75f7bca94b2",
+       "spanId": "1b9e391eaf47e3de",
+       "observedTimeUnixNano": "1790607839507771094",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "I am a helpful assistant built with ADK."
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "6e3b15a96576cd732bf7c75f7bca94b2",
+       "spanId": "1b9e391eaf47e3de",
+       "observedTimeUnixNano": "1790607839514931402",
+       "eventName": "gen_ai.choice"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.30.0"
+    }
+   ]
+  }
+ ]
+}

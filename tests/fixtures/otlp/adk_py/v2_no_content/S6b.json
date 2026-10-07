@@ -1,0 +1,757 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_no_content"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "c8009505ee3eaddd84bb20db3286731d",
+       "spanId": "6b63de4c4486f1b7",
+       "parentSpanId": "bf7ab3d5e1ab65fd",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607512737472951",
+       "endTimeUnixNano": "1790607512737619304",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6b-v2_no_content"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "01d5f65f-fbb4-477d-9a2a-a5987a2e1138"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-0a608362-3f6b-4f26-a40b-1bf60f735681"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "18"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"get_stock_price\",\"description\":\"Returns the stock price for a ticker.\",\"parameters\":null,\"type\":\"function\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "c8009505ee3eaddd84bb20db3286731d",
+       "spanId": "4a088894eae03ed3",
+       "parentSpanId": "02da9db984fc8493",
+       "name": "execute_tool get_stock_price",
+       "kind": 1,
+       "startTimeUnixNano": "1790607512737795977",
+       "endTimeUnixNano": "1790607512737933083",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "Returns the stock price for a ticker."
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_stock_price"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "FunctionTool"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "error.type",
+         "value": {
+          "stringValue": "TOOL_ERROR"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_call_args",
+         "value": {
+          "stringValue": "{\"ticker\": \"XYZ\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "adk-3d4ffdd7-3dc2-4635-a7e3-cea97b080bbd"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "67984c9e-b0c2-421d-a1ae-86b1dccb69ce"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_response",
+         "value": {
+          "stringValue": "{\"error\": \"ValueError: ticker not found: XYZ\"}"
+         }
+        }
+       ],
+       "status": {
+        "message": "TOOL_ERROR",
+        "code": 2
+       },
+       "flags": 256
+      },
+      {
+       "traceId": "c8009505ee3eaddd84bb20db3286731d",
+       "spanId": "bf7ab3d5e1ab65fd",
+       "parentSpanId": "02da9db984fc8493",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607512737428345",
+       "endTimeUnixNano": "1790607512738002386",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-0a608362-3f6b-4f26-a40b-1bf60f735681"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S6b-v2_no_content"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "01d5f65f-fbb4-477d-9a2a-a5987a2e1138"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"system_instruction\": \"Answer stock questions using tools.\\n\\nYou are an agent. Your internal name is \\\"stock_agent\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Returns the stock price for a ticker.\", \"name\": \"get_stock_price\", \"parameters_json_schema\": {\"properties\": {\"ticker\": {\"title\": \"Ticker\", \"type\": \"string\"}}, \"required\": [\"ticker\"], \"title\": \"get_stock_priceParams\", \"type\": \"object\"}}]}], \"labels\": {\"adk_agent_name\": \"stock_agent\"}}, \"contents\": [{\"parts\": [{\"text\": \"What is the price of XYZ?\"}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"function_call\":{\"args\":{\"ticker\":\"XYZ\"},\"name\":\"get_stock_price\"}}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":6,\"prompt_token_count\":18,\"total_token_count\":24}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "18"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "c8009505ee3eaddd84bb20db3286731d",
+       "spanId": "02e19c5e5065af9c",
+       "parentSpanId": "c1a567a8c66839d5",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607512738357356",
+       "endTimeUnixNano": "1790607512738482010",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6b-v2_no_content"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "b5236762-5a8b-4a79-b6a6-2b78f14cc7c6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-0a608362-3f6b-4f26-a40b-1bf60f735681"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "40"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"get_stock_price\",\"description\":\"Returns the stock price for a ticker.\",\"parameters\":null,\"type\":\"function\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "c8009505ee3eaddd84bb20db3286731d",
+       "spanId": "c1a567a8c66839d5",
+       "parentSpanId": "02da9db984fc8493",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607512738311502",
+       "endTimeUnixNano": "1790607512738630779",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-0a608362-3f6b-4f26-a40b-1bf60f735681"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S6b-v2_no_content"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "b5236762-5a8b-4a79-b6a6-2b78f14cc7c6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"system_instruction\": \"Answer stock questions using tools.\\n\\nYou are an agent. Your internal name is \\\"stock_agent\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Returns the stock price for a ticker.\", \"name\": \"get_stock_price\", \"parameters_json_schema\": {\"properties\": {\"ticker\": {\"title\": \"Ticker\", \"type\": \"string\"}}, \"required\": [\"ticker\"], \"title\": \"get_stock_priceParams\", \"type\": \"object\"}}]}], \"labels\": {\"adk_agent_name\": \"stock_agent\"}}, \"contents\": [{\"parts\": [{\"text\": \"What is the price of XYZ?\"}], \"role\": \"user\"}, {\"parts\": [{\"function_call\": {\"args\": {\"ticker\": \"XYZ\"}, \"name\": \"get_stock_price\"}}], \"role\": \"model\"}, {\"parts\": [{\"function_response\": {\"name\": \"get_stock_price\", \"response\": {\"error\": \"ValueError: ticker not found: XYZ\"}}}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"text\":\"Sorry, I could not find a stock with ticker XYZ.\"}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":12,\"prompt_token_count\":40,\"total_token_count\":52}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "40"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "c8009505ee3eaddd84bb20db3286731d",
+       "spanId": "02da9db984fc8493",
+       "parentSpanId": "0a79c6fd482b0c6d",
+       "name": "invoke_agent stock_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607512737116482",
+       "endTimeUnixNano": "1790607512738653061",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6b-v2_no_content"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "c8009505ee3eaddd84bb20db3286731d",
+       "spanId": "0a79c6fd482b0c6d",
+       "name": "invoke_workflow stock_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607512736695290",
+       "endTimeUnixNano": "1790607512738702539",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6b-v2_no_content"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_no_content"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "logRecords": [
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6b-v2_no_content"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "01d5f65f-fbb4-477d-9a2a-a5987a2e1138"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-0a608362-3f6b-4f26-a40b-1bf60f735681"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "18"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "get_stock_price"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Returns the stock price for a ticker."
+                }
+               },
+               {
+                "key": "parameters"
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "c8009505ee3eaddd84bb20db3286731d",
+       "spanId": "6b63de4c4486f1b7",
+       "observedTimeUnixNano": "1790607512737592149",
+       "eventName": "gen_ai.client.inference.operation.details"
+      },
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6b-v2_no_content"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "b5236762-5a8b-4a79-b6a6-2b78f14cc7c6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-0a608362-3f6b-4f26-a40b-1bf60f735681"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "40"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "get_stock_price"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Returns the stock price for a ticker."
+                }
+               },
+               {
+                "key": "parameters"
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "c8009505ee3eaddd84bb20db3286731d",
+       "spanId": "02e19c5e5065af9c",
+       "observedTimeUnixNano": "1790607512738458604",
+       "eventName": "gen_ai.client.inference.operation.details"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ]
+}

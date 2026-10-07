@@ -1,0 +1,1673 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_event_only"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "ac2cfe14ecc0e5cd",
+       "parentSpanId": "2b2f9bcb0122c897",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511571386455",
+       "endTimeUnixNano": "1790607511571549176",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "a727ab8b-8216-40b4-ab2c-a57f866f10d6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-8172d3fa-3eae-4881-ab4e-09a34fb77e96"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "22"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"research_agent\",\"description\":\"Answers research questions.\",\"parameters\":null,\"type\":\"function\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "a9f850241d456724",
+       "parentSpanId": "dc0fb0bb29285b27",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511572995172",
+       "endTimeUnixNano": "1790607511573102833",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "f48485e4-411b-4885-93a8-275309a356ab"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "ee651993-3a45-44fb-9158-68aaaea27907"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-b1a53522-b8b3-4ef5-80d9-8dc0761b3bf9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "15"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "7"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "dc0fb0bb29285b27",
+       "parentSpanId": "87292d584403dc0d",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511572950483",
+       "endTimeUnixNano": "1790607511573252310",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-b1a53522-b8b3-4ef5-80d9-8dc0761b3bf9"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "f48485e4-411b-4885-93a8-275309a356ab"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "ee651993-3a45-44fb-9158-68aaaea27907"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"system_instruction\": \"Answer research questions concisely.\\n\\nYou are an agent. Your internal name is \\\"research_agent\\\". The description about you is \\\"Answers research questions.\\\".\", \"labels\": {\"adk_agent_name\": \"research_agent\"}}, \"contents\": [{\"parts\": [{\"text\": \"What is the capital of France?\"}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"text\":\"The capital of France is Paris.\"}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":7,\"prompt_token_count\":15,\"total_token_count\":22}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "15"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "7"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "87292d584403dc0d",
+       "parentSpanId": "1db9ff67e017c854",
+       "name": "invoke_agent research_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511572448118",
+       "endTimeUnixNano": "1790607511573275216",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": "Answers research questions."
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "f48485e4-411b-4885-93a8-275309a356ab"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "1db9ff67e017c854",
+       "parentSpanId": "0cd32b75c5cb156f",
+       "name": "invoke_workflow research_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511572068242",
+       "endTimeUnixNano": "1790607511573326985",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "f48485e4-411b-4885-93a8-275309a356ab"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.nested",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "0cd32b75c5cb156f",
+       "parentSpanId": "f39c570dedddbbbf",
+       "name": "execute_tool research_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511571742675",
+       "endTimeUnixNano": "1790607511573419237",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "Answers research questions."
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "AgentTool"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_call_args",
+         "value": {
+          "stringValue": "{\"request\": \"What is the capital of France?\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "adk-74918f7f-2856-4ca8-b265-955d66a50d58"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "30bb4c17-df0e-4747-9966-ac3b3d66b0d0"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_response",
+         "value": {
+          "stringValue": "{\"result\": \"The capital of France is Paris.\"}"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "2b2f9bcb0122c897",
+       "parentSpanId": "f39c570dedddbbbf",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511571337643",
+       "endTimeUnixNano": "1790607511573494038",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-8172d3fa-3eae-4881-ab4e-09a34fb77e96"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "a727ab8b-8216-40b4-ab2c-a57f866f10d6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"system_instruction\": \"Use research_agent for research questions.\\n\\nYou are an agent. Your internal name is \\\"coordinator\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Answers research questions.\", \"name\": \"research_agent\", \"parameters_json_schema\": {\"type\": \"object\", \"properties\": {\"request\": {\"type\": \"string\"}}, \"required\": [\"request\"]}}]}], \"labels\": {\"adk_agent_name\": \"coordinator\"}}, \"contents\": [{\"parts\": [{\"text\": \"Please research the capital of France.\"}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"function_call\":{\"args\":{\"request\":\"What is the capital of France?\"},\"name\":\"research_agent\"}}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":8,\"prompt_token_count\":22,\"total_token_count\":30}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "22"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "4ec8c6123f2cfbf2",
+       "parentSpanId": "a57a6c28fb9143c1",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511573795740",
+       "endTimeUnixNano": "1790607511573936803",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "7a0f3b43-63c4-4f4f-8f63-fcfa29b26b07"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-8172d3fa-3eae-4881-ab4e-09a34fb77e96"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "45"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "11"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"name\":\"research_agent\",\"description\":\"Answers research questions.\",\"parameters\":null,\"type\":\"function\"}]"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "a57a6c28fb9143c1",
+       "parentSpanId": "f39c570dedddbbbf",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511573754674",
+       "endTimeUnixNano": "1790607511574088904",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-8172d3fa-3eae-4881-ab4e-09a34fb77e96"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "7a0f3b43-63c4-4f4f-8f63-fcfa29b26b07"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"system_instruction\": \"Use research_agent for research questions.\\n\\nYou are an agent. Your internal name is \\\"coordinator\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Answers research questions.\", \"name\": \"research_agent\", \"parameters_json_schema\": {\"type\": \"object\", \"properties\": {\"request\": {\"type\": \"string\"}}, \"required\": [\"request\"]}}]}], \"labels\": {\"adk_agent_name\": \"coordinator\"}}, \"contents\": [{\"parts\": [{\"text\": \"Please research the capital of France.\"}], \"role\": \"user\"}, {\"parts\": [{\"function_call\": {\"args\": {\"request\": \"What is the capital of France?\"}, \"name\": \"research_agent\"}}], \"role\": \"model\"}, {\"parts\": [{\"function_response\": {\"name\": \"research_agent\", \"response\": {\"result\": \"The capital of France is Paris.\"}}}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"text\":\"According to research: the capital of France is Paris.\"}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":11,\"prompt_token_count\":45,\"total_token_count\":56}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "45"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "11"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "f39c570dedddbbbf",
+       "parentSpanId": "745fb69285ceb44b",
+       "name": "invoke_agent coordinator",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511571040481",
+       "endTimeUnixNano": "1790607511574112144",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "745fb69285ceb44b",
+       "name": "invoke_workflow coordinator",
+       "kind": 1,
+       "startTimeUnixNano": "1790607511570568770",
+       "endTimeUnixNano": "1790607511574161789",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_event_only"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "logRecords": [
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "a727ab8b-8216-40b4-ab2c-a57f866f10d6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-8172d3fa-3eae-4881-ab4e-09a34fb77e96"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "user-1"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "22"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "user"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "Please research the capital of France."
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "content",
+                "value": {
+                 "stringValue": "Use research_agent for research questions.\n\nYou are an agent. Your internal name is \"coordinator\"."
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "text"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "research_agent"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Answers research questions."
+                }
+               },
+               {
+                "key": "parameters",
+                "value": {
+                 "kvlistValue": {
+                  "values": [
+                   {
+                    "key": "type",
+                    "value": {
+                     "stringValue": "object"
+                    }
+                   },
+                   {
+                    "key": "properties",
+                    "value": {
+                     "kvlistValue": {
+                      "values": [
+                       {
+                        "key": "request",
+                        "value": {
+                         "kvlistValue": {
+                          "values": [
+                           {
+                            "key": "type",
+                            "value": {
+                             "stringValue": "string"
+                            }
+                           }
+                          ]
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    }
+                   },
+                   {
+                    "key": "required",
+                    "value": {
+                     "arrayValue": {
+                      "values": [
+                       {
+                        "stringValue": "request"
+                       }
+                      ]
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "assistant"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "id",
+                       "value": {
+                        "stringValue": "research_agent_0"
+                       }
+                      },
+                      {
+                       "key": "name",
+                       "value": {
+                        "stringValue": "research_agent"
+                       }
+                      },
+                      {
+                       "key": "arguments",
+                       "value": {
+                        "kvlistValue": {
+                         "values": [
+                          {
+                           "key": "request",
+                           "value": {
+                            "stringValue": "What is the capital of France?"
+                           }
+                          }
+                         ]
+                        }
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "tool_call"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "finish_reason",
+                "value": {
+                 "stringValue": "stop"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "ac2cfe14ecc0e5cd",
+       "observedTimeUnixNano": "1790607511571516940",
+       "eventName": "gen_ai.client.inference.operation.details"
+      },
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "research_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "f48485e4-411b-4885-93a8-275309a356ab"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "ee651993-3a45-44fb-9158-68aaaea27907"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-b1a53522-b8b3-4ef5-80d9-8dc0761b3bf9"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "user-1"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "15"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "7"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "user"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "What is the capital of France?"
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "content",
+                "value": {
+                 "stringValue": "Answer research questions concisely.\n\nYou are an agent. Your internal name is \"research_agent\". The description about you is \"Answers research questions.\"."
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "text"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {}
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "assistant"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "The capital of France is Paris."
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "finish_reason",
+                "value": {
+                 "stringValue": "stop"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "a9f850241d456724",
+       "observedTimeUnixNano": "1790607511573079718",
+       "eventName": "gen_ai.client.inference.operation.details"
+      },
+      {
+       "attributes": [
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "coordinator"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S4b-v2_event_only"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "7a0f3b43-63c4-4f4f-8f63-fcfa29b26b07"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-8172d3fa-3eae-4881-ab4e-09a34fb77e96"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "user-1"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "45"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "11"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "user"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "Please research the capital of France."
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            },
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "assistant"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "id",
+                       "value": {
+                        "stringValue": "research_agent_0"
+                       }
+                      },
+                      {
+                       "key": "name",
+                       "value": {
+                        "stringValue": "research_agent"
+                       }
+                      },
+                      {
+                       "key": "arguments",
+                       "value": {
+                        "kvlistValue": {
+                         "values": [
+                          {
+                           "key": "request",
+                           "value": {
+                            "stringValue": "What is the capital of France?"
+                           }
+                          }
+                         ]
+                        }
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "tool_call"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            },
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "user"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "id",
+                       "value": {
+                        "stringValue": "research_agent_0"
+                       }
+                      },
+                      {
+                       "key": "response",
+                       "value": {
+                        "kvlistValue": {
+                         "values": [
+                          {
+                           "key": "result",
+                           "value": {
+                            "stringValue": "The capital of France is Paris."
+                           }
+                          }
+                         ]
+                        }
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "tool_call_response"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "content",
+                "value": {
+                 "stringValue": "Use research_agent for research questions.\n\nYou are an agent. Your internal name is \"coordinator\"."
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "text"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "name",
+                "value": {
+                 "stringValue": "research_agent"
+                }
+               },
+               {
+                "key": "description",
+                "value": {
+                 "stringValue": "Answers research questions."
+                }
+               },
+               {
+                "key": "parameters",
+                "value": {
+                 "kvlistValue": {
+                  "values": [
+                   {
+                    "key": "type",
+                    "value": {
+                     "stringValue": "object"
+                    }
+                   },
+                   {
+                    "key": "properties",
+                    "value": {
+                     "kvlistValue": {
+                      "values": [
+                       {
+                        "key": "request",
+                        "value": {
+                         "kvlistValue": {
+                          "values": [
+                           {
+                            "key": "type",
+                            "value": {
+                             "stringValue": "string"
+                            }
+                           }
+                          ]
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    }
+                   },
+                   {
+                    "key": "required",
+                    "value": {
+                     "arrayValue": {
+                      "values": [
+                       {
+                        "stringValue": "request"
+                       }
+                      ]
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "type",
+                "value": {
+                 "stringValue": "function"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "kvlistValue": {
+              "values": [
+               {
+                "key": "role",
+                "value": {
+                 "stringValue": "assistant"
+                }
+               },
+               {
+                "key": "parts",
+                "value": {
+                 "arrayValue": {
+                  "values": [
+                   {
+                    "kvlistValue": {
+                     "values": [
+                      {
+                       "key": "content",
+                       "value": {
+                        "stringValue": "According to research: the capital of France is Paris."
+                       }
+                      },
+                      {
+                       "key": "type",
+                       "value": {
+                        "stringValue": "text"
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "key": "finish_reason",
+                "value": {
+                 "stringValue": "stop"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f5c5654e80e82f1ca603aeed853ab6b6",
+       "spanId": "4ec8c6123f2cfbf2",
+       "observedTimeUnixNano": "1790607511573902443",
+       "eventName": "gen_ai.client.inference.operation.details"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ]
+}

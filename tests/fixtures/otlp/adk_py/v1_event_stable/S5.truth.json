@@ -1,0 +1,55 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v1_event_stable/S5",
+ "source": "adk-python 2.10 recording, mode v1_event_stable, scenario S5",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "Compare the weather in Paris and London.",
+   "final_text": "Paris is sunny at 21C; London is rainy at 12C.",
+   "intermediate_texts": [],
+   "agents": [
+    "weather_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get_weather",
+     "args": {
+      "city": "Paris"
+     },
+     "result": {
+      "city": "Paris",
+      "forecast": "sunny",
+      "temp_c": 21
+     },
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "get_weather",
+     "args": {
+      "city": "London"
+     },
+     "result": {
+      "city": "London",
+      "forecast": "rainy",
+      "temp_c": 12
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 70,
+    "output": 23
+   }
+  }
+ ],
+ "tokens": {
+  "input": 70,
+  "output": 23
+ },
+ "notes": [
+  "parallel tool calls in one model response"
+ ]
+}

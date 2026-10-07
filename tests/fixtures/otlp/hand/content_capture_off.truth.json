@@ -1,0 +1,36 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/content_capture_off",
+ "source": "hand authored; content capture off (no messages, no tool args or result)",
+ "content_captured": false,
+ "turns": [
+  {
+   "user_text": null,
+   "final_text": null,
+   "intermediate_texts": [],
+   "agents": [
+    "weather_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get_weather",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 120,
+    "output": 20
+   }
+  }
+ ],
+ "notes": [
+  "turns, trajectory names, tokens and errors survive without content"
+ ],
+ "tokens": {
+  "input": 120,
+  "output": 20
+ }
+}

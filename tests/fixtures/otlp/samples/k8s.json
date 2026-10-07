@@ -1,0 +1,3908 @@
+{
+    "data": [
+        {
+            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+            "spans": [
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "31e3495892e80304",
+                    "operationName": "GET",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881558798,
+                    "duration": 4172,
+                    "tags": [
+                        {
+                            "key": "error",
+                            "type": "bool",
+                            "value": true
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "GET"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 404
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/tasks/9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "ERROR"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "ded8728ead97f014",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "bfdb163f37e04a47"
+                        }
+                    ],
+                    "startTime": 1771237881577110,
+                    "duration": 623,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 202
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-tools.kagent:8084/mcp"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "f36169ff7c6148d8",
+                    "operationName": "invocation",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "91e742a0097b2406"
+                        }
+                    ],
+                    "startTime": 1771237881564668,
+                    "duration": 2130338,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "gcp.vertex.agent"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.22.1"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "0567e5e8200a6646",
+                    "operationName": "POST / http send",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883698197,
+                    "duration": 5,
+                    "tags": [
+                        {
+                            "key": "asgi.event.type",
+                            "type": "string",
+                            "value": "http.response.body"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "fbb62071e7e08d8e",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.task_done",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881567459,
+                    "duration": 4,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "d13497133aa8767e",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.enqueue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "896fc6b7b215e46d"
+                        }
+                    ],
+                    "startTime": 1771237883694871,
+                    "duration": 18,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "949b0ac61aa2068e",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.dequeue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883582453,
+                    "duration": 112776,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "270b1c9fe8fa6853",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.close",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "7a5e65814ff107bc"
+                        }
+                    ],
+                    "startTime": 1771237883699551,
+                    "duration": 3,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "c1e37ee5143118a5",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881565587,
+                    "duration": 1142,
+                    "tags": [
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 201
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/tasks"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "3bba9412f03dee2f",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881567609,
+                    "duration": 6829,
+                    "tags": [
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 201
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/tasks"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "642e81f6d0ac9b24",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "bfdb163f37e04a47"
+                        }
+                    ],
+                    "startTime": 1771237881573974,
+                    "duration": 2088,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-tools.kagent:8084/mcp"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "fed27723cb20e037",
+                    "operationName": "a2a.server.events.in_memory_queue_manager.InMemoryQueueManager.create_or_tap",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "6e3ba8a31599887a"
+                        }
+                    ],
+                    "startTime": 1771237881556532,
+                    "duration": 65,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "bf5a9281c6d0005e",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._send_push_notification_if_needed",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881566910,
+                    "duration": 6,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "40bb4d99be0b6336",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "f36169ff7c6148d8"
+                        }
+                    ],
+                    "startTime": 1771237881566293,
+                    "duration": 1425,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 201
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/sessions/ctx-d8251ac3-6289-464a-8404-0fc4e312e823/events?user_id=admin@kagent.dev"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "bbd35fa3d4576bc5",
+                    "operationName": "DELETE",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "91e742a0097b2406"
+                        }
+                    ],
+                    "startTime": 1771237883695664,
+                    "duration": 453,
+                    "tags": [
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "DELETE"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-tools.kagent:8084/mcp"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "ffb7c045373b3643",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883698508,
+                    "duration": 636,
+                    "tags": [
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 201
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/tasks"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "261bf303d987494a",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.dequeue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881567430,
+                    "duration": 10,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "68db2ca62fc43126",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "896fc6b7b215e46d"
+                        }
+                    ],
+                    "startTime": 1771237883693478,
+                    "duration": 973,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 201
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/sessions/ctx-d8251ac3-6289-464a-8404-0fc4e312e823/events?user_id=admin@kagent.dev"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "ea32556f3a738a9c",
+                    "operationName": "POST / http send",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883699578,
+                    "duration": 3,
+                    "tags": [
+                        {
+                            "key": "asgi.event.type",
+                            "type": "string",
+                            "value": "http.response.body"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "4002f5e528f31040",
+                    "operationName": "a2a.server.events.event_consumer.EventConsumer.consume_all",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881556711,
+                    "duration": 3,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "ce7fcbb15299df20",
+                    "operationName": "POST /",
+                    "references": [],
+                    "startTime": 1771237881554046,
+                    "duration": 2145579,
+                    "tags": [
+                        {
+                            "key": "http.flavor",
+                            "type": "string",
+                            "value": "1.1"
+                        },
+                        {
+                            "key": "http.host",
+                            "type": "string",
+                            "value": "10.42.0.28:8080"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.route",
+                            "type": "string",
+                            "value": "/"
+                        },
+                        {
+                            "key": "http.scheme",
+                            "type": "string",
+                            "value": "http"
+                        },
+                        {
+                            "key": "http.server_name",
+                            "type": "string",
+                            "value": "k8s-agent.kagent:8080"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "http.target",
+                            "type": "string",
+                            "value": "/"
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://k8s-agent.kagent:8080/"
+                        },
+                        {
+                            "key": "http.user_agent",
+                            "type": "string",
+                            "value": "trpc-a2a-go-client/0.1"
+                        },
+                        {
+                            "key": "net.host.port",
+                            "type": "int64",
+                            "value": 8080
+                        },
+                        {
+                            "key": "net.peer.ip",
+                            "type": "string",
+                            "value": "10.42.0.23"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 54848
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "bf79ccbb5d626f98",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.dequeue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883696810,
+                    "duration": 6,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "f5ceeab5ffe6943c",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.clear_events",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "5de27895aa9cdd56"
+                        }
+                    ],
+                    "startTime": 1771237883698330,
+                    "duration": 8,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "48e58f0f48da4877",
+                    "operationName": "a2a.utils.helpers.append_artifact_to_task",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883696853,
+                    "duration": 26,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "8443239a9d0f4b3d",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.dequeue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881575112,
+                    "duration": 501746,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [
+                        {
+                            "timestamp": 1771237882076846,
+                            "fields": [
+                                {
+                                    "key": "event",
+                                    "type": "string",
+                                    "value": "exception"
+                                },
+                                {
+                                    "key": "exception.escaped",
+                                    "type": "string",
+                                    "value": "False"
+                                },
+                                {
+                                    "key": "exception.message",
+                                    "type": "string",
+                                    "value": ""
+                                },
+                                {
+                                    "key": "exception.stacktrace",
+                                    "type": "string",
+                                    "value": "Traceback (most recent call last):\n  File \"/.kagent/.venv/lib/python3.13/site-packages/a2a/utils/telemetry.py\", line 196, in async_wrapper\n    result = await func(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/.kagent/.venv/lib/python3.13/site-packages/a2a/server/events/event_queue.py\", line 111, in dequeue_event\n    event = await self.queue.get()\n            ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/python/cpython-3.13.11-linux-aarch64-gnu/lib/python3.13/asyncio/queues.py\", line 186, in get\n    await getter\nasyncio.exceptions.CancelledError\n"
+                                },
+                                {
+                                    "key": "exception.type",
+                                    "type": "string",
+                                    "value": "asyncio.exceptions.CancelledError"
+                                }
+                            ]
+                        }
+                    ],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "81be0c0b80243b47",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._send_push_notification_if_needed",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883698064,
+                    "duration": 6,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "c082867b3bb9c121",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "bfdb163f37e04a47"
+                        }
+                    ],
+                    "startTime": 1771237883689764,
+                    "duration": 1248,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-tools.kagent:8084/mcp"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "9761ceb66858970b",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.task_done",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881558623,
+                    "duration": 9,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "eadb193fa9dffdd2",
+                    "operationName": "a2a.server.request_handlers.jsonrpc_handler.JSONRPCHandler.on_message_send_stream",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881555461,
+                    "duration": 45,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "6e3ba8a31599887a",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._setup_message_execution",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881556269,
+                    "duration": 404,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "731dac9178657f53",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883697019,
+                    "duration": 824,
+                    "tags": [
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 201
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/tasks"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "259df174456c47c6",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._send_push_notification_if_needed",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881574801,
+                    "duration": 10,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "fa46f6e2c71635e1",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._cleanup_producer",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883699528,
+                    "duration": 35,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "e2f301109bffc6ce",
+                    "operationName": "GET",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "f36169ff7c6148d8"
+                        }
+                    ],
+                    "startTime": 1771237881564839,
+                    "duration": 891,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "GET"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/sessions/ctx-d8251ac3-6289-464a-8404-0fc4e312e823?user_id=admin@kagent.dev\u0026order=asc\u0026limit=-1"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "0433f27fed5c4c36",
+                    "operationName": "GET",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "bfdb163f37e04a47"
+                        }
+                    ],
+                    "startTime": 1771237881577295,
+                    "duration": 1918,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "GET"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-tools.kagent:8084/mcp"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "ebef5315ea74ba4a",
+                    "operationName": "POST / http send",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883699415,
+                    "duration": 5,
+                    "tags": [
+                        {
+                            "key": "asgi.event.type",
+                            "type": "string",
+                            "value": "http.response.body"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "37459531e53d3be4",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.dequeue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883698270,
+                    "duration": 8,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "5de27895aa9cdd56",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.close",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883698316,
+                    "duration": 26,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "764340234e57f34a",
+                    "operationName": "openai.chat",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "896fc6b7b215e46d"
+                        }
+                    ],
+                    "startTime": 1771237881589367,
+                    "duration": 2099429,
+                    "tags": [
+                        {
+                            "key": "gen_ai.completion.0.content",
+                            "type": "string",
+                            "value": "To list all Helm releases, I would typically use Helm CLI commands like `helm list --all-namespaces`. However, I currently only have access to Kubernetes cluster via the available functions and do not have direct Helm CLI access.\n\nI can help by listing Kubernetes resources related to Helm releases. Helm stores release information as secrets or configmaps in namespaces, commonly in the \"kube-system\" or the namespace of the release with labels such as `owner=helm`.\n\nWould you like me to:\n1. List all Helm release secrets across all namespaces?\n2. List configmaps labeled as Helm release metadata?\n3. Or provide another approach?\n\nPlease confirm or specify how you'd like to proceed."
+                        },
+                        {
+                            "key": "gen_ai.completion.0.finish_reason",
+                            "type": "string",
+                            "value": "stop"
+                        },
+                        {
+                            "key": "gen_ai.completion.0.role",
+                            "type": "string",
+                            "value": "assistant"
+                        },
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.openai.api_base",
+                            "type": "string",
+                            "value": "https://api.openai.com/v1/"
+                        },
+                        {
+                            "key": "gen_ai.openai.system_fingerprint",
+                            "type": "string",
+                            "value": "fp_459ebace24"
+                        },
+                        {
+                            "key": "gen_ai.prompt.0.content",
+                            "type": "string",
+                            "value": "# Kubernetes AI Agent System Prompt\n\nYou are KubeAssist, an advanced AI agent specialized in Kubernetes troubleshooting and operations. You have deep expertise in Kubernetes architecture, container orchestration, networking, storage systems, and resource management. Your purpose is to help users diagnose and resolve Kubernetes-related issues while following best practices and security protocols.\n\n## Core Capabilities\n\n- **Expert Kubernetes Knowledge**: You understand Kubernetes components, architecture, orchestration principles, and resource management.\n- **Systematic Troubleshooting**: You follow a methodical approach to problem diagnosis, analyzing logs, metrics, and cluster state.\n- **Security-First Mindset**: You prioritize security awareness including RBAC, Pod Security Policies, and secure practices.\n- **Clear Communication**: You provide clear, concise technical information and explain complex concepts appropriately.\n- **Safety-Oriented**: You follow the principle of least privilege and avoid destructive operations without confirmation.\n\n## Operational Guidelines\n\n### Investigation Protocol\n\n1. **Start Non-Intrusively**: Begin with read-only operations (get, describe) before more invasive actions.\n2. **Progressive Escalation**: Escalate to more detailed investigation only when necessary.\n3. **Document Everything**: Maintain a clear record of all investigative steps and actions.\n4. **Verify Before Acting**: Consider potential impacts before executing any changes.\n5. **Rollback Planning**: Always have a plan to revert changes if needed.\n\n### Problem-Solving Framework\n\n1. **Initial Assessment**\n  - Gather basic cluster information\n  - Verify Kubernetes version and configuration\n  - Check node status and resource capacity\n  - Review recent changes or deployments\n\n2. **Problem Classification**\n  - Application issues (crashes, scaling problems)\n  - Infrastructure problems (node failures, networking)\n  - Performance concerns (resource constraints, latency)\n  - Security incidents (policy violations, unauthorized access)\n  - Configuration errors (misconfigurations, invalid specs)\n\n3. **Resource Analysis**\n  - Pod status and events\n  - Container logs\n  - Resource metrics\n  - Network connectivity\n  - Storage status\n\n4. **Solution Implementation**\n  - Propose multiple solutions when appropriate\n  - Assess risks for each approach\n  - Present implementation plan\n  - Suggest testing strategies\n  - Include rollback procedures\n\n## Available Tools\n\nYou have access to the following tools to help diagnose and solve Kubernetes issues:\n\n### Informational Tools\n- `GetResources`: Retrieve information about Kubernetes resources. Always prefer \"wide\" output unless specified otherwise. Specify the exact resource type.\n- `DescribeResource`: Get detailed information about a specific Kubernetes resource.\n- `GetEvents`: View events in the Kubernetes cluster to identify recent issues.\n- `GetPodLogs`: Retrieve logs from specific pods for troubleshooting.\n- `GetResourceYAML`: Obtain the YAML representation of a Kubernetes resource.\n- `GetAvailableAPIResources`: View supported API resources in the cluster.\n- `GetClusterConfiguration`: Retrieve the Kubernetes cluster configuration.\n- `CheckServiceConnectivity`: Verify connectivity to a service.\n- `ExecuteCommand`: Run a command inside a pod (use cautiously).\n\n### Modification Tools\n- `CreateResource`: Create a new resource from a local file.\n- `CreateResourceFromUrl`: Create a resource from a URL.\n- `ApplyManifest`: Apply a YAML resource file to the cluster.\n- `PatchResource`: Make partial updates to a resource.\n- `DeleteResource`: Remove a resource from the cluster (use with caution).\n- `LabelResource`: Add labels to resources.\n- `RemoveLabel`: Remove labels from resources.\n- `AnnotateResource`: Add annotations to resources.\n- `RemoveAnnotation`: Remove annotations from resources.\n- `GenerateResourceTool`: Generate YAML configurations for Istio, Gateway API, or Argo resources.\n\n## Safety Protocols\n\n1. **Read Before Write**: Always use informational tools first before modification tools.\n2. **Explain Actions**: Before using any modification tool, explain what you're doing and why.\n3. **Dry-Run When Possible**: Suggest using `--dry-run` flags when available.\n4. **Backup Current State**: Before modifications, suggest capturing the current state using `GetResourceYAML`.\n5. **Limited Scope**: Apply changes to the minimum scope necessary to fix the issue.\n6. **Verify Changes**: After any modification, verify the results with appropriate informational tools.\n7. **Avoid Dangerous Commands**: Do not execute potentially destructive commands without explicit confirmation.\n\n## Response Format\n\nWhen responding to user queries:\n\n1. **Initial Assessment**: Briefly acknowledge the issue and establish what you understand about the situation.\n2. **Information Gathering**: If needed, state what additional information you require.\n3. **Analysis**: Provide your analysis of the situation in clear, technical terms.\n4. **Recommendations**: Offer specific recommendations and the tools you'll use.\n5. **Action Plan**: Present a step-by-step plan for resolution.\n6. **Verification**: Explain how to verify the solution worked correctly.\n7. **Knowledge Sharing**: Include brief explanations of relevant Kubernetes concepts.\n\n## Limitations\n\n1. You cannot directly connect to or diagnose external systems outside of the Kubernetes cluster.\n2. You must rely on the tools provided and cannot use kubectl commands directly.\n3. You cannot access or modify files on the host system outside of the agent's environment.\n4. Remember that your suggestions impact production environments - prioritize safety and stability.\n\nAlways start with the least intrusive approach, and escalate diagnostics only as needed. When in doubt, gather more information before recommending changes.\n\n\nYou are an agent. Your internal name is \"k8s_agent\". The description about you is \"An Kubernetes Expert AI Agent specializing in cluster operations, troubleshooting, and maintenance.\"."
+                        },
+                        {
+                            "key": "gen_ai.prompt.0.role",
+                            "type": "string",
+                            "value": "system"
+                        },
+                        {
+                            "key": "gen_ai.prompt.1.content",
+                            "type": "string",
+                            "value": "list all Helm releases"
+                        },
+                        {
+                            "key": "gen_ai.prompt.1.role",
+                            "type": "string",
+                            "value": "user"
+                        },
+                        {
+                            "key": "gen_ai.request.model",
+                            "type": "string",
+                            "value": "gpt-4.1-mini"
+                        },
+                        {
+                            "key": "gen_ai.request.reasoning_effort",
+                            "type": "string",
+                            "value": "[]"
+                        },
+                        {
+                            "key": "gen_ai.response.id",
+                            "type": "string",
+                            "value": "chatcmpl-D9qArHCFLjLCCQgTZe5nDPEBLhQrM"
+                        },
+                        {
+                            "key": "gen_ai.response.model",
+                            "type": "string",
+                            "value": "gpt-4.1-mini-2025-04-14"
+                        },
+                        {
+                            "key": "gen_ai.system",
+                            "type": "string",
+                            "value": "openai"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "gen_ai.usage.cache_read_input_tokens",
+                            "type": "int64",
+                            "value": 1792
+                        },
+                        {
+                            "key": "gen_ai.usage.completion_tokens",
+                            "type": "int64",
+                            "value": 139
+                        },
+                        {
+                            "key": "gen_ai.usage.prompt_tokens",
+                            "type": "int64",
+                            "value": 2203
+                        },
+                        {
+                            "key": "gen_ai.usage.reasoning_tokens",
+                            "type": "int64",
+                            "value": 0
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "llm.headers",
+                            "type": "string",
+                            "value": "None"
+                        },
+                        {
+                            "key": "llm.is_streaming",
+                            "type": "bool",
+                            "value": false
+                        },
+                        {
+                            "key": "llm.request.functions.0.description",
+                            "type": "string",
+                            "value": "Add or update annotations on a Kubernetes resource"
+                        },
+                        {
+                            "key": "llm.request.functions.0.name",
+                            "type": "string",
+                            "value": "k8s_annotate_resource"
+                        },
+                        {
+                            "key": "llm.request.functions.0.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"annotations\": {\"description\": \"Space-separated key=value pairs for annotations\", \"type\": \"string\"}, \"namespace\": {\"description\": \"The namespace of the resource\", \"type\": \"string\"}, \"resource_name\": {\"description\": \"The name of the resource\", \"type\": \"string\"}, \"resource_type\": {\"description\": \"The type of resource\", \"type\": \"string\"}}, \"required\": [\"resource_type\", \"resource_name\", \"annotations\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.1.description",
+                            "type": "string",
+                            "value": "Apply a YAML manifest to the Kubernetes cluster"
+                        },
+                        {
+                            "key": "llm.request.functions.1.name",
+                            "type": "string",
+                            "value": "k8s_apply_manifest"
+                        },
+                        {
+                            "key": "llm.request.functions.1.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"manifest\": {\"description\": \"YAML manifest content\", \"type\": \"string\"}}, \"required\": [\"manifest\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.10.description",
+                            "type": "string",
+                            "value": "Get events from a Kubernetes namespace"
+                        },
+                        {
+                            "key": "llm.request.functions.10.name",
+                            "type": "string",
+                            "value": "k8s_get_events"
+                        },
+                        {
+                            "key": "llm.request.functions.10.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"namespace\": {\"description\": \"Namespace to get events from (default: default)\", \"type\": \"string\"}}, \"required\": []}"
+                        },
+                        {
+                            "key": "llm.request.functions.11.description",
+                            "type": "string",
+                            "value": "Get logs from a Kubernetes pod"
+                        },
+                        {
+                            "key": "llm.request.functions.11.name",
+                            "type": "string",
+                            "value": "k8s_get_pod_logs"
+                        },
+                        {
+                            "key": "llm.request.functions.11.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"container\": {\"description\": \"Container name (for multi-container pods)\", \"type\": \"string\"}, \"namespace\": {\"description\": \"Namespace of the pod (default: default)\", \"type\": \"string\"}, \"pod_name\": {\"description\": \"Name of the pod\", \"type\": \"string\"}, \"tail_lines\": {\"description\": \"Number of lines to show from the end (default: 50)\", \"type\": \"number\"}}, \"required\": [\"pod_name\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.12.description",
+                            "type": "string",
+                            "value": "Get the YAML representation of a Kubernetes resource"
+                        },
+                        {
+                            "key": "llm.request.functions.12.name",
+                            "type": "string",
+                            "value": "k8s_get_resource_yaml"
+                        },
+                        {
+                            "key": "llm.request.functions.12.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"namespace\": {\"description\": \"Namespace of the resource (optional)\", \"type\": \"string\"}, \"resource_name\": {\"description\": \"Name of the resource\", \"type\": \"string\"}, \"resource_type\": {\"description\": \"Type of resource\", \"type\": \"string\"}}, \"required\": [\"resource_type\", \"resource_name\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.13.description",
+                            "type": "string",
+                            "value": "Get Kubernetes resources using kubectl"
+                        },
+                        {
+                            "key": "llm.request.functions.13.name",
+                            "type": "string",
+                            "value": "k8s_get_resources"
+                        },
+                        {
+                            "key": "llm.request.functions.13.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"all_namespaces\": {\"description\": \"Query all namespaces (true/false)\", \"type\": \"string\"}, \"namespace\": {\"description\": \"Namespace to query (optional)\", \"type\": \"string\"}, \"output\": {\"default\": \"wide\", \"description\": \"Output format (json, yaml, wide)\", \"type\": \"string\"}, \"resource_name\": {\"description\": \"Name of specific resource (optional)\", \"type\": \"string\"}, \"resource_type\": {\"description\": \"Type of resource (pod, service, deployment, etc.)\", \"type\": \"string\"}}, \"required\": [\"resource_type\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.14.description",
+                            "type": "string",
+                            "value": "Add or update labels on a Kubernetes resource"
+                        },
+                        {
+                            "key": "llm.request.functions.14.name",
+                            "type": "string",
+                            "value": "k8s_label_resource"
+                        },
+                        {
+                            "key": "llm.request.functions.14.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"labels\": {\"description\": \"Space-separated key=value pairs for labels\", \"type\": \"string\"}, \"namespace\": {\"description\": \"The namespace of the resource\", \"type\": \"string\"}, \"resource_name\": {\"description\": \"The name of the resource\", \"type\": \"string\"}, \"resource_type\": {\"description\": \"The type of resource\", \"type\": \"string\"}}, \"required\": [\"resource_type\", \"resource_name\", \"labels\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.15.description",
+                            "type": "string",
+                            "value": "Patch a Kubernetes resource using strategic merge patch"
+                        },
+                        {
+                            "key": "llm.request.functions.15.name",
+                            "type": "string",
+                            "value": "k8s_patch_resource"
+                        },
+                        {
+                            "key": "llm.request.functions.15.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"namespace\": {\"description\": \"Namespace of the resource (default: default)\", \"type\": \"string\"}, \"patch\": {\"description\": \"JSON patch to apply\", \"type\": \"string\"}, \"resource_name\": {\"description\": \"Name of the resource\", \"type\": \"string\"}, \"resource_type\": {\"description\": \"Type of resource (deployment, service, etc.)\", \"type\": \"string\"}}, \"required\": [\"resource_type\", \"resource_name\", \"patch\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.16.description",
+                            "type": "string",
+                            "value": "Remove an annotation from a Kubernetes resource"
+                        },
+                        {
+                            "key": "llm.request.functions.16.name",
+                            "type": "string",
+                            "value": "k8s_remove_annotation"
+                        },
+                        {
+                            "key": "llm.request.functions.16.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"annotation_key\": {\"description\": \"The key of the annotation to remove\", \"type\": \"string\"}, \"namespace\": {\"description\": \"The namespace of the resource\", \"type\": \"string\"}, \"resource_name\": {\"description\": \"The name of the resource\", \"type\": \"string\"}, \"resource_type\": {\"description\": \"The type of resource\", \"type\": \"string\"}}, \"required\": [\"resource_type\", \"resource_name\", \"annotation_key\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.17.description",
+                            "type": "string",
+                            "value": "Remove a label from a Kubernetes resource"
+                        },
+                        {
+                            "key": "llm.request.functions.17.name",
+                            "type": "string",
+                            "value": "k8s_remove_label"
+                        },
+                        {
+                            "key": "llm.request.functions.17.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"label_key\": {\"description\": \"The key of the label to remove\", \"type\": \"string\"}, \"namespace\": {\"description\": \"The namespace of the resource\", \"type\": \"string\"}, \"resource_name\": {\"description\": \"The name of the resource\", \"type\": \"string\"}, \"resource_type\": {\"description\": \"The type of resource\", \"type\": \"string\"}}, \"required\": [\"resource_type\", \"resource_name\", \"label_key\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.2.description",
+                            "type": "string",
+                            "value": "Check connectivity to a service using a temporary curl pod"
+                        },
+                        {
+                            "key": "llm.request.functions.2.name",
+                            "type": "string",
+                            "value": "k8s_check_service_connectivity"
+                        },
+                        {
+                            "key": "llm.request.functions.2.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"namespace\": {\"description\": \"Namespace to run the check from (default: default)\", \"type\": \"string\"}, \"service_name\": {\"description\": \"Service name to test (e.g., my-service.my-namespace.svc.cluster.local:80)\", \"type\": \"string\"}}, \"required\": [\"service_name\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.3.description",
+                            "type": "string",
+                            "value": "Create a Kubernetes resource from YAML content"
+                        },
+                        {
+                            "key": "llm.request.functions.3.name",
+                            "type": "string",
+                            "value": "k8s_create_resource"
+                        },
+                        {
+                            "key": "llm.request.functions.3.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"yaml_content\": {\"description\": \"YAML content of the resource\", \"type\": \"string\"}}, \"required\": [\"yaml_content\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.4.description",
+                            "type": "string",
+                            "value": "Create a Kubernetes resource from a URL pointing to a YAML manifest"
+                        },
+                        {
+                            "key": "llm.request.functions.4.name",
+                            "type": "string",
+                            "value": "k8s_create_resource_from_url"
+                        },
+                        {
+                            "key": "llm.request.functions.4.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"namespace\": {\"description\": \"The namespace to create the resource in\", \"type\": \"string\"}, \"url\": {\"description\": \"The URL of the manifest\", \"type\": \"string\"}}, \"required\": [\"url\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.5.description",
+                            "type": "string",
+                            "value": "Delete a Kubernetes resource"
+                        },
+                        {
+                            "key": "llm.request.functions.5.name",
+                            "type": "string",
+                            "value": "k8s_delete_resource"
+                        },
+                        {
+                            "key": "llm.request.functions.5.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"namespace\": {\"description\": \"Namespace of the resource (default: default)\", \"type\": \"string\"}, \"resource_name\": {\"description\": \"Name of the resource\", \"type\": \"string\"}, \"resource_type\": {\"description\": \"Type of resource (pod, service, deployment, etc.)\", \"type\": \"string\"}}, \"required\": [\"resource_type\", \"resource_name\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.6.description",
+                            "type": "string",
+                            "value": "Describe a Kubernetes resource in detail"
+                        },
+                        {
+                            "key": "llm.request.functions.6.name",
+                            "type": "string",
+                            "value": "k8s_describe_resource"
+                        },
+                        {
+                            "key": "llm.request.functions.6.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"namespace\": {\"description\": \"Namespace of the resource (optional)\", \"type\": \"string\"}, \"resource_name\": {\"description\": \"Name of the resource\", \"type\": \"string\"}, \"resource_type\": {\"description\": \"Type of resource (deployment, service, pod, node, etc.)\", \"type\": \"string\"}}, \"required\": [\"resource_type\", \"resource_name\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.7.description",
+                            "type": "string",
+                            "value": "Execute a command in a Kubernetes pod"
+                        },
+                        {
+                            "key": "llm.request.functions.7.name",
+                            "type": "string",
+                            "value": "k8s_execute_command"
+                        },
+                        {
+                            "key": "llm.request.functions.7.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {\"command\": {\"description\": \"Command to execute\", \"type\": \"string\"}, \"container\": {\"description\": \"Container name (for multi-container pods)\", \"type\": \"string\"}, \"namespace\": {\"description\": \"Namespace of the pod (default: default)\", \"type\": \"string\"}, \"pod_name\": {\"description\": \"Name of the pod to execute in\", \"type\": \"string\"}}, \"required\": [\"pod_name\", \"command\"]}"
+                        },
+                        {
+                            "key": "llm.request.functions.8.description",
+                            "type": "string",
+                            "value": "Get available Kubernetes API resources"
+                        },
+                        {
+                            "key": "llm.request.functions.8.name",
+                            "type": "string",
+                            "value": "k8s_get_available_api_resources"
+                        },
+                        {
+                            "key": "llm.request.functions.8.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {}, \"required\": []}"
+                        },
+                        {
+                            "key": "llm.request.functions.9.description",
+                            "type": "string",
+                            "value": "Get cluster configuration details"
+                        },
+                        {
+                            "key": "llm.request.functions.9.name",
+                            "type": "string",
+                            "value": "k8s_get_cluster_configuration"
+                        },
+                        {
+                            "key": "llm.request.functions.9.parameters",
+                            "type": "string",
+                            "value": "{\"type\": \"object\", \"properties\": {}, \"required\": []}"
+                        },
+                        {
+                            "key": "llm.request.type",
+                            "type": "string",
+                            "value": "chat"
+                        },
+                        {
+                            "key": "llm.usage.total_tokens",
+                            "type": "int64",
+                            "value": 2342
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.openai.v1"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.47.3"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "bfdb163f37e04a47",
+                    "operationName": "invoke_agent k8s_agent",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "f36169ff7c6148d8"
+                        }
+                    ],
+                    "startTime": 1771237881568036,
+                    "duration": 2126953,
+                    "tags": [
+                        {
+                            "key": "gen_ai.agent.description",
+                            "type": "string",
+                            "value": "An Kubernetes Expert AI Agent specializing in cluster operations, troubleshooting, and maintenance."
+                        },
+                        {
+                            "key": "gen_ai.agent.name",
+                            "type": "string",
+                            "value": "k8s_agent"
+                        },
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.operation.name",
+                            "type": "string",
+                            "value": "invoke_agent"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "gcp.vertex.agent"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.22.1"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "fcb528d4dfdeb25e",
+                    "operationName": "POST / http send",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881574931,
+                    "duration": 7,
+                    "tags": [
+                        {
+                            "key": "asgi.event.type",
+                            "type": "string",
+                            "value": "http.response.body"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "c2707efdb91ce323",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._track_background_task",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883699477,
+                    "duration": 6,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "f448a9fe5256b6c8",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.dequeue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883080336,
+                    "duration": 502044,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [
+                        {
+                            "timestamp": 1771237883582372,
+                            "fields": [
+                                {
+                                    "key": "event",
+                                    "type": "string",
+                                    "value": "exception"
+                                },
+                                {
+                                    "key": "exception.escaped",
+                                    "type": "string",
+                                    "value": "False"
+                                },
+                                {
+                                    "key": "exception.message",
+                                    "type": "string",
+                                    "value": ""
+                                },
+                                {
+                                    "key": "exception.stacktrace",
+                                    "type": "string",
+                                    "value": "Traceback (most recent call last):\n  File \"/.kagent/.venv/lib/python3.13/site-packages/a2a/utils/telemetry.py\", line 196, in async_wrapper\n    result = await func(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/.kagent/.venv/lib/python3.13/site-packages/a2a/server/events/event_queue.py\", line 111, in dequeue_event\n    event = await self.queue.get()\n            ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/python/cpython-3.13.11-linux-aarch64-gnu/lib/python3.13/asyncio/queues.py\", line 186, in get\n    await getter\nasyncio.exceptions.CancelledError\n"
+                                },
+                                {
+                                    "key": "exception.type",
+                                    "type": "string",
+                                    "value": "asyncio.exceptions.CancelledError"
+                                }
+                            ]
+                        }
+                    ],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "d20e5e7ad90b9dee",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.enqueue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "91e742a0097b2406"
+                        }
+                    ],
+                    "startTime": 1771237883695067,
+                    "duration": 10,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "2c0129462b563289",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "91e742a0097b2406"
+                        }
+                    ],
+                    "startTime": 1771237881562824,
+                    "duration": 1243,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 201
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/sessions/ctx-d8251ac3-6289-464a-8404-0fc4e312e823/events?user_id=admin@kagent.dev"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "ba0322bda52adfb6",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.enqueue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "91e742a0097b2406"
+                        }
+                    ],
+                    "startTime": 1771237881564576,
+                    "duration": 22,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "01c5bbaef741e6f5",
+                    "operationName": "POST / http receive",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881554324,
+                    "duration": 27,
+                    "tags": [
+                        {
+                            "key": "asgi.event.type",
+                            "type": "string",
+                            "value": "http.request"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "96d4b34e4c994657",
+                    "operationName": "POST / http receive",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881556856,
+                    "duration": 2142795,
+                    "tags": [
+                        {
+                            "key": "asgi.event.type",
+                            "type": "string",
+                            "value": "http.disconnect"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [
+                        "clock skew adjustment disabled; not applying calculated delta of -1.41871ms"
+                    ]
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "4b0f634f09f41b98",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.task_done",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883698297,
+                    "duration": 4,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "39813c63cf329fe5",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._register_producer",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "6e3ba8a31599887a"
+                        }
+                    ],
+                    "startTime": 1771237881556645,
+                    "duration": 19,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "4a505e3bd96e7635",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._send_push_notification_if_needed",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883696679,
+                    "duration": 5,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "91e742a0097b2406",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._run_event_stream",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "6e3ba8a31599887a"
+                        }
+                    ],
+                    "startTime": 1771237881556879,
+                    "duration": 2141755,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "896fc6b7b215e46d",
+                    "operationName": "call_llm",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "bfdb163f37e04a47"
+                        }
+                    ],
+                    "startTime": 1771237881585997,
+                    "duration": 2108918,
+                    "tags": [
+                        {
+                            "key": "gcp.vertex.agent.event_id",
+                            "type": "string",
+                            "value": "daca9511-a606-4847-83f5-0cebfd7f2e88"
+                        },
+                        {
+                            "key": "gcp.vertex.agent.invocation_id",
+                            "type": "string",
+                            "value": "e-5b34c3c7-8685-4a85-ba43-11094a2ff90d"
+                        },
+                        {
+                            "key": "gcp.vertex.agent.llm_request",
+                            "type": "string",
+                            "value": "{\"model\": \"gpt-4.1-mini\", \"config\": {\"system_instruction\": \"# Kubernetes AI Agent System Prompt\\n\\nYou are KubeAssist, an advanced AI agent specialized in Kubernetes troubleshooting and operations. You have deep expertise in Kubernetes architecture, container orchestration, networking, storage systems, and resource management. Your purpose is to help users diagnose and resolve Kubernetes-related issues while following best practices and security protocols.\\n\\n## Core Capabilities\\n\\n- **Expert Kubernetes Knowledge**: You understand Kubernetes components, architecture, orchestration principles, and resource management.\\n- **Systematic Troubleshooting**: You follow a methodical approach to problem diagnosis, analyzing logs, metrics, and cluster state.\\n- **Security-First Mindset**: You prioritize security awareness including RBAC, Pod Security Policies, and secure practices.\\n- **Clear Communication**: You provide clear, concise technical information and explain complex concepts appropriately.\\n- **Safety-Oriented**: You follow the principle of least privilege and avoid destructive operations without confirmation.\\n\\n## Operational Guidelines\\n\\n### Investigation Protocol\\n\\n1. **Start Non-Intrusively**: Begin with read-only operations (get, describe) before more invasive actions.\\n2. **Progressive Escalation**: Escalate to more detailed investigation only when necessary.\\n3. **Document Everything**: Maintain a clear record of all investigative steps and actions.\\n4. **Verify Before Acting**: Consider potential impacts before executing any changes.\\n5. **Rollback Planning**: Always have a plan to revert changes if needed.\\n\\n### Problem-Solving Framework\\n\\n1. **Initial Assessment**\\n  - Gather basic cluster information\\n  - Verify Kubernetes version and configuration\\n  - Check node status and resource capacity\\n  - Review recent changes or deployments\\n\\n2. **Problem Classification**\\n  - Application issues (crashes, scaling problems)\\n  - Infrastructure problems (node failures, networking)\\n  - Performance concerns (resource constraints, latency)\\n  - Security incidents (policy violations, unauthorized access)\\n  - Configuration errors (misconfigurations, invalid specs)\\n\\n3. **Resource Analysis**\\n  - Pod status and events\\n  - Container logs\\n  - Resource metrics\\n  - Network connectivity\\n  - Storage status\\n\\n4. **Solution Implementation**\\n  - Propose multiple solutions when appropriate\\n  - Assess risks for each approach\\n  - Present implementation plan\\n  - Suggest testing strategies\\n  - Include rollback procedures\\n\\n## Available Tools\\n\\nYou have access to the following tools to help diagnose and solve Kubernetes issues:\\n\\n### Informational Tools\\n- `GetResources`: Retrieve information about Kubernetes resources. Always prefer \\\"wide\\\" output unless specified otherwise. Specify the exact resource type.\\n- `DescribeResource`: Get detailed information about a specific Kubernetes resource.\\n- `GetEvents`: View events in the Kubernetes cluster to identify recent issues.\\n- `GetPodLogs`: Retrieve logs from specific pods for troubleshooting.\\n- `GetResourceYAML`: Obtain the YAML representation of a Kubernetes resource.\\n- `GetAvailableAPIResources`: View supported API resources in the cluster.\\n- `GetClusterConfiguration`: Retrieve the Kubernetes cluster configuration.\\n- `CheckServiceConnectivity`: Verify connectivity to a service.\\n- `ExecuteCommand`: Run a command inside a pod (use cautiously).\\n\\n### Modification Tools\\n- `CreateResource`: Create a new resource from a local file.\\n- `CreateResourceFromUrl`: Create a resource from a URL.\\n- `ApplyManifest`: Apply a YAML resource file to the cluster.\\n- `PatchResource`: Make partial updates to a resource.\\n- `DeleteResource`: Remove a resource from the cluster (use with caution).\\n- `LabelResource`: Add labels to resources.\\n- `RemoveLabel`: Remove labels from resources.\\n- `AnnotateResource`: Add annotations to resources.\\n- `RemoveAnnotation`: Remove annotations from resources.\\n- `GenerateResourceTool`: Generate YAML configurations for Istio, Gateway API, or Argo resources.\\n\\n## Safety Protocols\\n\\n1. **Read Before Write**: Always use informational tools first before modification tools.\\n2. **Explain Actions**: Before using any modification tool, explain what you're doing and why.\\n3. **Dry-Run When Possible**: Suggest using `--dry-run` flags when available.\\n4. **Backup Current State**: Before modifications, suggest capturing the current state using `GetResourceYAML`.\\n5. **Limited Scope**: Apply changes to the minimum scope necessary to fix the issue.\\n6. **Verify Changes**: After any modification, verify the results with appropriate informational tools.\\n7. **Avoid Dangerous Commands**: Do not execute potentially destructive commands without explicit confirmation.\\n\\n## Response Format\\n\\nWhen responding to user queries:\\n\\n1. **Initial Assessment**: Briefly acknowledge the issue and establish what you understand about the situation.\\n2. **Information Gathering**: If needed, state what additional information you require.\\n3. **Analysis**: Provide your analysis of the situation in clear, technical terms.\\n4. **Recommendations**: Offer specific recommendations and the tools you'll use.\\n5. **Action Plan**: Present a step-by-step plan for resolution.\\n6. **Verification**: Explain how to verify the solution worked correctly.\\n7. **Knowledge Sharing**: Include brief explanations of relevant Kubernetes concepts.\\n\\n## Limitations\\n\\n1. You cannot directly connect to or diagnose external systems outside of the Kubernetes cluster.\\n2. You must rely on the tools provided and cannot use kubectl commands directly.\\n3. You cannot access or modify files on the host system outside of the agent's environment.\\n4. Remember that your suggestions impact production environments - prioritize safety and stability.\\n\\nAlways start with the least intrusive approach, and escalate diagnostics only as needed. When in doubt, gather more information before recommending changes.\\n\\n\\nYou are an agent. Your internal name is \\\"k8s_agent\\\". The description about you is \\\"An Kubernetes Expert AI Agent specializing in cluster operations, troubleshooting, and maintenance.\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Add or update annotations on a Kubernetes resource\", \"name\": \"k8s_annotate_resource\", \"parameters\": {\"properties\": {\"annotations\": {\"description\": \"Space-separated key=value pairs for annotations\", \"type\": \"STRING\"}, \"namespace\": {\"description\": \"The namespace of the resource\", \"type\": \"STRING\"}, \"resource_name\": {\"description\": \"The name of the resource\", \"type\": \"STRING\"}, \"resource_type\": {\"description\": \"The type of resource\", \"type\": \"STRING\"}}, \"required\": [\"resource_type\", \"resource_name\", \"annotations\"], \"type\": \"OBJECT\"}}, {\"description\": \"Apply a YAML manifest to the Kubernetes cluster\", \"name\": \"k8s_apply_manifest\", \"parameters\": {\"properties\": {\"manifest\": {\"description\": \"YAML manifest content\", \"type\": \"STRING\"}}, \"required\": [\"manifest\"], \"type\": \"OBJECT\"}}, {\"description\": \"Check connectivity to a service using a temporary curl pod\", \"name\": \"k8s_check_service_connectivity\", \"parameters\": {\"properties\": {\"namespace\": {\"description\": \"Namespace to run the check from (default: default)\", \"type\": \"STRING\"}, \"service_name\": {\"description\": \"Service name to test (e.g., my-service.my-namespace.svc.cluster.local:80)\", \"type\": \"STRING\"}}, \"required\": [\"service_name\"], \"type\": \"OBJECT\"}}, {\"description\": \"Create a Kubernetes resource from YAML content\", \"name\": \"k8s_create_resource\", \"parameters\": {\"properties\": {\"yaml_content\": {\"description\": \"YAML content of the resource\", \"type\": \"STRING\"}}, \"required\": [\"yaml_content\"], \"type\": \"OBJECT\"}}, {\"description\": \"Create a Kubernetes resource from a URL pointing to a YAML manifest\", \"name\": \"k8s_create_resource_from_url\", \"parameters\": {\"properties\": {\"namespace\": {\"description\": \"The namespace to create the resource in\", \"type\": \"STRING\"}, \"url\": {\"description\": \"The URL of the manifest\", \"type\": \"STRING\"}}, \"required\": [\"url\"], \"type\": \"OBJECT\"}}, {\"description\": \"Delete a Kubernetes resource\", \"name\": \"k8s_delete_resource\", \"parameters\": {\"properties\": {\"namespace\": {\"description\": \"Namespace of the resource (default: default)\", \"type\": \"STRING\"}, \"resource_name\": {\"description\": \"Name of the resource\", \"type\": \"STRING\"}, \"resource_type\": {\"description\": \"Type of resource (pod, service, deployment, etc.)\", \"type\": \"STRING\"}}, \"required\": [\"resource_type\", \"resource_name\"], \"type\": \"OBJECT\"}}, {\"description\": \"Describe a Kubernetes resource in detail\", \"name\": \"k8s_describe_resource\", \"parameters\": {\"properties\": {\"namespace\": {\"description\": \"Namespace of the resource (optional)\", \"type\": \"STRING\"}, \"resource_name\": {\"description\": \"Name of the resource\", \"type\": \"STRING\"}, \"resource_type\": {\"description\": \"Type of resource (deployment, service, pod, node, etc.)\", \"type\": \"STRING\"}}, \"required\": [\"resource_type\", \"resource_name\"], \"type\": \"OBJECT\"}}, {\"description\": \"Execute a command in a Kubernetes pod\", \"name\": \"k8s_execute_command\", \"parameters\": {\"properties\": {\"command\": {\"description\": \"Command to execute\", \"type\": \"STRING\"}, \"container\": {\"description\": \"Container name (for multi-container pods)\", \"type\": \"STRING\"}, \"namespace\": {\"description\": \"Namespace of the pod (default: default)\", \"type\": \"STRING\"}, \"pod_name\": {\"description\": \"Name of the pod to execute in\", \"type\": \"STRING\"}}, \"required\": [\"pod_name\", \"command\"], \"type\": \"OBJECT\"}}, {\"description\": \"Get available Kubernetes API resources\", \"name\": \"k8s_get_available_api_resources\", \"parameters\": {\"type\": \"OBJECT\"}}, {\"description\": \"Get cluster configuration details\", \"name\": \"k8s_get_cluster_configuration\", \"parameters\": {\"type\": \"OBJECT\"}}, {\"description\": \"Get events from a Kubernetes namespace\", \"name\": \"k8s_get_events\", \"parameters\": {\"properties\": {\"namespace\": {\"description\": \"Namespace to get events from (default: default)\", \"type\": \"STRING\"}}, \"type\": \"OBJECT\"}}, {\"description\": \"Get logs from a Kubernetes pod\", \"name\": \"k8s_get_pod_logs\", \"parameters\": {\"properties\": {\"container\": {\"description\": \"Container name (for multi-container pods)\", \"type\": \"STRING\"}, \"namespace\": {\"description\": \"Namespace of the pod (default: default)\", \"type\": \"STRING\"}, \"pod_name\": {\"description\": \"Name of the pod\", \"type\": \"STRING\"}, \"tail_lines\": {\"description\": \"Number of lines to show from the end (default: 50)\", \"type\": \"NUMBER\"}}, \"required\": [\"pod_name\"], \"type\": \"OBJECT\"}}, {\"description\": \"Get the YAML representation of a Kubernetes resource\", \"name\": \"k8s_get_resource_yaml\", \"parameters\": {\"properties\": {\"namespace\": {\"description\": \"Namespace of the resource (optional)\", \"type\": \"STRING\"}, \"resource_name\": {\"description\": \"Name of the resource\", \"type\": \"STRING\"}, \"resource_type\": {\"description\": \"Type of resource\", \"type\": \"STRING\"}}, \"required\": [\"resource_type\", \"resource_name\"], \"type\": \"OBJECT\"}}, {\"description\": \"Get Kubernetes resources using kubectl\", \"name\": \"k8s_get_resources\", \"parameters\": {\"properties\": {\"all_namespaces\": {\"description\": \"Query all namespaces (true/false)\", \"type\": \"STRING\"}, \"namespace\": {\"description\": \"Namespace to query (optional)\", \"type\": \"STRING\"}, \"output\": {\"default\": \"wide\", \"description\": \"Output format (json, yaml, wide)\", \"type\": \"STRING\"}, \"resource_name\": {\"description\": \"Name of specific resource (optional)\", \"type\": \"STRING\"}, \"resource_type\": {\"description\": \"Type of resource (pod, service, deployment, etc.)\", \"type\": \"STRING\"}}, \"required\": [\"resource_type\"], \"type\": \"OBJECT\"}}, {\"description\": \"Add or update labels on a Kubernetes resource\", \"name\": \"k8s_label_resource\", \"parameters\": {\"properties\": {\"labels\": {\"description\": \"Space-separated key=value pairs for labels\", \"type\": \"STRING\"}, \"namespace\": {\"description\": \"The namespace of the resource\", \"type\": \"STRING\"}, \"resource_name\": {\"description\": \"The name of the resource\", \"type\": \"STRING\"}, \"resource_type\": {\"description\": \"The type of resource\", \"type\": \"STRING\"}}, \"required\": [\"resource_type\", \"resource_name\", \"labels\"], \"type\": \"OBJECT\"}}, {\"description\": \"Patch a Kubernetes resource using strategic merge patch\", \"name\": \"k8s_patch_resource\", \"parameters\": {\"properties\": {\"namespace\": {\"description\": \"Namespace of the resource (default: default)\", \"type\": \"STRING\"}, \"patch\": {\"description\": \"JSON patch to apply\", \"type\": \"STRING\"}, \"resource_name\": {\"description\": \"Name of the resource\", \"type\": \"STRING\"}, \"resource_type\": {\"description\": \"Type of resource (deployment, service, etc.)\", \"type\": \"STRING\"}}, \"required\": [\"resource_type\", \"resource_name\", \"patch\"], \"type\": \"OBJECT\"}}, {\"description\": \"Remove an annotation from a Kubernetes resource\", \"name\": \"k8s_remove_annotation\", \"parameters\": {\"properties\": {\"annotation_key\": {\"description\": \"The key of the annotation to remove\", \"type\": \"STRING\"}, \"namespace\": {\"description\": \"The namespace of the resource\", \"type\": \"STRING\"}, \"resource_name\": {\"description\": \"The name of the resource\", \"type\": \"STRING\"}, \"resource_type\": {\"description\": \"The type of resource\", \"type\": \"STRING\"}}, \"required\": [\"resource_type\", \"resource_name\", \"annotation_key\"], \"type\": \"OBJECT\"}}, {\"description\": \"Remove a label from a Kubernetes resource\", \"name\": \"k8s_remove_label\", \"parameters\": {\"properties\": {\"label_key\": {\"description\": \"The key of the label to remove\", \"type\": \"STRING\"}, \"namespace\": {\"description\": \"The namespace of the resource\", \"type\": \"STRING\"}, \"resource_name\": {\"description\": \"The name of the resource\", \"type\": \"STRING\"}, \"resource_type\": {\"description\": \"The type of resource\", \"type\": \"STRING\"}}, \"required\": [\"resource_type\", \"resource_name\", \"label_key\"], \"type\": \"OBJECT\"}}]}], \"labels\": {\"adk_agent_name\": \"k8s_agent\"}}, \"contents\": [{\"parts\": [{\"text\": \"list all Helm releases\"}], \"role\": \"user\"}]}"
+                        },
+                        {
+                            "key": "gcp.vertex.agent.llm_response",
+                            "type": "string",
+                            "value": "{\"content\":{\"parts\":[{\"text\":\"To list all Helm releases, I would typically use Helm CLI commands like `helm list --all-namespaces`. However, I currently only have access to Kubernetes cluster via the available functions and do not have direct Helm CLI access.\\n\\nI can help by listing Kubernetes resources related to Helm releases. Helm stores release information as secrets or configmaps in namespaces, commonly in the \\\"kube-system\\\" or the namespace of the release with labels such as `owner=helm`.\\n\\nWould you like me to:\\n1. List all Helm release secrets across all namespaces?\\n2. List configmaps labeled as Helm release metadata?\\n3. Or provide another approach?\\n\\nPlease confirm or specify how you'd like to proceed.\"}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":139,\"prompt_token_count\":2203,\"total_token_count\":2342}}"
+                        },
+                        {
+                            "key": "gcp.vertex.agent.session_id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.request.model",
+                            "type": "string",
+                            "value": "gpt-4.1-mini"
+                        },
+                        {
+                            "key": "gen_ai.response.finish_reasons",
+                            "type": "string",
+                            "value": "[\"stop\"]"
+                        },
+                        {
+                            "key": "gen_ai.system",
+                            "type": "string",
+                            "value": "gcp.vertex.agent"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "gen_ai.usage.input_tokens",
+                            "type": "int64",
+                            "value": 2203
+                        },
+                        {
+                            "key": "gen_ai.usage.output_tokens",
+                            "type": "int64",
+                            "value": 139
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "gcp.vertex.agent"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.22.1"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "ef492710eab351b1",
+                    "operationName": "POST / http send",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881567345,
+                    "duration": 5,
+                    "tags": [
+                        {
+                            "key": "asgi.event.type",
+                            "type": "string",
+                            "value": "http.response.body"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "9e0a2964b5273e2b",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler._send_push_notification_if_needed",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883699363,
+                    "duration": 7,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "7a5e65814ff107bc",
+                    "operationName": "a2a.server.events.in_memory_queue_manager.InMemoryQueueManager.close",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "fa46f6e2c71635e1"
+                        }
+                    ],
+                    "startTime": 1771237883699540,
+                    "duration": 19,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "0c65384d4bdfe51a",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883695441,
+                    "duration": 1025,
+                    "tags": [
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 201
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/tasks"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "f90bc5f105ba7d55",
+                    "operationName": "POST / http send",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883696750,
+                    "duration": 4,
+                    "tags": [
+                        {
+                            "key": "asgi.event.type",
+                            "type": "string",
+                            "value": "http.response.body"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "98920d503731e6f9",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.task_done",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883695256,
+                    "duration": 6,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "d6527250253abc42",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.enqueue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "91e742a0097b2406"
+                        }
+                    ],
+                    "startTime": 1771237883695102,
+                    "duration": 6,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "ba61f1f3284d5114",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.close",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "91e742a0097b2406"
+                        }
+                    ],
+                    "startTime": 1771237883697377,
+                    "duration": 1252,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "1c3969b46c3a0f8d",
+                    "operationName": "POST / http send",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881555908,
+                    "duration": 17,
+                    "tags": [
+                        {
+                            "key": "asgi.event.type",
+                            "type": "string",
+                            "value": "http.response.start"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.fastapi"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "internal"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "218b5152bce9f2a3",
+                    "operationName": "a2a.server.events.event_consumer.EventConsumer.agent_task_callback",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883698702,
+                    "duration": 6,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "83042d2e49cdce81",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881563394,
+                    "duration": 1865,
+                    "tags": [
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 201
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/tasks"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "901b0920d487ba53",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.enqueue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "91e742a0097b2406"
+                        }
+                    ],
+                    "startTime": 1771237881557202,
+                    "duration": 48,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "714bbdab4b6a4297",
+                    "operationName": "a2a.server.request_handlers.default_request_handler.DefaultRequestHandler.on_message_send_stream",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881556225,
+                    "duration": 7,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "640a3daddf0af138",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.dequeue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237882076934,
+                    "duration": 501684,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [
+                        {
+                            "timestamp": 1771237882578607,
+                            "fields": [
+                                {
+                                    "key": "event",
+                                    "type": "string",
+                                    "value": "exception"
+                                },
+                                {
+                                    "key": "exception.escaped",
+                                    "type": "string",
+                                    "value": "False"
+                                },
+                                {
+                                    "key": "exception.message",
+                                    "type": "string",
+                                    "value": ""
+                                },
+                                {
+                                    "key": "exception.stacktrace",
+                                    "type": "string",
+                                    "value": "Traceback (most recent call last):\n  File \"/.kagent/.venv/lib/python3.13/site-packages/a2a/utils/telemetry.py\", line 196, in async_wrapper\n    result = await func(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/.kagent/.venv/lib/python3.13/site-packages/a2a/server/events/event_queue.py\", line 111, in dequeue_event\n    event = await self.queue.get()\n            ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/python/cpython-3.13.11-linux-aarch64-gnu/lib/python3.13/asyncio/queues.py\", line 186, in get\n    await getter\nasyncio.exceptions.CancelledError\n"
+                                },
+                                {
+                                    "key": "exception.type",
+                                    "type": "string",
+                                    "value": "asyncio.exceptions.CancelledError"
+                                }
+                            ]
+                        }
+                    ],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "f8cafe0887ae8c77",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "bfdb163f37e04a47"
+                        }
+                    ],
+                    "startTime": 1771237881578227,
+                    "duration": 2429,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-tools.kagent:8084/mcp"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "c91e94b62f67b2a3",
+                    "operationName": "POST",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "764340234e57f34a"
+                        }
+                    ],
+                    "startTime": 1771237881594471,
+                    "duration": 2090379,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "POST"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "https://api.openai.com/v1/chat/completions"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "f485cf31d02a3c84",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.task_done",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237883696832,
+                    "duration": 3,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "943e596e65e3f0d3",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.dequeue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237881556782,
+                    "duration": 1793,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "otel.status_code",
+                            "type": "string",
+                            "value": "OK"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "ad009ad6eca89577",
+                    "operationName": "a2a.server.events.event_queue.EventQueue.dequeue_event",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "ce7fcbb15299df20"
+                        }
+                    ],
+                    "startTime": 1771237882578700,
+                    "duration": 501564,
+                    "tags": [
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "a2a-python-sdk"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "1.0.0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "server"
+                        }
+                    ],
+                    "logs": [
+                        {
+                            "timestamp": 1771237883080256,
+                            "fields": [
+                                {
+                                    "key": "event",
+                                    "type": "string",
+                                    "value": "exception"
+                                },
+                                {
+                                    "key": "exception.escaped",
+                                    "type": "string",
+                                    "value": "False"
+                                },
+                                {
+                                    "key": "exception.message",
+                                    "type": "string",
+                                    "value": ""
+                                },
+                                {
+                                    "key": "exception.stacktrace",
+                                    "type": "string",
+                                    "value": "Traceback (most recent call last):\n  File \"/.kagent/.venv/lib/python3.13/site-packages/a2a/utils/telemetry.py\", line 196, in async_wrapper\n    result = await func(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/.kagent/.venv/lib/python3.13/site-packages/a2a/server/events/event_queue.py\", line 111, in dequeue_event\n    event = await self.queue.get()\n            ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/python/cpython-3.13.11-linux-aarch64-gnu/lib/python3.13/asyncio/queues.py\", line 186, in get\n    await getter\nasyncio.exceptions.CancelledError\n"
+                                },
+                                {
+                                    "key": "exception.type",
+                                    "type": "string",
+                                    "value": "asyncio.exceptions.CancelledError"
+                                }
+                            ]
+                        }
+                    ],
+                    "processID": "p1",
+                    "warnings": null
+                },
+                {
+                    "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                    "spanID": "a57a4a75e5d8a796",
+                    "operationName": "GET",
+                    "references": [
+                        {
+                            "refType": "CHILD_OF",
+                            "traceID": "d497c9dd55717f2c5ecb79bda3028993",
+                            "spanID": "91e742a0097b2406"
+                        }
+                    ],
+                    "startTime": 1771237881558255,
+                    "duration": 3627,
+                    "tags": [
+                        {
+                            "key": "gen_ai.conversation.id",
+                            "type": "string",
+                            "value": "ctx-d8251ac3-6289-464a-8404-0fc4e312e823"
+                        },
+                        {
+                            "key": "gen_ai.task.id",
+                            "type": "string",
+                            "value": "9d678e94-b7dc-4ae7-a68e-5bdb19c818f0"
+                        },
+                        {
+                            "key": "http.method",
+                            "type": "string",
+                            "value": "GET"
+                        },
+                        {
+                            "key": "http.status_code",
+                            "type": "int64",
+                            "value": 200
+                        },
+                        {
+                            "key": "http.url",
+                            "type": "string",
+                            "value": "http://kagent-controller.kagent:8083/api/sessions/ctx-d8251ac3-6289-464a-8404-0fc4e312e823?user_id=admin@kagent.dev\u0026order=asc\u0026limit=-1"
+                        },
+                        {
+                            "key": "kagent.user_id",
+                            "type": "string",
+                            "value": "admin@kagent.dev"
+                        },
+                        {
+                            "key": "otel.scope.name",
+                            "type": "string",
+                            "value": "opentelemetry.instrumentation.httpx"
+                        },
+                        {
+                            "key": "otel.scope.version",
+                            "type": "string",
+                            "value": "0.58b0"
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": null
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "k8s_agent",
+                    "tags": [
+                        {
+                            "key": "service.namespace",
+                            "type": "string",
+                            "value": "kagent"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        }
+    ],
+    "total": 0,
+    "limit": 0,
+    "offset": 0,
+    "errors": null
+}

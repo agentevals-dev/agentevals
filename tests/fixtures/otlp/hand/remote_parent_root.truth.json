@@ -1,0 +1,28 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/remote_parent_root",
+ "source": "hand authored; A2A server side trace whose root has a remote parent (flags 0x300)",
+ "turns": [
+  {
+   "user_text": "Ping?",
+   "final_text": "Pong.",
+   "intermediate_texts": [],
+   "agents": [
+    "helper"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 12,
+    "output": 3
+   }
+  }
+ ],
+ "notes": [
+  "the remote parent is absent from the file; the agent span is a local root"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 12,
+  "output": 3
+ }
+}

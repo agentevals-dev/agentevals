@@ -1,0 +1,38 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v2proj_no_content/S6a",
+ "source": "adk-python 2.10 recording, mode v2proj_no_content, scenario S6a",
+ "content_captured": false,
+ "turns": [
+  {
+   "user_text": null,
+   "final_text": null,
+   "intermediate_texts": [],
+   "agents": [
+    "stock_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get_stock_price",
+     "args": null,
+     "result": null,
+     "is_error": true,
+     "error_type": "ValueError"
+    }
+   ],
+   "tokens": {
+    "input": 18,
+    "output": 6
+   }
+  }
+ ],
+ "tokens": {
+  "input": 18,
+  "output": 6
+ },
+ "notes": [
+  "tool raises, no error callback (run aborts)",
+  "run aborted: ValueError: ticker not found: XYZ",
+  "mode captures no message content; text, tool args and results must be absent"
+ ]
+}

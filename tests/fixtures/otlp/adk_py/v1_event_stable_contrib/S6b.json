@@ -1,0 +1,1434 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_event_stable_contrib"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.google_genai",
+      "version": "0.7b1",
+      "attributes": [
+       {
+        "key": "gcp.client.name",
+        "value": {
+         "stringValue": "google.genai"
+        }
+       },
+       {
+        "key": "gcp.client.repo",
+        "value": {
+         "stringValue": "googleapis/python-genai"
+        }
+       },
+       {
+        "key": "gcp.client.version",
+        "value": {
+         "stringValue": "2.25.0"
+        }
+       },
+       {
+        "key": "pypi.package.name",
+        "value": {
+         "stringValue": "opentelemetry-instrumentation-google-genai"
+        }
+       }
+      ]
+     },
+     "spans": [
+      {
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "5deac2adf96fd07f",
+       "parentSpanId": "d20357a8dff56716",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839636855249",
+       "endTimeUnixNano": "1790607839637707072",
+       "attributes": [
+        {
+         "key": "code.function.name",
+         "value": {
+          "stringValue": "google.genai.AsyncModels.generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6b-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "471409f1-e275-468f-9f2b-498d4b17d4fc"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-68efb798-b95d-48f0-a7c5-ac0138a8a844"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "18"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "59e5f2a9a153bc2c",
+       "parentSpanId": "3949191bc1a4ffce",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839638602141",
+       "endTimeUnixNano": "1790607839639502252",
+       "attributes": [
+        {
+         "key": "code.function.name",
+         "value": {
+          "stringValue": "google.genai.AsyncModels.generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6b-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "094ef7ee-05fc-4271-ad72-043e6951af8e"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-68efb798-b95d-48f0-a7c5-ac0138a8a844"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "40"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.30.0"
+    },
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "65a3ff8a04e618ea",
+       "parentSpanId": "e14f1cfcd0f4723e",
+       "name": "execute_tool get_stock_price",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839637951473",
+       "endTimeUnixNano": "1790607839638088590",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "Returns the stock price for a ticker."
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_stock_price"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "FunctionTool"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "error.type",
+         "value": {
+          "stringValue": "TOOL_ERROR"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_call_args",
+         "value": {
+          "stringValue": "{\"ticker\": \"XYZ\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "adk-c5dae601-ce93-475f-bf0d-4d5a318a7770"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "7dfa4307-78df-4f74-b37c-c05986d4d12c"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_response",
+         "value": {
+          "stringValue": "{\"error\": \"ValueError: ticker not found: XYZ\"}"
+         }
+        }
+       ],
+       "status": {
+        "message": "TOOL_ERROR",
+        "code": 2
+       },
+       "flags": 256
+      },
+      {
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "d20357a8dff56716",
+       "parentSpanId": "e14f1cfcd0f4723e",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839631958552",
+       "endTimeUnixNano": "1790607839638164502",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-68efb798-b95d-48f0-a7c5-ac0138a8a844"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S6b-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "471409f1-e275-468f-9f2b-498d4b17d4fc"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"http_options\": {}, \"system_instruction\": \"Answer stock questions using tools.\\n\\nYou are an agent. Your internal name is \\\"stock_agent\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Returns the stock price for a ticker.\", \"name\": \"get_stock_price\", \"parameters_json_schema\": {\"properties\": {\"ticker\": {\"title\": \"Ticker\", \"type\": \"string\"}}, \"required\": [\"ticker\"], \"title\": \"get_stock_priceParams\", \"type\": \"object\"}}]}]}, \"contents\": [{\"parts\": [{\"text\": \"What is the price of XYZ?\"}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"function_call\":{\"args\":{\"ticker\":\"XYZ\"},\"name\":\"get_stock_price\"}}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":6,\"prompt_token_count\":18,\"total_token_count\":24}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "18"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "3949191bc1a4ffce",
+       "parentSpanId": "e14f1cfcd0f4723e",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839638508772",
+       "endTimeUnixNano": "1790607839639677158",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-68efb798-b95d-48f0-a7c5-ac0138a8a844"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S6b-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "094ef7ee-05fc-4271-ad72-043e6951af8e"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"http_options\": {}, \"system_instruction\": \"Answer stock questions using tools.\\n\\nYou are an agent. Your internal name is \\\"stock_agent\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Returns the stock price for a ticker.\", \"name\": \"get_stock_price\", \"parameters_json_schema\": {\"properties\": {\"ticker\": {\"title\": \"Ticker\", \"type\": \"string\"}}, \"required\": [\"ticker\"], \"title\": \"get_stock_priceParams\", \"type\": \"object\"}}]}]}, \"contents\": [{\"parts\": [{\"text\": \"What is the price of XYZ?\"}], \"role\": \"user\"}, {\"parts\": [{\"function_call\": {\"args\": {\"ticker\": \"XYZ\"}, \"name\": \"get_stock_price\"}}], \"role\": \"model\"}, {\"parts\": [{\"function_response\": {\"name\": \"get_stock_price\", \"response\": {\"error\": \"ValueError: ticker not found: XYZ\"}}}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"text\":\"Sorry, I could not find a stock with ticker XYZ.\"}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":12,\"prompt_token_count\":40,\"total_token_count\":52}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "40"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "e14f1cfcd0f4723e",
+       "parentSpanId": "04e176830f4ce86b",
+       "name": "invoke_agent stock_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839631568451",
+       "endTimeUnixNano": "1790607839639701948",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6b-v1_event_stable_contrib"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "04e176830f4ce86b",
+       "name": "invocation",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839630530890",
+       "endTimeUnixNano": "1790607839639749071",
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_event_stable_contrib"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.google_genai",
+      "version": "0.7b1",
+      "attributes": [
+       {
+        "key": "gcp.client.name",
+        "value": {
+         "stringValue": "google.genai"
+        }
+       },
+       {
+        "key": "gcp.client.repo",
+        "value": {
+         "stringValue": "googleapis/python-genai"
+        }
+       },
+       {
+        "key": "gcp.client.version",
+        "value": {
+         "stringValue": "2.25.0"
+        }
+       },
+       {
+        "key": "pypi.package.name",
+        "value": {
+         "stringValue": "opentelemetry-instrumentation-google-genai"
+        }
+       }
+      ]
+     },
+     "logRecords": [
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "Answer stock questions using tools.\n\nYou are an agent. Your internal name is \"stock_agent\"."
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "5deac2adf96fd07f",
+       "observedTimeUnixNano": "1790607839636970909",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "What is the price of XYZ?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "5deac2adf96fd07f",
+       "observedTimeUnixNano": "1790607839636995657",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call",
+                      "value": {
+                       "kvlistValue": {
+                        "values": [
+                         {
+                          "key": "id"
+                         },
+                         {
+                          "key": "args",
+                          "value": {
+                           "kvlistValue": {
+                            "values": [
+                             {
+                              "key": "ticker",
+                              "value": {
+                               "stringValue": "XYZ"
+                              }
+                             }
+                            ]
+                           }
+                          }
+                         },
+                         {
+                          "key": "name",
+                          "value": {
+                           "stringValue": "get_stock_price"
+                          }
+                         },
+                         {
+                          "key": "partial_args"
+                         },
+                         {
+                          "key": "will_continue"
+                         }
+                        ]
+                       }
+                      }
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text"
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "5deac2adf96fd07f",
+       "observedTimeUnixNano": "1790607839637686864",
+       "eventName": "gen_ai.choice"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "Answer stock questions using tools.\n\nYou are an agent. Your internal name is \"stock_agent\"."
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "59e5f2a9a153bc2c",
+       "observedTimeUnixNano": "1790607839638687136",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "What is the price of XYZ?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "59e5f2a9a153bc2c",
+       "observedTimeUnixNano": "1790607839638701552",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call",
+                      "value": {
+                       "kvlistValue": {
+                        "values": [
+                         {
+                          "key": "id"
+                         },
+                         {
+                          "key": "args",
+                          "value": {
+                           "kvlistValue": {
+                            "values": [
+                             {
+                              "key": "ticker",
+                              "value": {
+                               "stringValue": "XYZ"
+                              }
+                             }
+                            ]
+                           }
+                          }
+                         },
+                         {
+                          "key": "name",
+                          "value": {
+                           "stringValue": "get_stock_price"
+                          }
+                         },
+                         {
+                          "key": "partial_args"
+                         },
+                         {
+                          "key": "will_continue"
+                         }
+                        ]
+                       }
+                      }
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text"
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "59e5f2a9a153bc2c",
+       "observedTimeUnixNano": "1790607839638711093",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response",
+                      "value": {
+                       "kvlistValue": {
+                        "values": [
+                         {
+                          "key": "will_continue"
+                         },
+                         {
+                          "key": "scheduling"
+                         },
+                         {
+                          "key": "parts"
+                         },
+                         {
+                          "key": "id"
+                         },
+                         {
+                          "key": "name",
+                          "value": {
+                           "stringValue": "get_stock_price"
+                          }
+                         },
+                         {
+                          "key": "response",
+                          "value": {
+                           "kvlistValue": {
+                            "values": [
+                             {
+                              "key": "error",
+                              "value": {
+                               "stringValue": "ValueError: ticker not found: XYZ"
+                              }
+                             }
+                            ]
+                           }
+                          }
+                         }
+                        ]
+                       }
+                      }
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text"
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "59e5f2a9a153bc2c",
+       "observedTimeUnixNano": "1790607839638720217",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Sorry, I could not find a stock with ticker XYZ."
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "755fbf23ee897d4fb57411ecfcc7d14a",
+       "spanId": "59e5f2a9a153bc2c",
+       "observedTimeUnixNano": "1790607839639485712",
+       "eventName": "gen_ai.choice"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.30.0"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,28 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "samples/helm_2",
+ "source": "samples/helm_2.json (copied verbatim)",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "get me all the Helm releases",
+   "final_text": "To help you effectively, could you please specify the namespace in your Kubernetes cluster where you want me to list all Helm releases? If you want to list releases from all namespaces, please let me know as well.",
+   "intermediate_texts": [],
+   "agents": [
+    "helm_agent"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 1822,
+    "output": 43
+   }
+  }
+ ],
+ "tokens": {
+  "input": 1822,
+  "output": 43
+ },
+ "notes": [
+  "kagent; no tool call, the agent asks a clarifying question"
+ ]
+}

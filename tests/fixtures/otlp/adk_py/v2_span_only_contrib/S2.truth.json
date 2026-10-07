@@ -1,0 +1,57 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v2_span_only_contrib/S2",
+ "source": "adk-python 2.10 recording, mode v2_span_only_contrib, scenario S2",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "What is the weather and local time in Paris?",
+   "final_text": "It is sunny and 21C in Paris; local time is 14:05.",
+   "intermediate_texts": [
+    "Let me look that up."
+   ],
+   "agents": [
+    "weather_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get_weather",
+     "args": {
+      "city": "Paris"
+     },
+     "result": {
+      "city": "Paris",
+      "forecast": "sunny",
+      "temp_c": 21
+     },
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "get_time",
+     "args": {
+      "city": "Paris"
+     },
+     "result": {
+      "city": "Paris",
+      "time": "14:05"
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 120,
+    "output": 24
+   }
+  }
+ ],
+ "tokens": {
+  "input": 120,
+  "output": 24
+ },
+ "notes": [
+  "tool loop: get_weather then get_time then answer (first response also has text)",
+  "evidence lost model call agent names in this mode; agents taken from the same scenario in v2_default"
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "samples/tempo_export_with_batches",
+ "source": "samples/tempo_export_with_batches.json (copied verbatim)",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "list all helm releases\n",
+   "final_text": "There are two Helm releases currently deployed:\n\n1. Release Name: kagent\n   - Namespace: kagent\n   - Revision: 5\n   - Status: deployed\n   - Chart: kagent version 0.9.0\n\n2. Release Name: kagent-crds\n   - Namespace: kagent\n   - Revision: 1\n   - Status: deployed\n   - Chart: kagent-crds version 0.9.0\n\nIf you need detailed information about any of these releases or further assistance, please let me know!",
+   "intermediate_texts": [],
+   "agents": [
+    "helm_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "helm_list_releases",
+     "args": {},
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "NAME       \tNAMESPACE\tREVISION\tUPDATED                                  \tSTATUS  \tCHART            \tAPP VERSION\nkagent     \tkagent   \t5       \t2026-04-30 15:14:13.141794486 +0200 +0200\tdeployed\tkagent-0.9.0     \t           \nkagent-crds\tkagent   \t1       \t2026-04-30 14:51:26.764317537 +0200 +0200\tdeployed\tkagent-crds-0.9.0\t           \n"
+       }
+      ],
+      "isError": false
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 4648,
+    "output": 129
+   }
+  }
+ ],
+ "tokens": {
+  "input": 4648,
+  "output": 129
+ },
+ "notes": [
+  "Tempo batches export; three nested inference levels (call_llm > generate_content > openai.chat) with equal usage; the controller side client invoke_agent (helm-agent) is under a different root (the export lacks the linking spans) and has nothing inside it, so it yields no turn (D-17)"
+ ]
+}

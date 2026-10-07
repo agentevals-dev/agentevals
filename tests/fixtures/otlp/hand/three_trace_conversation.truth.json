@@ -1,0 +1,55 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/three_trace_conversation",
+ "source": "hand authored; multi trace conversation linked by gen_ai.conversation.id",
+ "turns": [
+  {
+   "user_text": "Hi, my name is Ada.",
+   "final_text": "Nice to meet you, Ada!",
+   "intermediate_texts": [],
+   "agents": [
+    "assistant"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 10,
+    "output": 6
+   }
+  },
+  {
+   "user_text": "What is the weather in Rome?",
+   "final_text": "It is cloudy and 17C in Rome.",
+   "intermediate_texts": [],
+   "agents": [
+    "assistant"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 30,
+    "output": 9
+   }
+  },
+  {
+   "user_text": "Thanks, bye!",
+   "final_text": "Goodbye, Ada!",
+   "intermediate_texts": [],
+   "agents": [
+    "assistant"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 50,
+    "output": 4
+   }
+  }
+ ],
+ "notes": [
+  "three traces form one conversation of three turns ordered by anchor start time",
+  "user and final text come from the agent span messages"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 90,
+  "output": 19
+ }
+}

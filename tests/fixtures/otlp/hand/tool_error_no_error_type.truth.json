@@ -1,0 +1,38 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/tool_error_no_error_type",
+ "source": "hand authored; tool span status ERROR without error.type",
+ "turns": [
+  {
+   "user_text": "What is the price of XYZ?",
+   "final_text": "Sorry, I could not find XYZ.",
+   "intermediate_texts": [],
+   "agents": [
+    "stock_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get_stock_price",
+     "args": {
+      "ticker": "XYZ"
+     },
+     "result": null,
+     "is_error": true,
+     "error_type": "_OTHER"
+    }
+   ],
+   "tokens": {
+    "input": 58,
+    "output": 18
+   }
+  }
+ ],
+ "notes": [
+  "status ERROR alone marks the tool as failed; error_type falls back to _OTHER"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 58,
+  "output": 18
+ }
+}

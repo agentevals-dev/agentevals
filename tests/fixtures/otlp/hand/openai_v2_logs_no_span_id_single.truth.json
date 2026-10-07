@@ -1,0 +1,26 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/openai_v2_logs_no_span_id_single",
+ "source": "hand authored, legacy openai-v2 events without span_id, event name as the legacy event.name attribute",
+ "turns": [
+  {
+   "user_text": "What is the weather in Paris?",
+   "final_text": "It is sunny and 21C in Paris.",
+   "intermediate_texts": [],
+   "agents": [],
+   "tool_calls": [],
+   "tokens": {
+    "input": 40,
+    "output": 9
+   }
+  }
+ ],
+ "notes": [
+  "the trace has exactly one inference span, so logs without span_id are attributable to it"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 40,
+  "output": 9
+ }
+}

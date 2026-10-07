@@ -1,0 +1,40 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/openai_v2_logs_span_id",
+ "source": "hand authored, legacy contrib openai-v2 2.4b0 message events as logs with span_id, event name in the OTLP eventName field",
+ "turns": [
+  {
+   "user_text": "What is the weather in Paris?",
+   "final_text": "It is sunny and 21C in Paris.",
+   "intermediate_texts": [],
+   "agents": [],
+   "tool_calls": [
+    {
+     "name": "get_weather",
+     "args": {
+      "city": "Paris"
+     },
+     "result": {
+      "city": "Paris",
+      "forecast": "sunny",
+      "temp_c": 21
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 120,
+    "output": 20
+   }
+  }
+ ],
+ "notes": [
+  "tool call reconstructed from gen_ai.choice tool_calls; result from gen_ai.tool.message by id"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 120,
+  "output": 20
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/adk_cycle_poisons_batch",
+ "source": "hand authored from verify_20261006/s4.py case 'adk 2-cycle' (RecursionError at 94785bb)",
+ "extra_turns_allowed": true,
+ "turns": [
+  {
+   "user_text": "Ping?",
+   "final_text": "Pong.",
+   "intermediate_texts": [],
+   "agents": [
+    "helper"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 12,
+    "output": 3
+   }
+  }
+ ],
+ "notes": [
+  "the healthy trace must survive; turns of the broken trace carry no content and are not compared",
+  "spec gap D-03: inference under a non agentic root in a trace that also has agentic anchors"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 12,
+  "output": 3
+ }
+}

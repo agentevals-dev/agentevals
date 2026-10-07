@@ -1,0 +1,132 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "fixture-agent"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.0"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "fixture.agent"
+     },
+     "spans": [
+      {
+       "traceId": "4920abdff5a8951e18ba2ed60c1aadc4",
+       "spanId": "eb86921785ed9606",
+       "name": "invoke_agent helper",
+       "kind": 1,
+       "startTimeUnixNano": "1760000000000000000",
+       "endTimeUnixNano": "1760000000050000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "helper"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "4920abdff5a8951e18ba2ed60c1aadc4",
+       "spanId": "23a6bb157382841e",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000001000000",
+       "endTimeUnixNano": "1760000000049000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "3"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Ping?\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"Pong.\"}]}]"
+         }
+        }
+       ],
+       "parentSpanId": "eb86921785ed9606",
+       "events": [
+        {
+         "name": "gen_ai.evaluation.result",
+         "timeUnixNano": "1760000000060000000",
+         "attributes": [
+          {
+           "key": "gen_ai.evaluation.name",
+           "value": {
+            "stringValue": "Relevance"
+           }
+          },
+          {
+           "key": "gen_ai.evaluation.score.value",
+           "value": {
+            "doubleValue": 0.9
+           }
+          },
+          {
+           "key": "gen_ai.evaluation.score.label",
+           "value": {
+            "stringValue": "relevant"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

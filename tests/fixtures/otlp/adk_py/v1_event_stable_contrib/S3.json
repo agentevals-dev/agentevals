@@ -1,0 +1,3488 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_event_stable_contrib"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.google_genai",
+      "version": "0.7b1",
+      "attributes": [
+       {
+        "key": "gcp.client.name",
+        "value": {
+         "stringValue": "google.genai"
+        }
+       },
+       {
+        "key": "gcp.client.repo",
+        "value": {
+         "stringValue": "googleapis/python-genai"
+        }
+       },
+       {
+        "key": "gcp.client.version",
+        "value": {
+         "stringValue": "2.25.0"
+        }
+       },
+       {
+        "key": "pypi.package.name",
+        "value": {
+         "stringValue": "opentelemetry-instrumentation-google-genai"
+        }
+       }
+      ]
+     },
+     "spans": [
+      {
+       "traceId": "ce90d5896940ba449044ceb74b56bdd5",
+       "spanId": "2b6d8c7c2a5268c8",
+       "parentSpanId": "a017071328991327",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839545395604",
+       "endTimeUnixNano": "1790607839546121976",
+       "attributes": [
+        {
+         "key": "code.function.name",
+         "value": {
+          "stringValue": "google.genai.AsyncModels.generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "4e8b627a-e005-4913-b5db-3e28dbbf3de6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-6ccc5615-2e98-4b7c-9f5b-e428c08ca103"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "50096554eb5da596",
+       "parentSpanId": "2971851848684453",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839547583636",
+       "endTimeUnixNano": "1790607839548445083",
+       "attributes": [
+        {
+         "key": "code.function.name",
+         "value": {
+          "stringValue": "google.genai.AsyncModels.generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "39e9042e-3c27-47a0-a83a-40458c966ace"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1d4861e6-2721-4f38-bd66-65cf5aeadf55"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "30"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "9ed8209e4c3b7f6f",
+       "parentSpanId": "d610e81815ad3999",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839549170996",
+       "endTimeUnixNano": "1790607839550216557",
+       "attributes": [
+        {
+         "key": "code.function.name",
+         "value": {
+          "stringValue": "google.genai.AsyncModels.generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "e3b182a6-8102-4859-9a60-49e64174f824"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1d4861e6-2721-4f38-bd66-65cf5aeadf55"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "50"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "parentSpanId": "6212e795d3355773",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839551731838",
+       "endTimeUnixNano": "1790607839552987594",
+       "attributes": [
+        {
+         "key": "code.function.name",
+         "value": {
+          "stringValue": "google.genai.AsyncModels.generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "823f0c72-ceab-4868-88a0-d66343553a79"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-562fd89e-ee96-4d07-903d-879428b8b69a"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "70"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.30.0"
+    },
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "ce90d5896940ba449044ceb74b56bdd5",
+       "spanId": "a017071328991327",
+       "parentSpanId": "28c7fa8841bf3f90",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839540803721",
+       "endTimeUnixNano": "1790607839546310840",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-6ccc5615-2e98-4b7c-9f5b-e428c08ca103"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "4e8b627a-e005-4913-b5db-3e28dbbf3de6"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"http_options\": {}, \"system_instruction\": \"Answer weather questions using tools.\\n\\nYou are an agent. Your internal name is \\\"weather_agent\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Returns the current weather for a city.\", \"name\": \"get_weather\", \"parameters_json_schema\": {\"properties\": {\"city\": {\"title\": \"City\", \"type\": \"string\"}}, \"required\": [\"city\"], \"title\": \"get_weatherParams\", \"type\": \"object\"}}]}]}, \"contents\": [{\"parts\": [{\"text\": \"Hi, my name is Ada.\"}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"text\":\"Nice to meet you, Ada! How can I help?\"}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":8,\"prompt_token_count\":10,\"total_token_count\":18}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "ce90d5896940ba449044ceb74b56bdd5",
+       "spanId": "28c7fa8841bf3f90",
+       "parentSpanId": "dc0c189b0b9e961d",
+       "name": "invoke_agent weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839540061059",
+       "endTimeUnixNano": "1790607839546335296",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "ce90d5896940ba449044ceb74b56bdd5",
+       "spanId": "dc0c189b0b9e961d",
+       "name": "invocation",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839539627002",
+       "endTimeUnixNano": "1790607839546380419",
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "701e897190b164bb",
+       "parentSpanId": "e02059dfaef1d497",
+       "name": "execute_tool get_weather",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839548645570",
+       "endTimeUnixNano": "1790607839548731857",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "Returns the current weather for a city."
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_weather"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "FunctionTool"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_call_args",
+         "value": {
+          "stringValue": "{\"city\": \"Rome\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "adk-e1505fc2-27dd-4f40-acdc-8ef4d420ce68"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "211e389f-c134-437d-a62a-24e39b54df90"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_response",
+         "value": {
+          "stringValue": "{\"city\": \"Rome\", \"forecast\": \"cloudy\", \"temp_c\": 17}"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "2971851848684453",
+       "parentSpanId": "e02059dfaef1d497",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839547508516",
+       "endTimeUnixNano": "1790607839548796144",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1d4861e6-2721-4f38-bd66-65cf5aeadf55"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "39e9042e-3c27-47a0-a83a-40458c966ace"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"http_options\": {}, \"system_instruction\": \"Answer weather questions using tools.\\n\\nYou are an agent. Your internal name is \\\"weather_agent\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Returns the current weather for a city.\", \"name\": \"get_weather\", \"parameters_json_schema\": {\"properties\": {\"city\": {\"title\": \"City\", \"type\": \"string\"}}, \"required\": [\"city\"], \"title\": \"get_weatherParams\", \"type\": \"object\"}}]}]}, \"contents\": [{\"parts\": [{\"text\": \"Hi, my name is Ada.\"}], \"role\": \"user\"}, {\"parts\": [{\"text\": \"Nice to meet you, Ada! How can I help?\"}], \"role\": \"model\"}, {\"parts\": [{\"text\": \"What is the weather in Rome?\"}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"function_call\":{\"args\":{\"city\":\"Rome\"},\"name\":\"get_weather\"}}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":5,\"prompt_token_count\":30,\"total_token_count\":35}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "30"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "d610e81815ad3999",
+       "parentSpanId": "e02059dfaef1d497",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839549099709",
+       "endTimeUnixNano": "1790607839550399545",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-1d4861e6-2721-4f38-bd66-65cf5aeadf55"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "e3b182a6-8102-4859-9a60-49e64174f824"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"http_options\": {}, \"system_instruction\": \"Answer weather questions using tools.\\n\\nYou are an agent. Your internal name is \\\"weather_agent\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Returns the current weather for a city.\", \"name\": \"get_weather\", \"parameters_json_schema\": {\"properties\": {\"city\": {\"title\": \"City\", \"type\": \"string\"}}, \"required\": [\"city\"], \"title\": \"get_weatherParams\", \"type\": \"object\"}}]}]}, \"contents\": [{\"parts\": [{\"text\": \"Hi, my name is Ada.\"}], \"role\": \"user\"}, {\"parts\": [{\"text\": \"Nice to meet you, Ada! How can I help?\"}], \"role\": \"model\"}, {\"parts\": [{\"text\": \"What is the weather in Rome?\"}], \"role\": \"user\"}, {\"parts\": [{\"function_call\": {\"args\": {\"city\": \"Rome\"}, \"name\": \"get_weather\"}}], \"role\": \"model\"}, {\"parts\": [{\"function_response\": {\"name\": \"get_weather\", \"response\": {\"city\": \"Rome\", \"forecast\": \"cloudy\", \"temp_c\": 17}}}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"text\":\"It is cloudy and 17C in Rome.\"}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":9,\"prompt_token_count\":50,\"total_token_count\":59}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "50"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "e02059dfaef1d497",
+       "parentSpanId": "67eb0ba53dff43d4",
+       "name": "invoke_agent weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839547198451",
+       "endTimeUnixNano": "1790607839550422752",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "67eb0ba53dff43d4",
+       "name": "invocation",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839546782310",
+       "endTimeUnixNano": "1790607839550465958",
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "6212e795d3355773",
+       "parentSpanId": "7122648129510b76",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839551658884",
+       "endTimeUnixNano": "1790607839553169666",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-562fd89e-ee96-4d07-903d-879428b8b69a"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "823f0c72-ceab-4868-88a0-d66343553a79"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"http_options\": {}, \"system_instruction\": \"Answer weather questions using tools.\\n\\nYou are an agent. Your internal name is \\\"weather_agent\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Returns the current weather for a city.\", \"name\": \"get_weather\", \"parameters_json_schema\": {\"properties\": {\"city\": {\"title\": \"City\", \"type\": \"string\"}}, \"required\": [\"city\"], \"title\": \"get_weatherParams\", \"type\": \"object\"}}]}]}, \"contents\": [{\"parts\": [{\"text\": \"Hi, my name is Ada.\"}], \"role\": \"user\"}, {\"parts\": [{\"text\": \"Nice to meet you, Ada! How can I help?\"}], \"role\": \"model\"}, {\"parts\": [{\"text\": \"What is the weather in Rome?\"}], \"role\": \"user\"}, {\"parts\": [{\"function_call\": {\"args\": {\"city\": \"Rome\"}, \"name\": \"get_weather\"}}], \"role\": \"model\"}, {\"parts\": [{\"function_response\": {\"name\": \"get_weather\", \"response\": {\"city\": \"Rome\", \"forecast\": \"cloudy\", \"temp_c\": 17}}}], \"role\": \"user\"}, {\"parts\": [{\"text\": \"It is cloudy and 17C in Rome.\"}], \"role\": \"model\"}, {\"parts\": [{\"text\": \"Thanks, bye!\"}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"text\":\"Goodbye, Ada!\"}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":4,\"prompt_token_count\":70,\"total_token_count\":74}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "70"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "7122648129510b76",
+       "parentSpanId": "35db6522a255b83b",
+       "name": "invoke_agent weather_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839551347279",
+       "endTimeUnixNano": "1790607839553192040",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "weather_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S3-v1_event_stable_contrib"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "35db6522a255b83b",
+       "name": "invocation",
+       "kind": 1,
+       "startTimeUnixNano": "1790607839550946345",
+       "endTimeUnixNano": "1790607839553233620",
+       "status": {},
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v1_event_stable_contrib"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.google_genai",
+      "version": "0.7b1",
+      "attributes": [
+       {
+        "key": "gcp.client.name",
+        "value": {
+         "stringValue": "google.genai"
+        }
+       },
+       {
+        "key": "gcp.client.repo",
+        "value": {
+         "stringValue": "googleapis/python-genai"
+        }
+       },
+       {
+        "key": "gcp.client.version",
+        "value": {
+         "stringValue": "2.25.0"
+        }
+       },
+       {
+        "key": "pypi.package.name",
+        "value": {
+         "stringValue": "opentelemetry-instrumentation-google-genai"
+        }
+       }
+      ]
+     },
+     "logRecords": [
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "Answer weather questions using tools.\n\nYou are an agent. Your internal name is \"weather_agent\"."
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "ce90d5896940ba449044ceb74b56bdd5",
+       "spanId": "2b6d8c7c2a5268c8",
+       "observedTimeUnixNano": "1790607839545487390",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Hi, my name is Ada."
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "ce90d5896940ba449044ceb74b56bdd5",
+       "spanId": "2b6d8c7c2a5268c8",
+       "observedTimeUnixNano": "1790607839545505056",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Nice to meet you, Ada! How can I help?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "ce90d5896940ba449044ceb74b56bdd5",
+       "spanId": "2b6d8c7c2a5268c8",
+       "observedTimeUnixNano": "1790607839546103936",
+       "eventName": "gen_ai.choice"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "Answer weather questions using tools.\n\nYou are an agent. Your internal name is \"weather_agent\"."
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "50096554eb5da596",
+       "observedTimeUnixNano": "1790607839547660048",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Hi, my name is Ada."
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "50096554eb5da596",
+       "observedTimeUnixNano": "1790607839547673630",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Nice to meet you, Ada! How can I help?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "50096554eb5da596",
+       "observedTimeUnixNano": "1790607839547681255",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "What is the weather in Rome?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "50096554eb5da596",
+       "observedTimeUnixNano": "1790607839547687713",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call",
+                      "value": {
+                       "kvlistValue": {
+                        "values": [
+                         {
+                          "key": "id"
+                         },
+                         {
+                          "key": "args",
+                          "value": {
+                           "kvlistValue": {
+                            "values": [
+                             {
+                              "key": "city",
+                              "value": {
+                               "stringValue": "Rome"
+                              }
+                             }
+                            ]
+                           }
+                          }
+                         },
+                         {
+                          "key": "name",
+                          "value": {
+                           "stringValue": "get_weather"
+                          }
+                         },
+                         {
+                          "key": "partial_args"
+                         },
+                         {
+                          "key": "will_continue"
+                         }
+                        ]
+                       }
+                      }
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text"
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "50096554eb5da596",
+       "observedTimeUnixNano": "1790607839548429084",
+       "eventName": "gen_ai.choice"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "Answer weather questions using tools.\n\nYou are an agent. Your internal name is \"weather_agent\"."
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "9ed8209e4c3b7f6f",
+       "observedTimeUnixNano": "1790607839549244242",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Hi, my name is Ada."
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "9ed8209e4c3b7f6f",
+       "observedTimeUnixNano": "1790607839549257866",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Nice to meet you, Ada! How can I help?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "9ed8209e4c3b7f6f",
+       "observedTimeUnixNano": "1790607839549265449",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "What is the weather in Rome?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "9ed8209e4c3b7f6f",
+       "observedTimeUnixNano": "1790607839549272115",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call",
+                      "value": {
+                       "kvlistValue": {
+                        "values": [
+                         {
+                          "key": "id"
+                         },
+                         {
+                          "key": "args",
+                          "value": {
+                           "kvlistValue": {
+                            "values": [
+                             {
+                              "key": "city",
+                              "value": {
+                               "stringValue": "Rome"
+                              }
+                             }
+                            ]
+                           }
+                          }
+                         },
+                         {
+                          "key": "name",
+                          "value": {
+                           "stringValue": "get_weather"
+                          }
+                         },
+                         {
+                          "key": "partial_args"
+                         },
+                         {
+                          "key": "will_continue"
+                         }
+                        ]
+                       }
+                      }
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text"
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "9ed8209e4c3b7f6f",
+       "observedTimeUnixNano": "1790607839549279781",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response",
+                      "value": {
+                       "kvlistValue": {
+                        "values": [
+                         {
+                          "key": "will_continue"
+                         },
+                         {
+                          "key": "scheduling"
+                         },
+                         {
+                          "key": "parts"
+                         },
+                         {
+                          "key": "id"
+                         },
+                         {
+                          "key": "name",
+                          "value": {
+                           "stringValue": "get_weather"
+                          }
+                         },
+                         {
+                          "key": "response",
+                          "value": {
+                           "kvlistValue": {
+                            "values": [
+                             {
+                              "key": "city",
+                              "value": {
+                               "stringValue": "Rome"
+                              }
+                             },
+                             {
+                              "key": "forecast",
+                              "value": {
+                               "stringValue": "cloudy"
+                              }
+                             },
+                             {
+                              "key": "temp_c",
+                              "value": {
+                               "intValue": "17"
+                              }
+                             }
+                            ]
+                           }
+                          }
+                         }
+                        ]
+                       }
+                      }
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text"
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "9ed8209e4c3b7f6f",
+       "observedTimeUnixNano": "1790607839549287864",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "It is cloudy and 17C in Rome."
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "fe54fc0cef9050fdbc1f844e79d4978d",
+       "spanId": "9ed8209e4c3b7f6f",
+       "observedTimeUnixNano": "1790607839550201183",
+       "eventName": "gen_ai.choice"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "Answer weather questions using tools.\n\nYou are an agent. Your internal name is \"weather_agent\"."
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "observedTimeUnixNano": "1790607839551809667",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Hi, my name is Ada."
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "observedTimeUnixNano": "1790607839551823083",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Nice to meet you, Ada! How can I help?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "observedTimeUnixNano": "1790607839551831124",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "What is the weather in Rome?"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "observedTimeUnixNano": "1790607839551838207",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call",
+                      "value": {
+                       "kvlistValue": {
+                        "values": [
+                         {
+                          "key": "id"
+                         },
+                         {
+                          "key": "args",
+                          "value": {
+                           "kvlistValue": {
+                            "values": [
+                             {
+                              "key": "city",
+                              "value": {
+                               "stringValue": "Rome"
+                              }
+                             }
+                            ]
+                           }
+                          }
+                         },
+                         {
+                          "key": "name",
+                          "value": {
+                           "stringValue": "get_weather"
+                          }
+                         },
+                         {
+                          "key": "partial_args"
+                         },
+                         {
+                          "key": "will_continue"
+                         }
+                        ]
+                       }
+                      }
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text"
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "observedTimeUnixNano": "1790607839551845706",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response",
+                      "value": {
+                       "kvlistValue": {
+                        "values": [
+                         {
+                          "key": "will_continue"
+                         },
+                         {
+                          "key": "scheduling"
+                         },
+                         {
+                          "key": "parts"
+                         },
+                         {
+                          "key": "id"
+                         },
+                         {
+                          "key": "name",
+                          "value": {
+                           "stringValue": "get_weather"
+                          }
+                         },
+                         {
+                          "key": "response",
+                          "value": {
+                           "kvlistValue": {
+                            "values": [
+                             {
+                              "key": "city",
+                              "value": {
+                               "stringValue": "Rome"
+                              }
+                             },
+                             {
+                              "key": "forecast",
+                              "value": {
+                               "stringValue": "cloudy"
+                              }
+                             },
+                             {
+                              "key": "temp_c",
+                              "value": {
+                               "intValue": "17"
+                              }
+                             }
+                            ]
+                           }
+                          }
+                         }
+                        ]
+                       }
+                      }
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text"
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "observedTimeUnixNano": "1790607839551853664",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "It is cloudy and 17C in Rome."
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "observedTimeUnixNano": "1790607839551860247",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Thanks, bye!"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "user"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "observedTimeUnixNano": "1790607839551871371",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "content",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "parts",
+               "value": {
+                "arrayValue": {
+                 "values": [
+                  {
+                   "kvlistValue": {
+                    "values": [
+                     {
+                      "key": "media_resolution"
+                     },
+                     {
+                      "key": "code_execution_result"
+                     },
+                     {
+                      "key": "executable_code"
+                     },
+                     {
+                      "key": "file_data"
+                     },
+                     {
+                      "key": "function_call"
+                     },
+                     {
+                      "key": "function_response"
+                     },
+                     {
+                      "key": "inline_data"
+                     },
+                     {
+                      "key": "text",
+                      "value": {
+                       "stringValue": "Goodbye, Ada!"
+                      }
+                     },
+                     {
+                      "key": "thought"
+                     },
+                     {
+                      "key": "thought_signature"
+                     },
+                     {
+                      "key": "video_metadata"
+                     },
+                     {
+                      "key": "tool_call"
+                     },
+                     {
+                      "key": "tool_response"
+                     },
+                     {
+                      "key": "part_metadata"
+                     },
+                     {
+                      "key": "audio_transcription"
+                     },
+                     {
+                      "key": "media_processing"
+                     },
+                     {
+                      "key": "speech_metadata"
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              },
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "model"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "f358f433a45ce07800b52caedf95fe2d",
+       "spanId": "735d560adcc5bef2",
+       "observedTimeUnixNano": "1790607839552971387",
+       "eventName": "gen_ai.choice"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.30.0"
+    }
+   ]
+  }
+ ]
+}

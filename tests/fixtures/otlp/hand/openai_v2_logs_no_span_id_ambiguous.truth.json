@@ -1,0 +1,26 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/openai_v2_logs_no_span_id_ambiguous",
+ "source": "hand authored, legacy openai-v2 events without span_id across two inference spans",
+ "turns": [
+  {
+   "user_text": null,
+   "final_text": null,
+   "intermediate_texts": [],
+   "agents": [],
+   "tool_calls": [],
+   "tokens": {
+    "input": 120,
+    "output": 20
+   }
+  }
+ ],
+ "notes": [
+  "logs cannot be attributed to one of two inference spans: they stay orphan_logs, no content is invented"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 120,
+  "output": 20
+ }
+}
