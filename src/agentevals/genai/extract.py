@@ -16,6 +16,10 @@ Rules, in brief (``otel_native_core_202610.md`` sections 4.5 and 16):
   tool name in order), never overriding what the span carries.
 * Outputs of calls under a tool span (AgentTool delegates) are not the turn's own speech: they
   are excluded from intermediate and final outputs, but their usage still counts.
+* Within a conversation, a root anchored turn whose first call's input ends with a tool response,
+  following a turn whose last call requested tools, continues that turn (provider only telemetry
+  puts each model call of a tool round in its own trace). This reads message content; with
+  content capture off the turns stay split and the later one carries a warning.
 
 Every walk is iterative, so adversarial nesting depth cannot exhaust the stack.
 """
@@ -38,7 +42,16 @@ from ..otel.model import (
     parse_json_value,
 )
 from . import semconv as sc
-from .messages import Message, has_content, has_text, text_of, tool_calls_of, tool_responses_of, user_turn_messages
+from .messages import (
+    Message,
+    ends_with_tool_response,
+    has_content,
+    has_text,
+    text_of,
+    tool_calls_of,
+    tool_responses_of,
+    user_turn_messages,
+)
 from .model import Conversation, ExternalEvaluation, LlmCall, ToolCall, Turn, Usage
 from .overlay import SpanView, overlay
 
@@ -52,6 +65,8 @@ IGNORED = "ignored"
 
 AGENTIC = frozenset({AGENT, WORKFLOW})
 BREAKS_INFERENCE_CHAIN = frozenset({AGENT, WORKFLOW, TOOL})
+
+TOOL_FINISH_REASONS = frozenset({"tool_calls", "tool_call", "tool_use", "function_call"})
 
 
 def classify(view: SpanView) -> str:
@@ -541,6 +556,7 @@ def _turn(analysis: TraceAnalysis, anchor: str) -> Turn:
     spans = [trace.spans[m] for m in ordered]
     return Turn(
         ref=anchor_span.ref,
+        anchor_kind=info[anchor].kind if info[anchor].kind in AGENTIC else "root",
         label=attr_str(anchor_view.attrs, sc.WORKFLOW_NAME) or attr_str(anchor_view.attrs, sc.AGENT_NAME),
         agent_name=attr_str(anchor_view.attrs, sc.AGENT_NAME)
         or next((c.agent_name for c in calls if c.agent_name), None),
@@ -568,11 +584,103 @@ def extract_turns(trace: Trace) -> list[Turn]:
     return [_turn(analysis, anchor) for anchor in analysis.anchors]
 
 
+def _last_call(turn: Turn) -> LlmCall | None:
+    return max(turn.llm_calls, key=lambda c: (c.end_ns, c.start_ns)) if turn.llm_calls else None
+
+
+def _first_call(turn: Turn) -> LlmCall | None:
+    return min(turn.llm_calls, key=lambda c: (c.start_ns, c.end_ns)) if turn.llm_calls else None
+
+
+def _continues(previous: Turn, turn: Turn) -> bool:
+    if turn.anchor_kind != "root":
+        return False
+    first, last = _first_call(turn), _last_call(previous)
+    return (
+        first is not None
+        and last is not None
+        and ends_with_tool_response(first.input_messages)
+        and bool(tool_calls_of(last.output_messages))
+    )
+
+
+def _maybe_continues(previous: Turn, turn: Turn) -> bool:
+    """A continuation that cannot be confirmed because message content was not captured."""
+    if turn.anchor_kind != "root":
+        return False
+    first, last = _first_call(turn), _last_call(previous)
+    return (
+        first is not None
+        and last is not None
+        and not first.input_messages
+        and bool(TOOL_FINISH_REASONS.intersection(last.finish_reasons))
+    )
+
+
+def _merge(previous: Turn, turn: Turn) -> Turn:
+    calls = sorted([*previous.llm_calls, *turn.llm_calls], key=lambda c: (c.start_ns, c.end_ns))
+    warnings = [*previous.warnings, *turn.warnings]
+    span_tools = [t for t in (*previous.tool_calls, *turn.tool_calls) if t.ref is not None]
+    if span_tools:
+        tools = span_tools
+        _fill_from_parts(tools, calls, warnings)
+    else:
+        tools = _tool_calls_from_parts(calls, warnings)
+
+    if turn.final_output:
+        final_output = turn.final_output
+        intermediate = [*previous.intermediate_outputs, *previous.final_output, *turn.intermediate_outputs]
+    else:
+        final_output = previous.final_output
+        intermediate = [*previous.intermediate_outputs, *turn.intermediate_outputs]
+
+    failed = previous if previous.status == "error" else turn if turn.status == "error" else None
+    framework_ids = dict(turn.framework_ids)
+    framework_ids.update(previous.framework_ids)
+    return previous.model_copy(
+        update={
+            "agent_name": previous.agent_name or turn.agent_name,
+            "agents": sorted({*previous.agents, *turn.agents}),
+            "user_input": previous.user_input or turn.user_input,
+            "final_output": final_output,
+            "intermediate_outputs": intermediate,
+            "llm_calls": calls,
+            "tool_calls": tools,
+            "usage": previous.usage + turn.usage,
+            "start_ns": min(previous.start_ns, turn.start_ns),
+            "end_ns": max(previous.end_ns, turn.end_ns),
+            "status": failed.status if failed else previous.status,
+            "error_type": failed.error_type if failed else previous.error_type,
+            "content_captured": previous.content_captured or turn.content_captured,
+            "conversation_id": previous.conversation_id or turn.conversation_id,
+            "framework_ids": framework_ids,
+            "external_evaluations": [*previous.external_evaluations, *turn.external_evaluations],
+            "warnings": list(dict.fromkeys(warnings)),
+        }
+    )
+
+
+def _join_continuations(turns: list[Turn]) -> list[Turn]:
+    out: list[Turn] = []
+    for turn in turns:
+        if out and _continues(out[-1], turn):
+            out[-1] = _merge(out[-1], turn)
+            continue
+        if out and _maybe_continues(out[-1], turn):
+            turn.warnings.append(
+                f"turn {turn.ref.span_id} may continue turn {out[-1].ref.span_id} after a tool call, "
+                "but message content was not captured; kept as its own turn"
+            )
+        out.append(turn)
+    return out
+
+
 def extract_conversation(traces: Iterable[Trace], key: str | None = None) -> Conversation:
-    """All turns of ``traces`` in start time order, indexed."""
+    """All turns of ``traces`` in start time order, indexed, with tool round continuations joined."""
     traces = list(traces)
     turns = [t for trace in traces for t in extract_turns(trace)]
     turns.sort(key=lambda t: (t.start_ns, t.ref.span_id))
+    turns = _join_continuations(turns)
     for i, turn in enumerate(turns):
         turn.index = i
     conversation_id = next((t.conversation_id for t in turns if t.conversation_id), None)

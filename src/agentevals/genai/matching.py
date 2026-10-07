@@ -4,7 +4,9 @@ Selection is explicit and never guesses:
 
 1. an explicit case id (``agentevals.eval.case.id`` on the resource or anchor span);
 2. otherwise the normalized first user text (casefolded, whitespace collapsed);
-3. otherwise no case, with a reason. There is no fallback to the first case.
+3. otherwise, when the caller paired exactly one golden case with exactly one evaluation
+   group, that case (``single_case``): the pairing is explicit, nothing is guessed;
+4. otherwise no case, with a reason. There is no fallback to the first case.
 
 When several cases share the first user text, the one with the same turn count wins; if that
 still leaves more than one, the match is ambiguous.
@@ -31,9 +33,13 @@ def normalize_text(value: str | None) -> str:
 
 @dataclass(frozen=True, slots=True)
 class ExpectedTurn:
+    """One golden turn. Tool calls are ``{"id", "name", "arguments"}``, responses ``{"id", "name", "response"}``."""
+
     user_text: str | None
     final_text: str | None = None
     tool_calls: tuple[dict[str, Any], ...] = ()
+    tool_responses: tuple[dict[str, Any], ...] = ()
+    invocation_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -61,6 +67,7 @@ def select_case(
     conversation: Conversation,
     cases: Sequence[ExpectedConversation],
     explicit_case_id: str | None = None,
+    single_pairing: bool = False,
 ) -> MatchResult:
     if explicit_case_id:
         for case in cases:
@@ -72,10 +79,14 @@ def select_case(
         return MatchResult(None, reason="no turns to match")
     first_user = normalize_text(text_of(conversation.turns[0].user_input))
     if not first_user:
+        if single_pairing and len(cases) == 1:
+            return MatchResult(cases[0], method="single_case")
         return MatchResult(None, reason="no user input to match")
 
     candidates = [c for c in cases if c.turns and normalize_text(c.turns[0].user_text) == first_user]
     if not candidates:
+        if single_pairing and len(cases) == 1:
+            return MatchResult(cases[0], method="single_case")
         return MatchResult(None, reason="no matching eval case")
     if len(candidates) > 1:
         same_length = [c for c in candidates if len(c.turns) == len(conversation.turns)]

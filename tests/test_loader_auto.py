@@ -238,4 +238,4 @@ class TestLoadTraces:
         traces = load_traces(TEMPO_FIXTURE)
         assert len(traces) == 1
         assert traces[0].trace_id == "dd547580319ab0312cee07f1def50dad"
-        assert len(traces[0].all_spans) == 86
+        assert len(traces[0].spans) == 86

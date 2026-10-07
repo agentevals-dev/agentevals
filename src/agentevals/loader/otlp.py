@@ -17,9 +17,7 @@ import logging
 from typing import Any
 
 from ..otel.decode import DecodeResult, decode_bare_spans_json, decode_json_document, is_otlp_document
-from ..otel.model import build_traces
-from .base import Trace, TraceLoader
-from .compat import to_legacy_traces
+from ..otel.model import Trace, build_traces
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +70,7 @@ def decode_otlp_text(content: str) -> DecodeResult:
     return result
 
 
-class OtlpJsonLoader(TraceLoader):
-    """Legacy entry point returning ``loader.base`` traces for the current extraction."""
-
+class OtlpJsonLoader:
     def format_name(self) -> str:
         return "otlp-json"
 
@@ -83,11 +79,11 @@ class OtlpJsonLoader(TraceLoader):
             result = decode_otlp_text(f.read())
         traces, _ = build_traces(result.spans, result.logs)
         logger.info("Loaded %d trace(s) from %s", len(traces), source)
-        return to_legacy_traces(traces)
+        return traces
 
     def load_from_dict(self, data: dict) -> list[Trace]:
         if not isinstance(data, dict) or not is_otlp_document(data):
             raise ValueError("Expected OTLP JSON with 'resourceSpans' or 'batches' key (or wrapped under 'trace')")
         result = decode_json_document(data, strict=False)
         traces, _ = build_traces(result.spans, result.logs)
-        return to_legacy_traces(traces)
+        return traces

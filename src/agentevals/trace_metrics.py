@@ -1,67 +1,25 @@
-"""Extract performance and metadata from trace spans."""
+"""Performance metrics and metadata derived from extracted conversations.
+
+Counts and token totals come from logical LLM calls, so a wrapper span over a provider span
+is counted once. Latencies come from the spans each turn, call and tool call refer to.
+"""
 
 from __future__ import annotations
 
+import re
+import statistics
+from collections.abc import Sequence
 from typing import Any
 
-from .extraction import (
-    extract_agent_response_from_attrs,
-    extract_extended_model_info_from_attrs,
-    extract_token_usage_from_attrs,
-    extract_user_text_from_attrs,
-    get_extractor,
-)
-from .trace_attrs import (
-    OTEL_GENAI_AGENT_ID,
-    OTEL_GENAI_AGENT_NAME,
-    OTEL_GENAI_REQUEST_MODEL,
-    OTEL_GENAI_TOOL_NAME,
-    OTEL_SERVICE_NAME,
-)
-
-
-def _first_service_name(trace) -> str | None:
-    """The OTel ``service.name`` resource attribute, merged onto every span at
-    ingest. Cross-framework, so it's the stable identifier for grouping runs by
-    agent regardless of instrumentation."""
-    for span in trace.all_spans:
-        value = span.get_tag(OTEL_SERVICE_NAME)
-        if value:
-            return value
-    return None
-
-
-def extract_agent_identity(trace, extractor=None) -> dict[str, str | None]:
-    """Best-effort agent identity for grouping runs. Prefers ``service.name``;
-    falls back only to a real ``gen_ai.agent.name``.
-
-    Deliberately does NOT fall back to the root span's operation name: for
-    OTel GenAI traces that's the LLM call name (e.g. "chat gpt-4o-mini"), which
-    is a model, not an agent, and would mislabel agent groups in the dashboard.
-    """
-    agent_name = None
-    try:
-        if extractor is None:
-            extractor = get_extractor(trace)
-        invocation_spans = extractor.find_invocation_spans(trace)
-        if invocation_spans:
-            agent_name = invocation_spans[0].get_tag(OTEL_GENAI_AGENT_NAME)
-    except Exception:
-        agent_name = None
-    return {"service_name": _first_service_name(trace), "agent_name": agent_name}
-
-
-def _truncate(text: str, max_length: int = 200) -> str:
-    if len(text) <= max_length:
-        return text
-    return text[:max_length] + "..."
+from .genai import semconv as sc
+from .genai.messages import text_of
+from .genai.model import Conversation
+from .otel.model import Span, Trace, attr_str
 
 
 def _calc_percentiles(values: list[float]) -> dict[str, float]:
     if not values:
         return {"p50": 0.0, "p95": 0.0, "p99": 0.0}
-    import statistics
-
     sorted_values = sorted(values)
     n = len(sorted_values)
     return {
@@ -72,11 +30,9 @@ def _calc_percentiles(values: list[float]) -> dict[str, float]:
 
 
 def _calc_summary_stats(values: list[float]) -> dict[str, float | int]:
-    """Return min/median/max/count plus legacy p50/p95/p99 keys."""
+    """min/median/max/count plus the p50/p95/p99 keys earlier clients read."""
     if not values:
         return {"min": 0.0, "median": 0.0, "max": 0.0, "count": 0, "p50": 0.0, "p95": 0.0, "p99": 0.0}
-    import statistics
-
     sorted_values = sorted(values)
     n = len(sorted_values)
     med = statistics.median(sorted_values)
@@ -91,97 +47,92 @@ def _calc_summary_stats(values: list[float]) -> dict[str, float | int]:
     }
 
 
-def extract_performance_metrics(trace, extractor=None) -> dict[str, Any]:
-    """Extract latency and token usage metrics from trace spans."""
-    agent_latencies: list[float] = []
-    llm_latencies: list[float] = []
-    tool_latencies: list[float] = []
-    prompt_tokens: list[int] = []
-    output_tokens: list[int] = []
-    total_tokens: list[int] = []
-    cache_creation_tokens_total = 0
-    cache_read_tokens_total = 0
-    models: set[str] = set()
-    tool_names: list[str] = []
+_SCHEMA_VERSION = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
 
-    if extractor is None:
-        extractor = get_extractor(trace)
-    invocation_spans = extractor.find_invocation_spans(trace)
 
-    if not invocation_spans and trace.root_spans:
-        for root_span in trace.root_spans:
-            agent_latencies.append(root_span.duration / 1000.0)
+def schema_version(schema_url: str | None) -> str | None:
+    """The last path segment of a schema URL when it is a version (``1.37.0``); never raises."""
+    if not schema_url or not isinstance(schema_url, str):
+        return None
+    last = schema_url.rstrip("/").rsplit("/", 1)[-1]
+    return last if _SCHEMA_VERSION.match(last) else None
 
-    for inv_span in invocation_spans:
-        agent_latencies.append(inv_span.duration / 1000.0)
 
-    for span in trace.all_spans:
-        duration_ms = span.duration / 1000.0
-        role = extractor.classify_span(span)
+def _truncate(text: str, max_length: int = 200) -> str:
+    return text if len(text) <= max_length else text[:max_length] + "..."
 
-        if role == "llm":
-            llm_latencies.append(duration_ms)
-            in_toks, out_toks, _ = extract_token_usage_from_attrs(span.tags)
-            if in_toks or out_toks:
-                prompt_tokens.append(in_toks)
-                output_tokens.append(out_toks)
-                total_tokens.append(in_toks + out_toks)
-            ext = extract_extended_model_info_from_attrs(span.tags)
-            cache_creation_tokens_total += ext["cache_creation_tokens"]
-            cache_read_tokens_total += ext["cache_read_tokens"]
-            model = span.get_tag(OTEL_GENAI_REQUEST_MODEL)
-            if model:
-                models.add(model)
-        elif role == "tool":
-            tool_latencies.append(duration_ms)
-            tn = span.get_tag(OTEL_GENAI_TOOL_NAME)
-            if not tn and span.operation_name.startswith("execute_tool "):
-                tn = span.operation_name[len("execute_tool ") :]
-            if tn:
-                tool_names.append(tn)
 
-    empty_stats: dict[str, float | int] = {
-        "min": 0.0,
-        "median": 0.0,
-        "max": 0.0,
-        "count": 0,
-        "p50": 0.0,
-        "p95": 0.0,
-        "p99": 0.0,
-    }
+def _span_index(traces: Sequence[Trace]) -> dict[tuple[str, str], Span]:
+    return {(s.trace_id, s.span_id): s for t in traces for s in t.spans.values()}
 
-    tokens_info: dict[str, Any] = {
-        "total_prompt": sum(prompt_tokens) if prompt_tokens else 0,
-        "total_output": sum(output_tokens) if output_tokens else 0,
-        "total": sum(total_tokens) if total_tokens else 0,
-        "per_llm_call": _calc_summary_stats(total_tokens) if total_tokens else dict(empty_stats),
-        "cache_creation_tokens": cache_creation_tokens_total,
-        "cache_read_tokens": cache_read_tokens_total,
-    }
+
+def _ms(span: Span | None) -> float | None:
+    return span.duration_unix_nano / 1e6 if span is not None else None
+
+
+def first_service_name(traces: Sequence[Trace]) -> str | None:
+    """``service.name`` of the first span's resource: the stable cross framework grouping key."""
+    for trace in traces:
+        for span in trace.spans.values():
+            name = attr_str(span.resource.attributes, sc.SERVICE_NAME)
+            if name:
+                return name
+    return None
+
+
+def extract_agent_identity(traces: Sequence[Trace], conversation: Conversation) -> dict[str, str | None]:
+    """Prefers ``service.name``; the agent name is a real ``gen_ai.agent.name`` or nothing."""
+    agent = next((t.agent_name for t in conversation.turns if t.agent_name), None)
+    return {"service_name": first_service_name(traces), "agent_name": agent}
+
+
+def extract_performance_metrics(conversation: Conversation, traces: Sequence[Trace]) -> dict[str, Any]:
+    spans = _span_index(traces)
+    turn_latencies = [(t.end_ns - t.start_ns) / 1e6 for t in conversation.turns]
+    calls = [c for t in conversation.turns for c in t.llm_calls]
+    call_latencies = [(c.end_ns - c.start_ns) / 1e6 for c in calls]
+    tools = [tc for t in conversation.turns for tc in t.tool_calls]
+    tool_latencies = [
+        ms for ms in (_ms(spans.get((tc.ref.trace_id, tc.ref.span_id))) for tc in tools if tc.ref) if ms is not None
+    ]
+
+    with_usage = [c.usage for c in calls if c.usage is not None]
+    per_call_totals = [u.input_tokens + u.output_tokens for u in with_usage]
+    models = sorted({c.request_model or c.response_model for c in calls if c.request_model or c.response_model})
+
+    if not turn_latencies:
+        turn_latencies = [t.duration_unix_nano / 1e6 for trace in traces for t in trace.root_spans()]
 
     return {
         "latency": {
-            "overall": _calc_summary_stats(agent_latencies) if agent_latencies else dict(empty_stats),
-            "llm_calls": _calc_summary_stats(llm_latencies) if llm_latencies else dict(empty_stats),
-            "tool_executions": _calc_summary_stats(tool_latencies) if tool_latencies else dict(empty_stats),
+            "overall": _calc_summary_stats(turn_latencies),
+            "llm_calls": _calc_summary_stats(call_latencies),
+            "tool_executions": _calc_summary_stats(tool_latencies),
         },
-        "tokens": tokens_info,
+        "tokens": {
+            "total_prompt": sum(u.input_tokens for u in with_usage),
+            "total_output": sum(u.output_tokens for u in with_usage),
+            "total": sum(per_call_totals),
+            "per_llm_call": _calc_summary_stats([float(x) for x in per_call_totals]),
+            "cache_creation_tokens": sum(u.cache_write_input_tokens for u in with_usage),
+            "cache_read_tokens": sum(u.cache_read_input_tokens for u in with_usage),
+        },
         "counts": {
-            "llm_calls": len(llm_latencies),
-            "tool_calls": len(tool_latencies),
-            "invocations": len(invocation_spans) if invocation_spans else len(trace.root_spans),
+            "llm_calls": len(calls),
+            "tool_calls": len(tools),
+            "invocations": len(conversation.turns),
         },
-        "models": sorted(models) if models else [],
-        "tool_names": sorted(set(tool_names)) if tool_names else [],
+        "models": models,
+        "tool_names": sorted({tc.name for tc in tools}),
     }
 
 
-def extract_trace_metadata(trace, extractor=None) -> dict[str, Any]:
-    """Extract agent name, model, timing, and preview text from a trace."""
+def extract_trace_metadata(traces: Sequence[Trace], conversation: Conversation) -> dict[str, Any]:
+    """Agent, model, start time (microseconds) and text previews of the first turn."""
     metadata: dict[str, Any] = {
         "agent_name": None,
         "agent_id": None,
-        "service_name": _first_service_name(trace),
+        "service_name": first_service_name(traces),
         "model": None,
         "response_model": None,
         "provider": None,
@@ -190,56 +141,24 @@ def extract_trace_metadata(trace, extractor=None) -> dict[str, Any]:
         "user_input_preview": None,
         "final_output_preview": None,
     }
-
-    if extractor is None:
-        extractor = get_extractor(trace)
-    invocation_spans = extractor.find_invocation_spans(trace)
-
-    if invocation_spans:
-        first_inv = invocation_spans[0]
-        metadata["agent_name"] = first_inv.get_tag(OTEL_GENAI_AGENT_NAME)
-        metadata["agent_id"] = first_inv.get_tag(OTEL_GENAI_AGENT_ID)
-        metadata["start_time"] = first_inv.start_time
-
-        llm_spans = extractor.find_llm_spans_in(first_inv)
-        if llm_spans:
-            metadata["model"] = llm_spans[0].get_tag(OTEL_GENAI_REQUEST_MODEL)
-
-            # NOTE: `ext` is extracted only from `llm_spans[0]` (the first LLM
-            # span). If a trace mixes instrumentors or different
-            # instrumentation versions, extended model info that appears only
-            # on later LLM spans may not be captured here.
-            ext = extract_extended_model_info_from_attrs(llm_spans[0].tags)
-            if ext["response_model"]:
-                metadata["response_model"] = ext["response_model"]
-            if ext["provider"]:
-                metadata["provider"] = ext["provider"]
-            if ext["schema_version"]:
-                metadata["schema_version"] = ext["schema_version"]
-
-            user_text = extract_user_text_from_attrs(llm_spans[0].tags)
-            if user_text:
-                metadata["user_input_preview"] = _truncate(user_text)
-
-            agent_text = extract_agent_response_from_attrs(llm_spans[-1].tags)
-            if agent_text:
-                metadata["final_output_preview"] = _truncate(agent_text)
-
-    if not metadata["agent_name"] and trace.root_spans:
-        metadata["agent_name"] = trace.root_spans[0].operation_name
-
-    if not metadata["model"]:
-        for span in trace.all_spans:
-            model = span.get_tag(OTEL_GENAI_REQUEST_MODEL)
-            if model:
-                metadata["model"] = model
-                break
-
-    if not metadata["provider"]:
-        for span in trace.all_spans:
-            ext = extract_extended_model_info_from_attrs(span.tags)
-            if ext["provider"]:
-                metadata["provider"] = ext["provider"]
-                break
-
+    if not conversation.turns:
+        return metadata
+    first = conversation.turns[0]
+    spans = _span_index(traces)
+    anchor = spans.get((first.ref.trace_id, first.ref.span_id))
+    metadata["agent_name"] = first.agent_name
+    metadata["agent_id"] = attr_str(anchor.attributes, sc.AGENT_ID) if anchor else None
+    metadata["start_time"] = first.start_ns // 1000
+    call = first.llm_calls[0] if first.llm_calls else None
+    if call is not None:
+        metadata["model"] = call.request_model or call.response_model
+        metadata["response_model"] = call.response_model
+        metadata["provider"] = call.provider
+        leaf = spans.get((call.ref.trace_id, call.ref.span_id))
+        if leaf is not None:
+            metadata["schema_version"] = schema_version(leaf.scope.schema_url or leaf.resource.schema_url)
+    user = text_of(first.user_input)
+    final = text_of(first.final_output)
+    metadata["user_input_preview"] = _truncate(user) if user else None
+    metadata["final_output_preview"] = _truncate(final) if final else None
     return metadata

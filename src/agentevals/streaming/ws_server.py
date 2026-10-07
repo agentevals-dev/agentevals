@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import logging
-import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -19,17 +19,23 @@ from ..api.models import (
     WSSessionStartedEvent,
     WSSpanReceivedEvent,
 )
-from ..converter import convert_traces
-from ..extraction import (
-    extract_extended_model_info_from_attrs,
-    extract_token_usage_from_attrs,
-    is_llm_span,
-    parse_tool_response_content,
+from ..genai.extract import extract_conversation
+from ..genai.grouping import SESSION_NAME
+from ..genai.messages import text_of
+from ..genai.model import Turn
+from ..otel.decode import decode_bare_spans_json
+from ..otel.encode import encode_traces
+from ..otel.model import (
+    EMPTY_SCOPE,
+    LogRecord,
+    Resource,
+    Scope,
+    Trace,
+    attr_float,
+    attr_int,
+    build_traces,
 )
-from ..loader.base import Trace
-from ..loader.otlp import OtlpJsonLoader
-from ..trace_attrs import OTEL_GENAI_INPUT_MESSAGES, OTEL_GENAI_REQUEST_MODEL, OTEL_SERVICE_NAME
-from ..utils.log_enrichment import enrich_spans_with_logs
+from ..trace_attrs import OTEL_SERVICE_NAME
 from .exports import EXPORT_DIR, export_name
 from .incremental_processor import IncrementalInvocationExtractor
 from .session import TraceSession
@@ -647,280 +653,128 @@ class StreamingTraceManager:
                     logger.info("Client disconnected after session end: %s", session_id)
 
     async def _save_spans_to_temp_file(self, session: TraceSession) -> Path:
-        """Save spans to a temporary OTLP JSONL file.
-
-        Args:
-            session: The trace session containing spans to save
-
-        Returns:
-            Path to the temporary JSONL file containing the spans
-        """
+        """Write the session as one OTLP/JSON export request (a single JSONL line) to the export dir."""
         temp_file = EXPORT_DIR / export_name(session.session_id, prefix="agentevals_", suffix=".jsonl")
-
-        enriched_spans = enrich_spans_with_logs(session.spans, session.logs, session.session_id)
-
-        # service.name is an OTel resource attribute, so it lives on the session
-        # (lifted from resource attrs at ingest) rather than on individual spans.
-        # The JSONL trace format has no resource envelope, so re-attach it to each
-        # span here; otherwise it's lost on reload and runs can't group by agent.
-        service_name = (session.metadata or {}).get(OTEL_SERVICE_NAME)
-
+        document = encode_traces(self.session_traces(session))
         with open(temp_file, "w", encoding="utf-8") as f:  # noqa: ASYNC230
-            for span in enriched_spans:
-                span_copy = span.copy()
-                span_copy["traceId"] = session.trace_id
-                if service_name:
-                    attrs = list(span_copy.get("attributes", []))
-                    if not any(a.get("key") == OTEL_SERVICE_NAME for a in attrs):
-                        attrs.append({"key": OTEL_SERVICE_NAME, "value": {"stringValue": service_name}})
-                        span_copy["attributes"] = attrs
-                f.write(json.dumps(span_copy) + "\n")
-
+            f.write(json.dumps(document) + "\n")
         return temp_file
 
-    async def _extract_invocations(self, session: TraceSession) -> list[dict]:
-        """Extract invocations from session spans for UI display.
+    def session_traces(self, session: TraceSession) -> list[Trace]:
+        """The session's spans and logs as envelope traces, keeping their real trace ids.
 
-        Converts raw OTLP spans into structured invocation data with user/agent messages,
-        tool calls, and model information for display in the UI.
-
-        Args:
-            session: The trace session containing spans to extract invocations from
-
-        Returns:
-            List of invocation dictionaries with the following structure:
-                - invocationId: Unique identifier for the invocation
-                - userText: User's input text
-                - agentText: Agent's response text
-                - toolCalls: List of tool calls with name and args
-                - modelInfo: Model metadata (model name, tokens, etc.)
+        Interim bridge from the session's stored dicts: scope and service name were flattened
+        into attributes and metadata at ingest, and stored log records keep only their span id,
+        so those are restored here. Logs are joined to spans by id, never copied into spans. The
+        resource carries ``agentevals.session_name`` so exports of the session group as one conversation.
         """
+        resource_attrs = {SESSION_NAME: session.session_id}
+        service_name = (session.metadata or {}).get(OTEL_SERVICE_NAME)
+        if service_name:
+            resource_attrs[OTEL_SERVICE_NAME] = service_name
+        resource = Resource(attributes=resource_attrs)
+        decoded = decode_bare_spans_json(session.spans, strict=False)
+        scopes: dict[tuple[str, str | None], Scope] = {}
+        spans = []
+        for span in decoded.spans:
+            name = span.attributes.get("otel.scope.name")
+            version = span.attributes.get("otel.scope.version")
+            key = (name if isinstance(name, str) else "", version if isinstance(version, str) else None)
+            scope = scopes.setdefault(key, Scope(name=key[0], version=key[1]))
+            spans.append(dataclasses.replace(span, resource=resource, scope=scope))
+        trace_of_span = {s.span_id: s.trace_id for s in spans}
+        only_trace = next(iter({s.trace_id for s in spans})) if len({s.trace_id for s in spans}) == 1 else None
+        logs = [
+            log for log in (_session_log(entry, trace_of_span, only_trace, resource) for entry in session.logs) if log
+        ]
+        traces, _ = build_traces(spans, logs)
+        return traces
+
+    async def _extract_invocations(self, session: TraceSession) -> list[dict]:
+        """Turns of the session as the ``session_complete`` invocation dicts the UI renders."""
         try:
-            temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False, encoding="utf-8")
-
-            has_genai_spans = any(
-                span.get("attributes", [])
-                and any(
-                    attr.get("key") in (OTEL_GENAI_REQUEST_MODEL, OTEL_GENAI_INPUT_MESSAGES)
-                    for attr in span.get("attributes", [])
-                )
-                for span in session.spans
-            )
-
-            if has_genai_spans and not session.logs:
-                logger.warning(
-                    "Session %s has GenAI spans but no logs. "
-                    "Message content will be missing unless spans already enriched.",
-                    session.session_id,
-                )
-
-            enriched_spans = enrich_spans_with_logs(session.spans, session.logs, session.session_id)
-
-            for span in enriched_spans:
-                span_copy = span.copy()
-                span_copy["traceId"] = session.trace_id
-                temp_file.write(json.dumps(span_copy) + "\n")
-            temp_file.close()
-
-            logger.debug("Saved %d enriched spans to %s", len(enriched_spans), temp_file.name)
-
-            loader = OtlpJsonLoader()
-            traces = loader.load(temp_file.name)
-
+            traces = self.session_traces(session)
             if not traces:
                 logger.warning("No traces loaded from session %s", session.session_id)
                 return []
-
-            logger.debug("Loaded %d traces", len(traces))
-
-            conversion_results = convert_traces(traces)
-
-            if not conversion_results:
-                logger.warning("No conversion results")
-                return []
-
-            invocations_data = []
-
-            for trace_idx, conv_result in enumerate(conversion_results):
-                if conv_result.warnings:
-                    logger.warning("Conversion warnings: %s", conv_result.warnings)
-
-                trace = traces[trace_idx] if trace_idx < len(traces) else None
-
-                for inv_idx, inv in enumerate(conv_result.invocations):
-                    user_text = ""
-                    if inv.user_content and inv.user_content.parts:
-                        user_text = " ".join(p.text for p in inv.user_content.parts if p.text)
-
-                    agent_text = ""
-                    if inv.final_response and inv.final_response.parts:
-                        for part in inv.final_response.parts:
-                            if part.text:
-                                agent_text += part.text
-
-                    tool_calls = []
-                    if inv.intermediate_data and inv.intermediate_data.tool_uses:
-                        for tool_use in inv.intermediate_data.tool_uses:
-                            tool_calls.append(
-                                {
-                                    "name": tool_use.name,
-                                    "args": tool_use.args if hasattr(tool_use, "args") else {},
-                                    "id": getattr(tool_use, "id", None),
-                                }
-                            )
-
-                    tool_responses = []
-                    if inv.intermediate_data and inv.intermediate_data.tool_responses:
-                        for tr in inv.intermediate_data.tool_responses:
-                            tool_responses.append(
-                                {
-                                    "name": tr.name,
-                                    "response": tr.response if hasattr(tr, "response") else {},
-                                    "id": getattr(tr, "id", None),
-                                }
-                            )
-
-                    model_info = {}
-                    if trace:
-                        model_info = self._extract_model_info_from_trace(trace, inv_idx)
-
-                    invocations_data.append(
-                        {
-                            "invocationId": inv.invocation_id,
-                            "userText": user_text,
-                            "agentText": agent_text,
-                            "toolCalls": tool_calls,
-                            "toolResponses": tool_responses,
-                            "modelInfo": model_info,
-                        }
-                    )
-
-            logger.debug("Extracted %d invocations from %d traces", len(invocations_data), len(conversion_results))
-
-            self._augment_tool_responses_from_logs(invocations_data, session)
-
-            return invocations_data
-
+            conversation = extract_conversation(traces, session.session_id)
+            spans = {(s.trace_id, s.span_id): s for t in traces for s in t.spans.values()}
+            return [
+                {
+                    "invocationId": turn.ref.span_id,
+                    "userText": text_of(turn.user_input) or "",
+                    "agentText": text_of(turn.final_output) or "",
+                    "toolCalls": [
+                        {"name": t.name, "args": t.arguments or {}, "id": t.call_id} for t in turn.tool_calls
+                    ],
+                    "toolResponses": [
+                        {"name": t.name, "response": t.result, "id": t.call_id}
+                        for t in turn.tool_calls
+                        if t.result is not None
+                    ],
+                    "modelInfo": _model_info(turn, spans),
+                }
+                for turn in conversation.turns
+            ]
         except Exception:
             logger.exception("Failed to extract invocations")
             return []
 
-    def _extract_model_info_from_trace(self, trace: Trace, invocation_idx: int) -> dict:
-        """Extract model information from LLM spans in the trace."""
-        model_info: dict[str, Any] = {}
-        models_used: set[str] = set()
-        total_input_tokens = 0
-        total_output_tokens = 0
-        total_cache_creation_tokens = 0
-        total_cache_read_tokens = 0
-        first_provider: str | None = None
-        response_models: set[str] = set()
-        finish_reasons: set[str] = set()
-        error_types: set[str] = set()
-        first_temperature: float | None = None
-        first_max_tokens: int | None = None
 
-        llm_spans = [s for s in trace.all_spans if is_llm_span(s) or "call_llm" in s.operation_name]
-        llm_spans.sort(key=lambda s: s.start_time)
+def _session_log(
+    entry: Any, trace_of_span: dict[str, str], only_trace: str | None, resource: Resource
+) -> LogRecord | None:
+    if not isinstance(entry, dict) or not isinstance(entry.get("event_name"), str):
+        return None
+    span_id = entry.get("span_id") or None
+    trace_id = entry.get("trace_id") or trace_of_span.get(span_id or "") or only_trace
+    try:
+        time_ns = int(entry.get("timestamp") or 0) or None
+    except (TypeError, ValueError):
+        time_ns = None
+    attributes = entry.get("attributes") if isinstance(entry.get("attributes"), dict) else {}
+    return LogRecord(
+        time_unix_nano=time_ns,
+        observed_time_unix_nano=None,
+        event_name=entry["event_name"],
+        severity_number=None,
+        severity_text=None,
+        body=entry.get("body"),
+        attributes=attributes,
+        trace_id=trace_id,
+        span_id=span_id if trace_id else None,
+        flags=None,
+        resource=resource,
+        scope=EMPTY_SCOPE,
+    )
 
-        for span in llm_spans:
-            in_toks, out_toks, model = extract_token_usage_from_attrs(span.tags)
-            if model and model != "unknown":
-                models_used.add(model)
-            else:
-                genai_model = span.get_tag(OTEL_GENAI_REQUEST_MODEL)
-                if genai_model:
-                    models_used.add(genai_model)
-            total_input_tokens += in_toks
-            total_output_tokens += out_toks
 
-            ext = extract_extended_model_info_from_attrs(span.tags)
-            if first_provider is None and ext["provider"]:
-                first_provider = ext["provider"]
-            if ext["response_model"]:
-                response_models.add(ext["response_model"])
-            finish_reasons.update(ext["finish_reasons"])
-            total_cache_creation_tokens += ext["cache_creation_tokens"]
-            total_cache_read_tokens += ext["cache_read_tokens"]
-            if ext["error_type"]:
-                error_types.add(ext["error_type"])
-            if first_temperature is None and ext["temperature"] is not None:
-                first_temperature = ext["temperature"]
-            if first_max_tokens is None and ext["max_tokens"] is not None:
-                first_max_tokens = ext["max_tokens"]
-
-        if models_used:
-            model_info["models"] = sorted(models_used)
-        if total_input_tokens > 0:
-            model_info["inputTokens"] = total_input_tokens
-        if total_output_tokens > 0:
-            model_info["outputTokens"] = total_output_tokens
-        if first_provider:
-            model_info["provider"] = first_provider
-        if response_models:
-            model_info["responseModels"] = sorted(response_models)
-        if finish_reasons:
-            model_info["finishReasons"] = sorted(finish_reasons)
-        if total_cache_creation_tokens > 0:
-            model_info["cacheCreationTokens"] = total_cache_creation_tokens
-        if total_cache_read_tokens > 0:
-            model_info["cacheReadTokens"] = total_cache_read_tokens
-        if first_temperature is not None:
-            model_info["temperature"] = first_temperature
-        if first_max_tokens is not None:
-            model_info["maxTokens"] = first_max_tokens
-        if error_types:
-            model_info["errorTypes"] = sorted(error_types)
-
-        return model_info
-
-    @staticmethod
-    def _augment_tool_responses_from_logs(invocations_data: list[dict], session: TraceSession) -> None:
-        """Fill in missing tool responses from session logs (e.g. LangChain gen_ai.tool.message)."""
-        if not session.logs:
-            return
-
-        needs_responses = any(inv.get("toolCalls") and not inv.get("toolResponses") for inv in invocations_data)
-        if not needs_responses:
-            return
-
-        tool_names: dict[str, str] = {}
-        for inv in invocations_data:
-            for tc in inv.get("toolCalls", []):
-                tc_id = tc.get("id")
-                if tc_id:
-                    tool_names[tc_id] = tc["name"]
-
-        tool_results_by_span: dict[str, list[dict]] = {}
-        for log_event in session.logs:
-            if log_event.get("event_name") != "gen_ai.tool.message":
-                continue
-            body = log_event.get("body", {})
-            if not isinstance(body, dict):
-                continue
-            span_id = log_event.get("span_id", "")
-            tool_id = body.get("id", "")
-            content = body.get("content")
-            if content is None:
-                continue
-
-            response = parse_tool_response_content(content)
-            tool_results_by_span.setdefault(span_id, []).append(
-                {
-                    "name": body.get("name") or tool_names.get(tool_id, "unknown"),
-                    "response": response,
-                    "id": tool_id,
-                }
-            )
-
-        if not tool_results_by_span:
-            return
-
-        for inv in invocations_data:
-            if inv.get("toolResponses"):
-                continue
-            inv_id = inv.get("invocationId", "")
-            bare_span_id = inv_id.removeprefix("genai-")
-            responses = tool_results_by_span.get(bare_span_id, [])
-            if responses:
-                inv["toolResponses"] = responses
+def _model_info(turn: Turn, spans: dict) -> dict[str, Any]:
+    """Per turn model metadata; usage counts each logical call once."""
+    info: dict[str, Any] = {}
+    calls = turn.llm_calls
+    models = sorted({c.request_model for c in calls if c.request_model})
+    response_models = sorted({c.response_model for c in calls if c.response_model})
+    finish = sorted({r for c in calls for r in c.finish_reasons})
+    errors = sorted({c.error_type for c in calls if c.error_type})
+    usage = turn.usage
+    provider = next((c.provider for c in calls if c.provider), None)
+    leaf = spans.get((calls[0].ref.trace_id, calls[0].ref.span_id)) if calls else None
+    temperature = attr_float(leaf.attributes, "gen_ai.request.temperature") if leaf else None
+    max_tokens = attr_int(leaf.attributes, "gen_ai.request.max_tokens") if leaf else None
+    for key, value in (
+        ("models", models),
+        ("inputTokens", usage.input_tokens),
+        ("outputTokens", usage.output_tokens),
+        ("provider", provider),
+        ("responseModels", response_models),
+        ("finishReasons", finish),
+        ("cacheCreationTokens", usage.cache_write_input_tokens),
+        ("cacheReadTokens", usage.cache_read_input_tokens),
+        ("temperature", temperature),
+        ("maxTokens", max_tokens),
+        ("errorTypes", errors),
+    ):
+        if value:
+            info[key] = value
+    return info

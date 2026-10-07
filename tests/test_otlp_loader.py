@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from agentevals.extraction import extract_user_text_from_attrs
+from agentevals.genai.messages import text_of, user_turn_messages
+from agentevals.genai.overlay import overlay
 from agentevals.loader.otlp import OtlpJsonLoader
 
 
@@ -55,22 +56,22 @@ def test_otlp_loader_jsonl_format(sample_otlp_span):
         trace = traces[0]
 
         assert trace.trace_id == "3e289017fe03ffd7c4145316d2eb3d0d"
-        assert len(trace.all_spans) == 1
+        assert len(list(trace.spans.values())) == 1
 
-        span = trace.all_spans[0]
+        span = next(iter(trace.spans.values()))
         assert span.span_id == "1f9762ca1e03e2d2"
         assert span.parent_span_id == "e3daa973379bbe3b"
-        assert span.operation_name == "invoke_agent hello_world"
+        assert span.name == "invoke_agent hello_world"
 
-        assert span.start_time == 1771237534577907000 // 1000
-        assert span.duration == (1771237534583417000 - 1771237534577907000) // 1000
+        assert span.start_time_unix_nano == 1771237534577907000
+        assert span.duration_unix_nano == 1771237534583417000 - 1771237534577907000
 
-        assert span.tags["otel.scope.name"] == "gcp.vertex.agent"
-        assert span.tags["gen_ai.operation.name"] == "invoke_agent"
-        assert span.tags["gen_ai.agent.name"] == "hello_world"
-        assert span.tags["count"] == 42
-        assert span.tags["score"] == 0.95
-        assert span.tags["enabled"] is True
+        assert span.attributes["otel.scope.name"] == "gcp.vertex.agent"
+        assert span.attributes["gen_ai.operation.name"] == "invoke_agent"
+        assert span.attributes["gen_ai.agent.name"] == "hello_world"
+        assert span.attributes["count"] == 42
+        assert span.attributes["score"] == 0.95
+        assert span.attributes["enabled"] is True
 
     finally:
         Path(temp_path).unlink()
@@ -122,16 +123,16 @@ def test_otlp_loader_full_export():
         trace = traces[0]
 
         assert trace.trace_id == "abc123"
-        assert len(trace.all_spans) == 1
+        assert len(list(trace.spans.values())) == 1
 
-        span = trace.all_spans[0]
+        span = next(iter(trace.spans.values()))
         assert span.span_id == "span1"
-        assert span.operation_name == "test_span"
+        assert span.name == "test_span"
 
-        assert span.tags["otel.scope.name"] == "gcp.vertex.agent"
-        assert span.tags["otel.scope.version"] == "1.0.0"
-        assert span.tags["service.name"] == "my-agent"
-        assert span.tags["test_attr"] == "test_value"
+        assert span.scope.name == "gcp.vertex.agent"
+        assert span.scope.version == "1.0.0"
+        assert span.resource.attributes["service.name"] == "my-agent"
+        assert span.attributes["test_attr"] == "test_value"
 
     finally:
         Path(temp_path).unlink()
@@ -181,17 +182,17 @@ def test_otlp_loader_parent_child_relationships():
         assert len(traces) == 1
         trace = traces[0]
 
-        assert len(trace.root_spans) == 1
-        root = trace.root_spans[0]
+        assert len(trace.roots) == 1
+        root = trace.root_spans()[0]
 
         assert root.span_id == "root"
-        assert len(root.children) == 2
+        assert len(trace.children_of(root)) == 2
 
-        assert root.children[0].span_id == "child1"
-        assert root.children[1].span_id == "child2"
+        assert trace.children_of(root)[0].span_id == "child1"
+        assert trace.children_of(root)[1].span_id == "child2"
 
-        assert root.children[0].parent_span_id == "root"
-        assert root.children[1].parent_span_id == "root"
+        assert trace.children_of(root)[0].parent_span_id == "root"
+        assert trace.children_of(root)[1].parent_span_id == "root"
 
     finally:
         Path(temp_path).unlink()
@@ -243,10 +244,10 @@ class TestLoadFromDict:
 
         assert len(traces) == 1
         assert traces[0].trace_id == "abc123"
-        span = traces[0].all_spans[0]
-        assert span.tags["gen_ai.agent.name"] == "my_agent"
-        assert span.tags["service.name"] == "test-agent"
-        assert span.tags["otel.scope.name"] == "gcp.vertex.agent"
+        span = next(iter(traces[0].spans.values()))
+        assert span.attributes["gen_ai.agent.name"] == "my_agent"
+        assert span.resource.attributes["service.name"] == "test-agent"
+        assert span.scope.name == "gcp.vertex.agent"
 
     def test_load_from_dict_missing_resource_spans(self):
         loader = OtlpJsonLoader()
@@ -287,7 +288,7 @@ class TestAnyValueAttributes:
                 }
             ],
         }
-        return loader.load_from_dict(data)[0].all_spans[0]
+        return next(iter(loader.load_from_dict(data)[0].spans.values()))
 
     def test_array_value(self):
         span = self._load_span_with(
@@ -296,7 +297,7 @@ class TestAnyValueAttributes:
                 "value": {"arrayValue": {"values": [{"stringValue": "stop"}]}},
             }
         )
-        assert span.tags["gen_ai.response.finish_reasons"] == ["stop"]
+        assert span.attributes["gen_ai.response.finish_reasons"] == ["stop"]
 
     def test_kvlist_value(self):
         span = self._load_span_with(
@@ -312,11 +313,11 @@ class TestAnyValueAttributes:
                 },
             }
         )
-        assert span.tags["gen_ai.tool.call.arguments"] == {"temperature": 0.7, "stream": False}
+        assert span.attributes["gen_ai.tool.call.arguments"] == {"temperature": 0.7, "stream": False}
 
     def test_bytes_value(self):
         span = self._load_span_with({"key": "payload", "value": {"bytesValue": "AP9oaQ=="}})
-        assert span.tags["payload"] == "AP9oaQ=="
+        assert span.attributes["payload"] == b"\x00\xffhi"
 
     @staticmethod
     def _load_span_with_event_attribute(attribute):
@@ -351,7 +352,7 @@ class TestAnyValueAttributes:
                 }
             ],
         }
-        return loader.load_from_dict(data)[0].all_spans[0]
+        return next(iter(loader.load_from_dict(data)[0].spans.values()))
 
     def test_event_promotion_decodes_array_value(self):
         """Strands stores messages in span events, and newer GenAI semconv makes
@@ -375,12 +376,11 @@ class TestAnyValueAttributes:
                 },
             }
         )
-        assert span.tags["gen_ai.input.messages"] == [{"role": "user", "content": "Hello"}]
+        assert span.events[0].attributes["gen_ai.input.messages"] == [{"role": "user", "content": "Hello"}]
 
-    def test_promoted_array_messages_reach_the_consumer(self):
-        """Past span.tags: a complex-array gen_ai.input.messages promoted out of
-        a span event must still yield the user text downstream, which is what a
-        consumer actually reads."""
+    def test_event_array_messages_reach_the_consumer(self):
+        """A complex-array gen_ai.input.messages on the details span event must
+        yield the user text through the overlay, which is what consumers read."""
         span = self._load_span_with_event_attribute(
             {
                 "key": "gen_ai.input.messages",
@@ -403,7 +403,8 @@ class TestAnyValueAttributes:
                 },
             }
         )
-        assert extract_user_text_from_attrs(span.tags) == "What is the weather?"
+        messages = overlay(span).messages("gen_ai.input.messages")
+        assert text_of(user_turn_messages(messages)) == "What is the weather?"
 
     def test_event_promotion_keeps_string_value(self):
         """The pre-existing stringValue path must keep working unchanged."""
@@ -411,7 +412,7 @@ class TestAnyValueAttributes:
         span = self._load_span_with_event_attribute(
             {"key": "gen_ai.output.messages", "value": {"stringValue": messages_json}}
         )
-        assert span.tags["gen_ai.output.messages"] == messages_json
+        assert span.events[0].attributes["gen_ai.output.messages"] == messages_json
 
 
 class TestFlatDictAttributes:
@@ -447,13 +448,13 @@ class TestFlatDictAttributes:
             ],
         }
         traces = loader.load_from_dict(data)
-        span = traces[0].all_spans[0]
+        span = next(iter(traces[0].spans.values()))
 
-        assert span.tags["gen_ai.operation.name"] == "chat"
-        assert span.tags["gen_ai.usage.input_tokens"] == 167
-        assert span.tags["gen_ai.usage.output_tokens"] == 42
-        assert span.tags["enabled"] is True
-        assert span.tags["service.name"] == "my-agent"
+        assert span.attributes["gen_ai.operation.name"] == "chat"
+        assert span.attributes["gen_ai.usage.input_tokens"] == 167
+        assert span.attributes["gen_ai.usage.output_tokens"] == 42
+        assert span.attributes["enabled"] is True
+        assert span.resource.attributes["service.name"] == "my-agent"
 
     def test_resource_attributes_as_flat_dict(self):
         loader = OtlpJsonLoader()
@@ -480,9 +481,9 @@ class TestFlatDictAttributes:
             ],
         }
         traces = loader.load_from_dict(data)
-        span = traces[0].all_spans[0]
-        assert span.tags["service.name"] == "agent"
-        assert span.tags["k8s.namespace.name"] == "default"
+        span = next(iter(traces[0].spans.values()))
+        assert span.resource.attributes["service.name"] == "agent"
+        assert span.resource.attributes["k8s.namespace.name"] == "default"
 
 
 class TestNestedDictAttributes:
@@ -526,16 +527,16 @@ class TestNestedDictAttributes:
             ],
         }
         traces = loader.load_from_dict(data)
-        span = traces[0].all_spans[0]
+        span = next(iter(traces[0].spans.values()))
 
-        assert span.tags["gen_ai.operation.name"] == "invoke_agent"
-        assert span.tags["gen_ai.agent.name"] == "dice_agent"
-        assert span.tags["gen_ai.request.model"] == "gpt-4o"
-        assert span.tags["gen_ai.usage.input_tokens"] == 167
-        assert span.tags["gen_ai.usage.output_tokens"] == 11
-        assert span.tags["service.name"] == "my-agent"
-        assert span.tags["k8s.namespace.name"] == "prod"
-        assert span.tags["cluster_name"] == "mgmt"
+        assert span.attributes["gen_ai.operation.name"] == "invoke_agent"
+        assert span.attributes["gen_ai.agent.name"] == "dice_agent"
+        assert span.attributes["gen_ai.request.model"] == "gpt-4o"
+        assert span.attributes["gen_ai.usage.input_tokens"] == 167
+        assert span.attributes["gen_ai.usage.output_tokens"] == 11
+        assert span.resource.attributes["service.name"] == "my-agent"
+        assert span.resource.attributes["k8s.namespace.name"] == "prod"
+        assert span.resource.attributes["cluster_name"] == "mgmt"
 
     def test_nested_event_attributes_flattened(self):
         loader = OtlpJsonLoader()
@@ -574,8 +575,8 @@ class TestNestedDictAttributes:
             ],
         }
         traces = loader.load_from_dict(data)
-        span = traces[0].all_spans[0]
-        assert span.tags["gen_ai.input.messages"] == messages_json
+        span = next(iter(traces[0].spans.values()))
+        assert span.events[0].attributes["gen_ai.input.messages"] == messages_json
 
     def test_mixed_nested_and_flat_keys(self):
         """Keys that are already flat should pass through unchanged."""
@@ -606,9 +607,9 @@ class TestNestedDictAttributes:
             ],
         }
         traces = loader.load_from_dict(data)
-        span = traces[0].all_spans[0]
-        assert span.tags["simple_key"] == "simple_value"
-        assert span.tags["nested.deep.key"] == 42
+        span = next(iter(traces[0].spans.values()))
+        assert span.attributes["simple_key"] == "simple_value"
+        assert span.attributes["nested.deep.key"] == 42
 
 
 def _tempo_v1_export(span_overrides=None) -> dict:
@@ -669,22 +670,22 @@ class TestTempoShapeSupport:
             traces = loader.load(path)
             assert len(traces) == 1
             assert traces[0].trace_id == "tempo-trace"
-            assert len(traces[0].all_spans) == 1
+            assert len(list(traces[0].spans.values())) == 1
         finally:
             Path(path).unlink()
 
-    def test_tempo_v1_resource_attrs_propagate_to_spans(self):
+    def test_tempo_v1_resource_attrs_reach_the_resource(self):
         loader = OtlpJsonLoader()
         traces = loader.load_from_dict(_tempo_v1_export())
-        span = traces[0].all_spans[0]
-        assert span.tags["service.name"] == "helm_agent"
+        span = next(iter(traces[0].spans.values()))
+        assert span.resource.attributes["service.name"] == "helm_agent"
 
     def test_tempo_v1_instrumentation_library_maps_to_scope(self):
         loader = OtlpJsonLoader()
         traces = loader.load_from_dict(_tempo_v1_export())
-        span = traces[0].all_spans[0]
-        assert span.tags["otel.scope.name"] == "opentelemetry.instrumentation.httpx"
-        assert span.tags["otel.scope.version"] == "0.59b0"
+        span = next(iter(traces[0].spans.values()))
+        assert span.scope.name == "opentelemetry.instrumentation.httpx"
+        assert span.scope.version == "0.59b0"
 
     def test_tempo_v2_trace_wrapper_unwrapped(self):
         loader = OtlpJsonLoader()
@@ -732,4 +733,4 @@ class TestTempoShapeSupport:
         traces = loader.load(fixture)
         assert len(traces) == 1
         assert traces[0].trace_id == "dd547580319ab0312cee07f1def50dad"
-        assert len(traces[0].all_spans) == 86
+        assert len(list(traces[0].spans.values())) == 86

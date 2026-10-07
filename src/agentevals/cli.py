@@ -131,6 +131,16 @@ def main(verbose: int) -> None:
     default=None,
     help="Path to an eval config YAML file defining evaluators.",
 )
+@click.option(
+    "--group-by",
+    type=click.Choice(["auto", "trace", "conversation"]),
+    default=None,
+    help=(
+        "Evaluation unit. 'conversation' evaluates traces sharing agentevals.session_name, "
+        "gen_ai.conversation.id or session.id together. 'auto' (default) does so when a trace "
+        "carries agentevals.session_name or the eval set has multi turn cases."
+    ),
+)
 def run(
     trace_files: tuple[str, ...],
     eval_set: str | None,
@@ -141,6 +151,7 @@ def run(
     trajectory_match_type: str | None,
     output: str,
     config_file: str | None,
+    group_by: str | None,
 ) -> None:
     """Evaluate trace file(s) against the configured evaluators."""
     from .config import EvalRunConfig, apply_builtin_overrides, make_builtin_evaluator_entries
@@ -190,6 +201,8 @@ def run(
         config.trace_format = trace_format
     if output != "table":
         config.output_format = output
+    if group_by is not None:
+        config.group_by = group_by
 
     result = asyncio.run(run_evaluation(config))
     formatted = format_results(result, fmt=config.output_format)

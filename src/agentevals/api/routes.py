@@ -18,10 +18,10 @@ from pydantic.alias_generators import to_camel
 
 from agentevals import __version__
 
+from ..adk_bridge import invocation_to_dict, to_adk_invocations
 from ..builtin_metrics import METRICS_NEEDING_EXPECTED, METRICS_NEEDING_GCP, METRICS_NEEDING_LLM
 from ..config import EvalParams, EvalRunConfig
-from ..converter import convert_traces
-from ..extraction import get_extractor
+from ..genai.extract import extract_conversation
 from ..loader import load_traces
 from ..loader.otlp import OtlpJsonLoader
 from ..resolvers import (
@@ -110,13 +110,29 @@ def _parse_credential_refs_form(raw: str | None) -> dict[str, dict[str, Any]] | 
     return refs
 
 
+_PAYLOAD_KEYS = frozenset({"args", "arguments", "response", "result", "output"})
+
+
 def _camel_keys(obj: Any) -> Any:
-    """Recursively convert dict keys from snake_case to camelCase."""
+    """Convert response structure keys to camelCase.
+
+    Values under payload keys (tool arguments, tool results) are user data and pass through
+    unchanged, so a tool argument named ``order_id`` stays ``order_id``.
+    """
     if isinstance(obj, dict):
-        return {to_camel(k): _camel_keys(v) for k, v in obj.items()}
+        return {to_camel(k): (v if k in _PAYLOAD_KEYS else _camel_keys(v)) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_camel_keys(item) for item in obj]
     return obj
+
+
+def _trace_views(trace) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Performance metrics and metadata of one trace, as camelCase wire dicts."""
+    conversation = extract_conversation([trace], trace.trace_id)
+    return (
+        _camel_keys(extract_performance_metrics(conversation, [trace])),
+        _camel_keys(extract_trace_metadata([trace], conversation)),
+    )
 
 
 def _safe_upload_path(temp_dir: str, filename: str, idx: int = 0) -> str:
@@ -201,10 +217,10 @@ async def get_config():
 
 @router.get("/metrics", response_model=StandardResponse[list[MetricInfo]])
 async def list_metrics():
-    _METRICS_NEEDING_RUBRICS = {
-        "rubric_based_final_response_quality_v1",
-        "rubric_based_tool_use_quality_v1",
-    }
+    from ..config import UNSUPPORTED_BUILTIN_METRICS
+
+    def _needs_rubrics(name: str) -> bool:
+        return name.startswith("rubric_based_")
 
     _METRIC_CATEGORIES = {
         "tool_trajectory_avg_score": "trajectory",
@@ -219,6 +235,7 @@ async def list_metrics():
         "multi_turn_task_success_v1": "multi-turn",
         "multi_turn_trajectory_quality_v1": "multi-turn",
         "multi_turn_tool_use_quality_v1": "multi-turn",
+        "rubric_based_multi_turn_trajectory_quality_v1": "multi-turn",
     }
 
     try:
@@ -230,7 +247,7 @@ async def list_metrics():
 
         metrics = []
         for m in registry_metrics:
-            if m.metric_name == "per_turn_user_simulator_quality_v1":
+            if m.metric_name in UNSUPPORTED_BUILTIN_METRICS:
                 continue
 
             metrics.append(
@@ -240,9 +257,9 @@ async def list_metrics():
                     requires_eval_set=m.metric_name in METRICS_NEEDING_EXPECTED,
                     requires_llm=m.metric_name in METRICS_NEEDING_LLM,
                     requires_gcp=m.metric_name in METRICS_NEEDING_GCP,
-                    requires_rubrics=m.metric_name in _METRICS_NEEDING_RUBRICS,
+                    requires_rubrics=_needs_rubrics(m.metric_name),
                     description=m.description or "No description available",
-                    working=m.metric_name not in _METRICS_NEEDING_RUBRICS,
+                    working=not _needs_rubrics(m.metric_name),
                 )
             )
 
@@ -406,19 +423,8 @@ def _session_name_from_filename(filename: str) -> str | None:
 
 
 def _serialize_invocation(inv) -> dict[str, Any]:
-    """Serialize an ADK Invocation to a camelCase dict matching the frontend Invocation type."""
-    inv_dict: dict[str, Any] = {
-        "invocation_id": inv.invocation_id,
-    }
-    if inv.user_content is not None:
-        inv_dict["user_content"] = inv.user_content.model_dump(exclude_none=True)
-    if inv.final_response is not None:
-        inv_dict["final_response"] = inv.final_response.model_dump(exclude_none=True)
-    if inv.intermediate_data is not None:
-        inv_dict["intermediate_data"] = inv.intermediate_data.model_dump(exclude_none=True)
-    if inv.creation_timestamp is not None:
-        inv_dict["creation_timestamp"] = inv.creation_timestamp
-    return _camel_keys(inv_dict)
+    """An ADK invocation as the camelCase dict the frontend ``Invocation`` type expects."""
+    return _camel_keys(invocation_to_dict(inv))
 
 
 @router.post("/convert", response_model=StandardResponse[ConvertTracesData])
@@ -478,33 +484,24 @@ async def convert_trace_files(
                 detail += ". Errors: " + "; ".join(load_warnings)
             raise HTTPException(status_code=400, detail=detail)
 
-        conversion_results = convert_traces(all_traces)
-        trace_map = {t.trace_id: t for t in all_traces}
-
         entries: list[TraceConversionEntry] = []
-        for conv_result in conversion_results:
-            invocations = [_serialize_invocation(inv) for inv in conv_result.invocations]
-            warnings = list(conv_result.warnings)
-
-            trace = trace_map.get(conv_result.trace_id)
-            meta = TraceConversionMetadata()
-            if trace:
-                meta_dict = extract_trace_metadata(trace)
-                filename = trace_to_filename.get(conv_result.trace_id, "")
-                session_name = _session_name_from_filename(filename)
-                meta = TraceConversionMetadata(
-                    agent_name=meta_dict.get("agent_name"),
-                    model=meta_dict.get("model"),
-                    schema_version=meta_dict.get("schema_version"),
-                    start_time=meta_dict.get("start_time"),
-                    user_input_preview=meta_dict.get("user_input_preview"),
-                    final_output_preview=meta_dict.get("final_output_preview"),
-                    session_name=session_name,
-                )
-
+        for trace in all_traces:
+            conversation = extract_conversation([trace], trace.trace_id)
+            invocations = [_serialize_invocation(inv) for inv in to_adk_invocations(conversation.turns)]
+            warnings = list(trace.warnings) + [w for t in conversation.turns for w in t.warnings]
+            meta_dict = extract_trace_metadata([trace], conversation)
+            meta = TraceConversionMetadata(
+                agent_name=meta_dict.get("agent_name"),
+                model=meta_dict.get("model"),
+                schema_version=meta_dict.get("schema_version"),
+                start_time=meta_dict.get("start_time"),
+                user_input_preview=meta_dict.get("user_input_preview"),
+                final_output_preview=meta_dict.get("final_output_preview"),
+                session_name=_session_name_from_filename(trace_to_filename.get(trace.trace_id, "")),
+            )
             entries.append(
                 TraceConversionEntry(
-                    trace_id=conv_result.trace_id,
+                    trace_id=trace.trace_id,
                     invocations=invocations,
                     warnings=warnings,
                     metadata=meta,
@@ -729,21 +726,31 @@ async def evaluate_traces_stream(
                 yield f"data: {SSEErrorEvent(error=f'Invalid config: {exc}').model_dump_json(by_alias=True)}\n\n"
                 return
 
+            loaded_traces = []
+            load_errors: list[str] = []
             for trace_file_path in trace_paths:
                 try:
-                    traces = load_traces(trace_file_path, format=eval_config.trace_format)
-                    for trace in traces:
-                        extractor = get_extractor(trace)
-                        perf_metrics = _camel_keys(extract_performance_metrics(trace, extractor))
-                        trace_metadata = _camel_keys(extract_trace_metadata(trace, extractor))
-                        evt = SSEPerformanceMetricsEvent(
-                            trace_id=trace.trace_id,
-                            performance_metrics=perf_metrics,
-                            trace_metadata=trace_metadata,
-                        )
-                        yield f"event: performance_metrics\ndata: {evt.model_dump_json(by_alias=True)}\n\n"
+                    loaded_traces.extend(load_traces(trace_file_path, format=eval_config.trace_format))
+                except Exception as exc:
+                    load_errors.append(f"Failed to load trace file '{os.path.basename(trace_file_path)}': {exc}")
+            for trace in loaded_traces:
+                try:
+                    perf_metrics, trace_metadata = _trace_views(trace)
+                    evt = SSEPerformanceMetricsEvent(
+                        trace_id=trace.trace_id,
+                        performance_metrics=perf_metrics,
+                        trace_metadata=trace_metadata,
+                    )
+                    yield f"event: performance_metrics\ndata: {evt.model_dump_json(by_alias=True)}\n\n"
                 except Exception as e:
-                    logger.error(f"Failed to extract early performance metrics from {trace_file_path}: {e}")
+                    logger.error(f"Failed to extract early performance metrics for trace {trace.trace_id}: {e}")
+
+            stream_eval_set = None
+            if eval_set_path:
+                try:
+                    stream_eval_set = load_eval_set(eval_set_path)
+                except Exception as exc:
+                    load_errors.append(f"Failed to load eval set: {exc}")
 
             queue: asyncio.Queue = asyncio.Queue()
 
@@ -754,7 +761,18 @@ async def evaluate_traces_stream(
                 await queue.put(("trace_progress", trace_result))
 
             async def run_with_progress():
-                result = await run_evaluation(eval_config, progress_callback, trace_progress_callback)
+                if loaded_traces:
+                    result = await run_evaluation_from_traces(
+                        traces=loaded_traces,
+                        config=eval_config,
+                        eval_set=stream_eval_set,
+                        progress_callback=progress_callback,
+                        trace_progress_callback=trace_progress_callback,
+                    )
+                else:
+                    result = RunResult(errors=["No traces loaded."])
+                if load_errors:
+                    result.errors = load_errors + result.errors
                 await queue.put(("done", result))
 
             try:
@@ -907,9 +925,7 @@ async def evaluate_traces_json_stream(request: EvaluateJsonRequest, raw_request:
 
             for trace in traces:
                 try:
-                    extractor = get_extractor(trace)
-                    perf_metrics = _camel_keys(extract_performance_metrics(trace, extractor))
-                    trace_metadata = _camel_keys(extract_trace_metadata(trace, extractor))
+                    perf_metrics, trace_metadata = _trace_views(trace)
                     evt = SSEPerformanceMetricsEvent(
                         trace_id=trace.trace_id,
                         performance_metrics=perf_metrics,

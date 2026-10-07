@@ -37,6 +37,7 @@ def result_from_metric_result(
     trace_id: str | None,
     evaluator_type: EvaluatorType,
     metric_result: MetricResult,
+    span_id: str | None = None,
 ) -> Result:
     """Project an ADK :class:`MetricResult` onto a persistable :class:`Result`.
 
@@ -67,6 +68,7 @@ def result_from_metric_result(
         score=metric_result.score,
         per_invocation_scores=list(metric_result.per_invocation_scores or []),
         trace_id=trace_id,
+        span_id=span_id,
         details=metric_result.details or {},
         error_text=metric_result.error,
         latency_ms=latency_ms,
@@ -77,14 +79,15 @@ def build_results(run_id: UUID, params: EvalParams, run_result: RunResult) -> li
     """Flatten ``run_result.trace_results[*].metric_results[*]`` into a list
     of persistable :class:`Result` rows.
 
-    The ``eval_set_item_id`` and ``eval_set_item_name`` both default to the
-    trace_id, since OSS doesn't currently extract a stable per-eval-case
-    identifier from the ADK :class:`EvalSet`. Callers may post-process to
-    attach their own identifiers.
+    ``eval_set_item_id`` and ``eval_set_item_name`` are the evaluation group key: the trace
+    id for single trace groups, the conversation key otherwise. ``span_id`` is the turn's
+    anchor span when the group has exactly one turn. Callers may post-process to attach
+    their own identifiers.
     """
     out: list[Result] = []
     for trace_result in run_result.trace_results:
-        item_id = trace_result.trace_id
+        item_id = trace_result.group_key or trace_result.trace_id
+        span_id = trace_result.turn_refs[0].span_id if len(trace_result.turn_refs) == 1 else None
         for mr in trace_result.metric_results:
             out.append(
                 result_from_metric_result(
@@ -94,6 +97,7 @@ def build_results(run_id: UUID, params: EvalParams, run_result: RunResult) -> li
                     trace_id=trace_result.trace_id,
                     evaluator_type=classify_evaluator(mr.metric_name, params),
                     metric_result=mr,
+                    span_id=span_id,
                 )
             )
     return out

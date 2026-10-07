@@ -2,8 +2,7 @@
 
 * :func:`load_telemetry` reads a file into envelope traces (``agentevals.otel.model``) plus the
   log records that belong to no trace in the file.
-* :func:`load_traces` returns legacy ``loader.base`` traces for the current extraction. It is
-  removed together with ``loader/base.py``.
+* :func:`load_traces` returns just the traces.
 * :func:`detect_format` sniffs content, so a ``.jsonl`` file holding Collector exports, bare
   spans or anything else is classified by what it contains.
 """
@@ -14,12 +13,10 @@ import json
 import logging
 from collections import Counter
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from ..otel.decode import decode_bare_spans_json, decode_json_document, is_otlp_document
-from ..otel.model import LogRecord, build_traces
-from ..otel.model import Trace as OtelTrace
-from .base import Trace, TraceLoader
-from .compat import to_legacy_traces
+from ..otel.model import LogRecord, Trace, build_traces
 from .jaeger import JaegerJsonLoader, decode_jaeger_document
 from .otlp import OtlpJsonLoader, decode_otlp_text
 
@@ -27,6 +24,13 @@ logger = logging.getLogger(__name__)
 
 JAEGER_JSON = "jaeger-json"
 OTLP_JSON = "otlp-json"
+
+
+class TraceLoader(Protocol):
+    def format_name(self) -> str: ...
+
+    def load(self, source: str) -> list[Trace]: ...
+
 
 _LOADERS: dict[str, type[TraceLoader]] = {
     JAEGER_JSON: JaegerJsonLoader,
@@ -37,7 +41,7 @@ _LOADERS: dict[str, type[TraceLoader]] = {
 @dataclass
 class TelemetryFile:
     format: str
-    traces: list[OtelTrace]
+    traces: list[Trace]
     unattributed_logs: list[LogRecord] = field(default_factory=list)
     warnings: Counter = field(default_factory=Counter)
 
@@ -105,24 +109,39 @@ def load_telemetry(path: str, *, format: str | None = None) -> TelemetryFile:
             '({"resourceSpans": [...]} / {"batches": [...]}). '
             "Pass an explicit format= override if needed."
         )
-    if fmt == JAEGER_JSON:
-        if data is _UNPARSED:
+    if data is _UNPARSED:
+        if fmt == JAEGER_JSON:
             raise ValueError(f"Invalid Jaeger JSON in {path!r}")
-        result = decode_jaeger_document(data)
-    elif data is _UNPARSED or not isinstance(data, (dict, list)):
         result = decode_otlp_text(content)
-    elif isinstance(data, dict) and is_otlp_document(data):
-        result = decode_json_document(data, strict=False)
-    elif isinstance(data, list) or _looks_like_span(data):
-        result = decode_bare_spans_json(data if isinstance(data, list) else [data], strict=False)
     else:
-        raise ValueError("not an OTLP JSON document: expected resourceSpans, resourceLogs or batches")
+        result = _decode_obj(data, fmt)
     traces, unattributed = build_traces(result.spans, result.logs)
     if result.reasons:
         logger.warning("Skipped items in %s: %s", path, result.error_message)
     return TelemetryFile(format=fmt, traces=traces, unattributed_logs=unattributed, warnings=result.warnings)
 
 
+def _decode_obj(data: object, fmt: str):
+    if fmt == JAEGER_JSON:
+        return decode_jaeger_document(data)
+    if isinstance(data, dict) and is_otlp_document(data):
+        return decode_json_document(data, strict=False)
+    if isinstance(data, list) or _looks_like_span(data):
+        return decode_bare_spans_json(data if isinstance(data, list) else [data], strict=False)
+    raise ValueError("not an OTLP JSON document: expected resourceSpans, resourceLogs or batches")
+
+
+def load_traces_from_obj(data: object, *, format: str | None = None) -> list[Trace]:
+    """Traces from an already parsed JSON document (Jaeger or OTLP)."""
+    if format is not None and format not in _LOADERS:
+        raise ValueError(f"Unknown trace format {format!r}. Supported: {sorted(_LOADERS)}")
+    fmt = format or (
+        JAEGER_JSON if isinstance(data, dict) and "data" in data and not is_otlp_document(data) else OTLP_JSON
+    )
+    result = _decode_obj(data, fmt)
+    traces, _ = build_traces(result.spans, result.logs)
+    return traces
+
+
 def load_traces(path: str, *, format: str | None = None) -> list[Trace]:
-    """Legacy traces for the current extraction pipeline."""
-    return to_legacy_traces(load_telemetry(path, format=format).traces)
+    return load_telemetry(path, format=format).traces

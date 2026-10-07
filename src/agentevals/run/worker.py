@@ -18,8 +18,7 @@ import socket
 from datetime import timedelta
 from uuid import UUID
 
-from google.adk.evaluation.eval_set import EvalSet
-
+from ..adk_bridge import EvalSet, load_eval_set_from_dict
 from ..config import EvalParams
 from ..resolvers import (
     reset_resolved_credentials,
@@ -146,7 +145,7 @@ class AsyncRunWorker:
         params = EvalParams.model_validate(run.spec.eval_config or {})
         eval_set: EvalSet | None = None
         if run.spec.eval_set:
-            eval_set = EvalSet.model_validate(run.spec.eval_set)
+            eval_set = load_eval_set_from_dict(run.spec.eval_set)
 
         fetcher = resolve_fetcher(run.spec.target)
 

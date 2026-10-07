@@ -4,69 +4,81 @@ import os
 
 import pytest
 
-from agentevals.config import BuiltinMetricDef, EvalRunConfig
-from agentevals.converter import convert_traces
-from agentevals.extraction import get_extractor
-from agentevals.loader.base import Span, Trace
-from agentevals.runner import _evaluate_trace, load_eval_set, run_evaluation
+from agentevals.config import BuiltinMetricDef, EvalParams, EvalRunConfig
+from agentevals.genai.extract import extract_conversation
+from agentevals.loader import Trace, load_traces
+from agentevals.loader.otlp import OtlpJsonLoader
+from agentevals.runner import load_eval_set, run_evaluation, run_evaluation_from_traces
 from agentevals.trace_metrics import extract_trace_metadata
 
 
-def _make_tool_trace(tools: list[str]) -> Trace:
-    """Build a minimal ADK trace calling the given tools in order."""
-    invoke = Span(
-        trace_id="t1",
-        span_id="invoke1",
-        parent_span_id=None,
-        operation_name="invoke_agent test_agent",
-        start_time=1000,
-        duration=10000,
-        tags={"otel.scope.name": "gcp.vertex.agent"},
-    )
-    call_llm_1 = Span(
-        trace_id="t1",
-        span_id="llm1",
-        parent_span_id="invoke1",
-        operation_name="call_llm",
-        start_time=2000,
-        duration=1000,
-        tags={
-            "otel.scope.name": "gcp.vertex.agent",
-            "gcp.vertex.agent.llm_request": json.dumps(
-                {"contents": [{"role": "user", "parts": [{"text": "do something"}]}]}
+def _metadata(traces):
+    return extract_trace_metadata(traces, extract_conversation(traces))
+
+
+def _attrs(**kv) -> list[dict]:
+    return [{"key": k.replace("__", "."), "value": {"stringValue": v}} for k, v in kv.items()]
+
+
+def _make_tool_trace(tools: list[str], schema_url: str | None = None) -> Trace:
+    """A minimal ADK trace: invoke_agent, call_llm, the given tools in order, call_llm."""
+
+    def span(span_id, name, start, attrs, parent="1" * 16):
+        out = {
+            "traceId": "a" * 32,
+            "spanId": span_id,
+            "name": name,
+            "startTimeUnixNano": str(start * 1000),
+            "endTimeUnixNano": str((start + 100) * 1000),
+            "attributes": attrs,
+        }
+        if parent:
+            out["parentSpanId"] = parent
+        return out
+
+    spans = [
+        span(
+            "1" * 16,
+            "invoke_agent test_agent",
+            1000,
+            _attrs(gen_ai__operation__name="invoke_agent", gen_ai__agent__name="test_agent"),
+            parent=None,
+        ),
+        span(
+            "2" * 16,
+            "call_llm",
+            2000,
+            _attrs(
+                gcp__vertex__agent__llm_request=json.dumps(
+                    {"contents": [{"role": "user", "parts": [{"text": "do something"}]}]}
+                )
             ),
-        },
-    )
-    tool_spans = [
-        Span(
-            trace_id="t1",
-            span_id=f"tool{i}",
-            parent_span_id="invoke1",
-            operation_name=f"execute_tool {name}",
-            start_time=3000 + i * 100,
-            duration=100,
-            tags={"otel.scope.name": "gcp.vertex.agent"},
-        )
-        for i, name in enumerate(tools)
+        ),
+        *[
+            span(
+                f"{i + 3:016x}",
+                f"execute_tool {name}",
+                3000 + i * 100,
+                _attrs(gen_ai__operation__name="execute_tool", gen_ai__tool__name=name),
+            )
+            for i, name in enumerate(tools)
+        ],
+        span(
+            "f" * 16,
+            "call_llm",
+            5000,
+            _attrs(
+                gcp__vertex__agent__llm_response=json.dumps({"content": {"role": "model", "parts": [{"text": "done"}]}})
+            ),
+        ),
     ]
-    call_llm_2 = Span(
-        trace_id="t1",
-        span_id="llm2",
-        parent_span_id="invoke1",
-        operation_name="call_llm",
-        start_time=5000,
-        duration=1000,
-        tags={
-            "otel.scope.name": "gcp.vertex.agent",
-            "gcp.vertex.agent.llm_response": json.dumps({"content": {"role": "model", "parts": [{"text": "done"}]}}),
-        },
-    )
-    invoke.children = [call_llm_1, *tool_spans, call_llm_2]
-    return Trace(
-        trace_id="t1",
-        root_spans=[invoke],
-        all_spans=[invoke, call_llm_1, *tool_spans, call_llm_2],
-    )
+    scope: dict = {"name": "gcp.vertex.agent"}
+    scope_spans: dict = {"scope": scope, "spans": spans}
+    if schema_url:
+        scope_spans["schemaUrl"] = schema_url
+    doc = {"resourceSpans": [{"resource": {"attributes": []}, "scopeSpans": [scope_spans]}]}
+    (trace,) = OtlpJsonLoader().load_from_dict(doc)
+    return trace
 
 
 def _make_eval_set_json(tools: list[str]) -> dict:
@@ -132,8 +144,8 @@ class TestRunner:
         assert mr.duration_ms is not None
         assert mr.duration_ms >= 0
 
-    def test_missing_eval_set_error(self):
-        """Trajectory metric without eval set should report a clear error."""
+    def test_missing_eval_set_not_evaluated(self):
+        """A trajectory metric without an eval set is NOT_EVALUATED with the reason, not an error."""
         config = EvalRunConfig(
             trace_files=[HELM_TRACE],
             evaluators=[BuiltinMetricDef(name="tool_trajectory_avg_score")],
@@ -141,8 +153,9 @@ class TestRunner:
         result = asyncio.run(run_evaluation(config))
 
         mr = result.trace_results[0].metric_results[0]
-        assert mr.error is not None
-        assert "requires expected invocations" in mr.error
+        assert mr.error is None
+        assert mr.eval_status == "NOT_EVALUATED"
+        assert mr.details == {"reason": "no eval set provided"}
         assert mr.duration_ms is not None
         assert mr.duration_ms >= 0
 
@@ -247,11 +260,8 @@ class TestRunner:
         assert len(result.errors) >= 1
 
     def testextract_trace_metadata_adk(self):
-        from agentevals.loader.jaeger import JaegerJsonLoader
-
-        loader = JaegerJsonLoader()
-        traces = loader.load(HELM_TRACE)
-        metadata = extract_trace_metadata(traces[0])
+        traces = load_traces(HELM_TRACE)
+        metadata = _metadata(traces)
 
         assert metadata["agent_name"] == "helm_agent"
         assert metadata["model"] is not None
@@ -263,36 +273,15 @@ class TestRunner:
         assert len(metadata["final_output_preview"]) > 0
 
     def test_extract_trace_metadata_schema_version_unknown_when_schema_missing(self):
-        trace = _make_tool_trace(["tool_a"])
-        metadata = extract_trace_metadata(trace)
+        metadata = _metadata([_make_tool_trace(["tool_a"])])
         assert metadata["schema_version"] is None
 
     def test_extract_trace_metadata_schema_version_unknown_when_schema_malformed(self):
-        trace = _make_tool_trace(["tool_a"])
-        extractor = get_extractor(trace)
-        inv_spans = extractor.find_invocation_spans(trace)
-        llm_spans = (
-            extractor.find_llm_spans_in(inv_spans[0])
-            if inv_spans
-            else [s for s in trace.all_spans if extractor.classify_span(s) == "llm"]
-        )
-        if llm_spans:
-            llm_spans[0].tags["otel.schema_url"] = "not-a-schema-version"
-        metadata = extract_trace_metadata(trace)
+        metadata = _metadata([_make_tool_trace(["tool_a"], schema_url="not-a-schema-version")])
         assert metadata["schema_version"] is None
 
     def test_extract_trace_metadata_schema_version_from_valid_schema_url(self):
-        trace = _make_tool_trace(["tool_a"])
-        extractor = get_extractor(trace)
-        inv_spans = extractor.find_invocation_spans(trace)
-        llm_spans = (
-            extractor.find_llm_spans_in(inv_spans[0])
-            if inv_spans
-            else [s for s in trace.all_spans if extractor.classify_span(s) == "llm"]
-        )
-        if llm_spans:
-            llm_spans[0].tags["otel.schema_url"] = "https://opentelemetry.io/schemas/1.39.0"
-        metadata = extract_trace_metadata(trace)
+        metadata = _metadata([_make_tool_trace(["tool_a"], schema_url="https://opentelemetry.io/schemas/1.39.0")])
         assert metadata["schema_version"] == "1.39.0"
 
 
@@ -304,7 +293,7 @@ class TestTrajectoryMatchType:
     """
 
     def _run(self, match_type, tmp_path):
-        conv_result = convert_traces([_make_tool_trace(["helm_get_release", "helm_list_releases"])])[0]
+        trace = _make_tool_trace(["helm_get_release", "helm_list_releases"])
 
         eval_set_path = tmp_path / "eval_set.json"
         eval_set_path.write_text(
@@ -312,20 +301,12 @@ class TestTrajectoryMatchType:
         )
         eval_set = load_eval_set(str(eval_set_path))
 
-        return asyncio.run(
-            _evaluate_trace(
-                conv_result=conv_result,
-                evaluators=[
-                    BuiltinMetricDef(
-                        name="tool_trajectory_avg_score",
-                        threshold=0.5,
-                        trajectory_match_type=match_type,
-                    )
-                ],
-                eval_set=eval_set,
-                eval_semaphore=asyncio.Semaphore(1),
-            )
+        params = EvalParams(
+            evaluators=[
+                BuiltinMetricDef(name="tool_trajectory_avg_score", threshold=0.5, trajectory_match_type=match_type)
+            ]
         )
+        return asyncio.run(run_evaluation_from_traces([trace], params, eval_set)).trace_results[0]
 
     def test_exact_fails(self, tmp_path):
         mr = self._run(None, tmp_path).metric_results[0]
@@ -345,7 +326,7 @@ class TestTrajectoryMatchType:
 
 class TestBuiltinCustomEvaluatorOverrides:
     def test_builtin_custom_evaluator_uses_per_evaluator_match_type(self, tmp_path):
-        conv_result = convert_traces([_make_tool_trace(["helm_get_release", "helm_list_releases"])])[0]
+        trace = _make_tool_trace(["helm_get_release", "helm_list_releases"])
 
         eval_set_path = tmp_path / "eval_set.json"
         eval_set_path.write_text(
@@ -353,20 +334,12 @@ class TestBuiltinCustomEvaluatorOverrides:
         )
         eval_set = load_eval_set(str(eval_set_path))
 
-        trace_result = asyncio.run(
-            _evaluate_trace(
-                conv_result=conv_result,
-                evaluators=[
-                    BuiltinMetricDef(
-                        name="tool_trajectory_avg_score",
-                        threshold=0.5,
-                        trajectory_match_type="ANY_ORDER",
-                    )
-                ],
-                eval_set=eval_set,
-                eval_semaphore=asyncio.Semaphore(1),
-            )
+        params = EvalParams(
+            evaluators=[
+                BuiltinMetricDef(name="tool_trajectory_avg_score", threshold=0.5, trajectory_match_type="ANY_ORDER")
+            ]
         )
+        trace_result = asyncio.run(run_evaluation_from_traces([trace], params, eval_set)).trace_results[0]
 
         assert len(trace_result.metric_results) == 1
         mr = trace_result.metric_results[0]

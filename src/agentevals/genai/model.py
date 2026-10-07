@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..otel.model import SpanRef
 
 Status = Literal["unset", "ok", "error"]
+AnchorKind = Literal["agent", "workflow", "root"]
 
 
 class Usage(BaseModel):
@@ -83,6 +84,7 @@ class Turn(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     ref: SpanRef
+    anchor_kind: AnchorKind = "agent"
     index: int = 0
     label: str | None = None
     agent_name: str | None = None

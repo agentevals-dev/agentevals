@@ -26,10 +26,9 @@ from ..otel.model import (
     Span,
     SpanEvent,
     SpanLink,
+    Trace,
     build_traces,
 )
-from .base import Trace, TraceLoader
-from .compat import to_legacy_traces
 
 logger = logging.getLogger(__name__)
 
@@ -161,9 +160,7 @@ def _span(raw: dict, resources: dict[str, Resource], scopes: dict, result: Decod
     )
 
 
-class JaegerJsonLoader(TraceLoader):
-    """Legacy entry point returning ``loader.base`` traces for the current extraction."""
-
+class JaegerJsonLoader:
     def format_name(self) -> str:
         return "jaeger-json"
 
@@ -175,4 +172,4 @@ class JaegerJsonLoader(TraceLoader):
         result = decode_jaeger_document(raw)
         traces, _ = build_traces(result.spans)
         logger.info("Loaded %d trace(s) from %s", len(traces), source)
-        return to_legacy_traces(traces)
+        return traces

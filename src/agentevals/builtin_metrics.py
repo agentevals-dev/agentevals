@@ -377,21 +377,20 @@ async def evaluate_builtin_metric(
     match_type: str | None = None,
     credential_ref: str | None = None,
     judge_base_url: str | None = None,
-) -> dict[str, Any]:
-    """Evaluate a single built-in ADK metric.
+    expected_reason: str | None = None,
+):
+    """Evaluate a single built-in ADK metric and return a ``MetricResult``.
 
-    Returns a dict with keys: metric_name, score, eval_status,
-    per_invocation_scores, error, details.
+    A metric that compares against a golden conversation is ``NOT_EVALUATED`` when none was
+    selected, with the reason in ``details``; it is never scored against an arbitrary case.
     """
     from .runner import MetricResult
 
     if metric_name in METRICS_NEEDING_EXPECTED and not expected_invocations:
         return MetricResult(
             metric_name=metric_name,
-            error=(
-                f"Metric '{metric_name}' requires expected invocations "
-                f"(golden eval set), but none were provided or matched."
-            ),
+            eval_status="NOT_EVALUATED",
+            details={"reason": expected_reason or "no eval set provided"},
         )
 
     try:

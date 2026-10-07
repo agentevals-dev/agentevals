@@ -27,8 +27,9 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types as genai_types
 
 from agentevals import builtin_metrics
+from agentevals.adk_bridge import to_adk_invocations
 from agentevals.builtin_metrics import _to_invocation_events, evaluate_builtin_metric
-from agentevals.converter import convert_traces
+from agentevals.genai.extract import extract_conversation
 from agentevals.loader import load_traces
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), "..", "samples")
@@ -258,8 +259,7 @@ class TestHallucinationsSeesToolEvidence:
     @pytest.mark.skipif(not os.path.exists(HELM_TRACE), reason="samples/helm.json not available")
     async def test_replayed_trace_tool_output_reaches_judge(self, fake_judge):
         judges = fake_judge(evidence="kagent-crds-0.7.14")
-        (conversion,) = convert_traces(load_traces(HELM_TRACE))
-        inv = conversion.invocations[0]
+        (inv,) = to_adk_invocations(extract_conversation(load_traces(HELM_TRACE)).turns)
         assert isinstance(inv.intermediate_data, IntermediateData)
         assert "kagent-crds-0.7.14" in str(inv.intermediate_data.tool_responses[0].response)
 

@@ -18,6 +18,13 @@ def _normalize_trajectory_match_type(v: str | None) -> str | None:
     return v.upper() if v is not None else v
 
 
+UNSUPPORTED_BUILTIN_METRICS = {
+    "per_turn_user_simulator_quality_v1": "it scores a simulated user, and agentevals evaluates recorded traces",
+}
+
+GroupBy = Literal["auto", "trace", "conversation"]
+
+
 class BuiltinMetricDef(BaseModel):
     """A built-in ADK metric, optionally with threshold/judge overrides."""
 
@@ -41,6 +48,13 @@ class BuiltinMetricDef(BaseModel):
     @classmethod
     def _validate_trajectory_match_type(cls, v: str | None) -> str | None:
         return _normalize_trajectory_match_type(v)
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, v: str) -> str:
+        if v in UNSUPPORTED_BUILTIN_METRICS:
+            raise ValueError(f"Built-in metric '{v}' is not supported: {UNSUPPORTED_BUILTIN_METRICS[v]}")
+        return v
 
 
 class BaseEvaluatorDef(BaseModel):
@@ -216,6 +230,16 @@ class EvalParams(BaseModel):
         default=5,
         ge=1,
         description="Maximum number of concurrent evaluator executions (for example LLM API calls).",
+    )
+
+    group_by: GroupBy = Field(
+        default="auto",
+        description=(
+            "How traces form evaluation units. 'trace': every trace on its own. 'conversation': traces "
+            "sharing agentevals.session_name, gen_ai.conversation.id or session.id are evaluated together. "
+            "'auto': conversation when any trace carries agentevals.session_name or the eval set has a "
+            "multi turn case, otherwise trace."
+        ),
     )
 
 

@@ -3,7 +3,6 @@ import os
 
 import pytest
 
-from agentevals.loader.base import Span, Trace
 from agentevals.loader.jaeger import JaegerJsonLoader
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), "..", "samples")
@@ -58,8 +57,8 @@ class TestJaegerJsonLoader:
 
         trace = traces[0]
         assert trace.trace_id == "abc123"
-        assert len(trace.all_spans) == 2
-        assert len(trace.root_spans) == 1
+        assert len(trace.spans) == 2
+        assert len(trace.roots) == 1
 
     def test_span_tree_structure(self, loader, minimal_jaeger_json, tmp_path):
         path = tmp_path / "test.json"
@@ -67,14 +66,14 @@ class TestJaegerJsonLoader:
 
         trace = loader.load(str(path))[0]
 
-        root = trace.root_spans[0]
+        root = trace.root_spans()[0]
         assert root.span_id == "span1"
-        assert root.operation_name == "root_op"
-        assert len(root.children) == 1
+        assert root.name == "root_op"
+        assert len(trace.children_of(root)) == 1
 
-        child = root.children[0]
+        child = trace.children_of(root)[0]
         assert child.span_id == "span2"
-        assert child.operation_name == "child_op"
+        assert child.name == "child_op"
         assert child.parent_span_id == "span1"
 
     def test_tags_parsed(self, loader, minimal_jaeger_json, tmp_path):
@@ -82,10 +81,9 @@ class TestJaegerJsonLoader:
         path.write_text(json.dumps(minimal_jaeger_json), encoding="utf-8")
 
         trace = loader.load(str(path))[0]
-        root = trace.root_spans[0]
-        assert root.get_tag("key1") == "val1"
-        assert root.get_tag("missing") is None
-        assert root.get_tag("missing", "default") == "default"
+        root = trace.root_spans()[0]
+        assert root.attributes["key1"] == "val1"
+        assert "missing" not in root.attributes
 
     def test_invalid_format_raises(self, loader, tmp_path):
         path = tmp_path / "bad.json"
@@ -102,24 +100,6 @@ class TestJaegerJsonLoader:
         traces = loader.load(str(path))
         assert len(traces) == 0
 
-    def test_find_spans_by_operation(self, loader, minimal_jaeger_json, tmp_path):
-        path = tmp_path / "test.json"
-        path.write_text(json.dumps(minimal_jaeger_json), encoding="utf-8")
-
-        trace = loader.load(str(path))[0]
-        found = trace.find_spans_by_operation("child")
-        assert len(found) == 1
-        assert found[0].operation_name == "child_op"
-
-    def test_find_spans_by_tag(self, loader, minimal_jaeger_json, tmp_path):
-        path = tmp_path / "test.json"
-        path.write_text(json.dumps(minimal_jaeger_json), encoding="utf-8")
-
-        trace = loader.load(str(path))[0]
-        found = trace.find_spans_by_tag("key1", "val1")
-        assert len(found) == 1
-        assert found[0].span_id == "span1"
-
     @pytest.mark.skipif(
         not os.path.exists(os.path.join(SAMPLES_DIR, "helm.json")),
         reason="Sample file not available",
@@ -129,18 +109,7 @@ class TestJaegerJsonLoader:
         assert len(traces) == 1
         trace = traces[0]
         assert trace.trace_id == "3e289017fe03ffd7c4145316d2eb3d0d"
-        assert len(trace.all_spans) > 0
+        assert len(trace.spans) > 0
 
-        adk_spans = trace.find_spans_by_tag("otel.scope.name", "gcp.vertex.agent")
-        assert len(adk_spans) >= 3  # invoke_agent, call_llm x2, execute_tool
-
-    def test_span_end_time(self):
-        span = Span(
-            trace_id="t",
-            span_id="s",
-            parent_span_id=None,
-            operation_name="op",
-            start_time=1000,
-            duration=500,
-        )
-        assert span.end_time == 1500
+        adk_spans = [s for s in trace.spans.values() if s.scope.name == "gcp.vertex.agent"]
+        assert len(adk_spans) >= 3

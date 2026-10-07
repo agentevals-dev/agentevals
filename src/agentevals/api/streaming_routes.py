@@ -12,10 +12,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..config import BuiltinMetricDef, EvalParams, EvalRunConfig, EvaluatorDef
-from ..converter import convert_traces
-from ..loader.otlp import OtlpJsonLoader
-from ..runner import RunResult, run_evaluation
+from ..adk_bridge import eval_set_from_turns, load_eval_set_from_dict
+from ..config import BuiltinMetricDef, EvalParams, EvaluatorDef
+from ..genai.extract import extract_conversation
+from ..otel.encode import encode_traces
+from ..runner import RunResult, run_evaluation_from_traces
 from ..streaming.exports import EXPORT_DIR, export_name
 from ..trace_attrs import OTEL_GENAI_INPUT_MESSAGES, OTEL_GENAI_REQUEST_MODEL
 from .dependencies import require_trace_manager
@@ -68,17 +69,7 @@ async def _do_create_eval_set(
         raise HTTPException(status_code=404, detail="Session not found")
 
     try:
-        trace_file = await manager._save_spans_to_temp_file(session)
-        logger.debug(
-            "Session %s: %d spans, %d logs saved to %s",
-            request.session_id,
-            len(session.spans),
-            len(session.logs),
-            trace_file,
-        )
-        loader = OtlpJsonLoader()
-        traces = loader.load(str(trace_file))
-
+        traces = manager.session_traces(session)
         if not traces:
             raise HTTPException(
                 status_code=400,
@@ -88,47 +79,13 @@ async def _do_create_eval_set(
                     f"ensure opentelemetry-instrumentation-openai-v2 is installed."
                 ),
             )
-
-        conversion_results = convert_traces(traces)
-        if not conversion_results:
-            raise HTTPException(status_code=400, detail="Failed to convert trace")
-
-        all_invocations = []
-        for conv_result in conversion_results:
-            all_invocations.extend(conv_result.invocations)
-
-        logger.debug(f"Creating eval set from {len(all_invocations)} invocations")
-        for i, inv in enumerate(all_invocations):
-            tool_count = len(inv.intermediate_data.tool_uses) if inv.intermediate_data else 0
-            logger.debug(f"  Invocation {i}: {tool_count} tool calls")
-
-        conversation = []
-        for inv in all_invocations:
-            inv_dict = {
-                "invocation_id": inv.invocation_id,
-                "user_content": inv.user_content.model_dump(exclude_none=True) if inv.user_content else None,
-            }
-            if inv.final_response:
-                inv_dict["final_response"] = inv.final_response.model_dump(exclude_none=True)
-            if inv.intermediate_data:
-                inv_dict["intermediate_data"] = inv.intermediate_data.model_dump(exclude_none=True)
-
-            conversation.append(inv_dict)
-
-        eval_set = {
-            "eval_set_id": request.eval_set_id,
-            "eval_cases": [
-                {
-                    "eval_id": "case_1",
-                    "conversation": conversation,
-                }
-            ],
-        }
-
+        conversation = extract_conversation(traces, request.session_id)
+        if not conversation.turns:
+            raise HTTPException(status_code=400, detail="No turns found in session")
         return StandardResponse(
             data=CreateEvalSetData(
-                eval_set=eval_set,
-                num_invocations=len(all_invocations),
+                eval_set=eval_set_from_turns(request.eval_set_id, conversation.turns),
+                num_invocations=len(conversation.turns),
             )
         )
 
@@ -216,7 +173,6 @@ async def evaluate_sessions(
     if not golden_session:
         raise HTTPException(status_code=404, detail="Golden session not found")
 
-    eval_set_file = None
     try:
         eval_set_response = await _do_create_eval_set(
             CreateEvalSetRequest(
@@ -225,14 +181,8 @@ async def evaluate_sessions(
             ),
             manager,
         )
-
-        import tempfile
-
-        eval_set_file = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False, dir=str(EXPORT_DIR), encoding="utf-8"
-        )
-        json.dump(eval_set_response.data.eval_set, eval_set_file)
-        eval_set_file.close()
+        eval_set = load_eval_set_from_dict(eval_set_response.data.eval_set)
+        params = EvalParams(evaluators=request.evaluators)
 
         sessions_to_evaluate = [
             (session_id, session) for session_id, session in manager.sessions.items() if session.is_complete
@@ -245,16 +195,8 @@ async def evaluate_sessions(
         async def eval_one_session(session_id: str, session) -> tuple[SessionEvalResult, RunResult | None]:
             async with sem:
                 try:
-                    trace_file = await manager._save_spans_to_temp_file(session)
-
-                    config = EvalRunConfig(
-                        trace_files=[str(trace_file)],
-                        trace_format="otlp-json",
-                        eval_set_file=eval_set_file.name,
-                        evaluators=request.evaluators,
-                    )
-
-                    eval_result = await run_evaluation(config)
+                    traces = manager.session_traces(session)
+                    eval_result = await run_evaluation_from_traces(traces, params, eval_set, group_key=session_id)
 
                     if eval_result.trace_results:
                         trace_result = eval_result.trace_results[0]
@@ -277,9 +219,8 @@ async def evaluate_sessions(
                             ),
                             eval_result,
                         )
-                    else:
-                        logger.warning("No trace results for session %s", session_id)
-                        return SessionEvalResult(session_id=session_id, error="No trace results"), None
+                    logger.warning("No trace results for session %s", session_id)
+                    return SessionEvalResult(session_id=session_id, error="No trace results"), None
 
                 except Exception as exc:
                     logger.error(f"Failed to evaluate session {session_id}: {exc}", exc_info=True)
@@ -312,14 +253,6 @@ async def evaluate_sessions(
     except Exception as exc:
         logger.exception("Failed to evaluate sessions")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    finally:
-        # This eval set is consumed only by run_evaluation above and is never
-        # served for download, so remove it once evaluation completes.
-        if eval_set_file is not None:
-            try:
-                os.unlink(eval_set_file.name)
-            except OSError:
-                pass
 
 
 @streaming_router.post("/prepare-evaluation", response_model=StandardResponse[PrepareEvaluationData])
@@ -395,6 +328,15 @@ async def download_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(candidate, media_type="application/json", filename=filename)
+
+
+@streaming_router.get("/sessions/{session_id}/otlp")
+async def export_session_otlp(session_id: str, manager: StreamingTraceManager = Depends(require_trace_manager)) -> dict:
+    """The session's spans and joined logs as one OTLP/JSON document (``resourceSpans`` and ``resourceLogs``)."""
+    session = manager.sessions.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return encode_traces(manager.session_traces(session))
 
 
 @streaming_router.post("/get-trace", response_model=StandardResponse[GetTraceData])

@@ -152,6 +152,18 @@ def tool_responses_of(messages: Iterable[Message] | None) -> list[dict[str, Any]
     return out
 
 
+def ends_with_tool_response(messages: Iterable[Message] | None) -> bool:
+    """True when the last message returns tool results: role ``tool``, or only ``tool_call_response`` parts."""
+    items = list(messages or ())
+    if not items:
+        return False
+    last = items[-1]
+    if last.get("role") == "tool":
+        return True
+    parts = last.get("parts") or []
+    return bool(parts) and all(isinstance(p, dict) and p.get("type") == TOOL_CALL_RESPONSE for p in parts)
+
+
 def user_turn_messages(messages: Iterable[Message] | None) -> list[Message]:
     """The trailing run of user messages that carry text (tool response messages do not count)."""
     out: list[Message] = []
