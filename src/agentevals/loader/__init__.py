@@ -9,8 +9,10 @@ dispatches to the right underlying loader.
 from .auto import (
     JAEGER_JSON,
     OTLP_JSON,
+    TelemetryFile,
     detect_format,
     get_loader_for_format,
+    load_telemetry,
     load_traces,
 )
 from .base import TraceLoader
@@ -18,6 +20,8 @@ from .jaeger import JaegerJsonLoader
 from .otlp import OtlpJsonLoader
 
 __all__ = [
+    "TelemetryFile",
+    "load_telemetry",
     "JAEGER_JSON",
     "OTLP_JSON",
     "JaegerJsonLoader",

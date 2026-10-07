@@ -94,10 +94,10 @@ def _jaeger_doc() -> dict:
 
 
 class TestDetectFormat:
-    def test_jsonl_extension_implies_otlp(self):
+    def test_jsonl_extension_is_sniffed_not_trusted(self):
         path = _write_tmp("not even json", suffix=".jsonl")
         try:
-            assert detect_format(path) == "otlp-json"
+            assert detect_format(path) is None
         finally:
             os.unlink(path)
 
