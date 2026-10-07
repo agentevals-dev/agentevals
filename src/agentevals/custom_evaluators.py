@@ -388,7 +388,11 @@ async def evaluate_custom_evaluator(
             venv_python = await ensure_venv_async(evaluator_path, strict_requirements=is_remote)
         except Exception as exc:
             logger.error("Failed to set up venv for '%s': %s", evaluator_def.name, exc)
-            return MetricResult(metric_name=evaluator_def.name, error=f"Dependency installation failed: {exc}")
+            return MetricResult(
+                metric_name=evaluator_def.name,
+                error=f"Dependency installation failed: {exc}",
+                error_type=type(exc).__name__,
+            )
         if venv_python:
             runtime = PythonRuntime(python_path=venv_python)
 
@@ -408,12 +412,17 @@ async def evaluate_custom_evaluator(
         result = await backend.run(eval_input, evaluator_def.name)
     except Exception as exc:
         logger.exception("Failed to evaluate custom evaluator '%s'", evaluator_def.name)
-        return MetricResult(metric_name=evaluator_def.name, error=str(exc))
+        return MetricResult(metric_name=evaluator_def.name, error=str(exc), error_type=type(exc).__name__)
 
+    threshold = evaluator_def.threshold
     return MetricResult(
         metric_name=evaluator_def.name,
         score=result.score,
-        eval_status=_status_of(result, evaluator_def.threshold),
+        eval_status=_status_of(result, threshold),
         per_invocation_scores=list(result.per_invocation_scores),
+        per_invocation_statuses=[
+            "NOT_EVALUATED" if s is None else "PASSED" if s >= threshold else "FAILED"
+            for s in result.per_invocation_scores
+        ],
         details=result.details,
     )

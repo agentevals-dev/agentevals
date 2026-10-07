@@ -33,6 +33,10 @@ dependencies = [
     "pygments>=2.20.0",
     "requests>=2.34.2",
     "urllib3>=2.7.0",
+    "opentelemetry-sdk>=1.38",
+    "opentelemetry-exporter-otlp-proto-http>=1.38",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.38",
+    "grpcio>=1.66",
 ]
 
 [project.optional-dependencies]
@@ -42,10 +46,7 @@ live = [
     "pyjwt>=2.13.0",
     "pydantic-settings>=2.15.0",
 ]
-streaming = [
-    "opentelemetry-exporter-otlp-proto-http>=1.38",
-    "opentelemetry-sdk>=1.38",
-]
+streaming = []
 postgres = [
     "asyncpg>=0.30.0",
 ]

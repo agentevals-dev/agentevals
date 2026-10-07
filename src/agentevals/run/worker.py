@@ -20,6 +20,7 @@ from uuid import UUID
 
 from ..adk_bridge import EvalSet, load_eval_set_from_dict
 from ..config import EvalParams
+from ..otel import emit
 from ..resolvers import (
     reset_resolved_credentials,
     resolve_credential_refs,
@@ -165,7 +166,9 @@ class AsyncRunWorker:
                 config=params,
                 eval_set=eval_set,
                 trace_progress_callback=_trace_progress,
+                run_id=str(run.run_id),
             )
+        await asyncio.to_thread(emit.flush)
 
         results = build_results(run.run_id, params, run_result)
         await self._results.upsert_many(run.run_id, results)

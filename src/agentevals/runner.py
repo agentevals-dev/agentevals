@@ -24,6 +24,7 @@ from .genai.grouping import coerce_key, group_traces, has_session_name
 from .genai.matching import EVAL_CASE_ID, ExpectedConversation, select_case
 from .genai.model import Conversation
 from .loader import load_traces
+from .otel import emit
 from .otel.model import Trace
 from .trace_metrics import _calc_percentiles, extract_agent_identity, extract_performance_metrics
 
@@ -51,7 +52,9 @@ class MetricResult(BaseModel):
     score: float | None = None
     eval_status: str = "NOT_EVALUATED"
     per_invocation_scores: list[float | None] = Field(default_factory=list)
+    per_invocation_statuses: list[str] = Field(default_factory=list)
     error: str | None = None
+    error_type: str | None = None
     details: dict[str, Any] | None = None
     duration_ms: float | None = None
 
@@ -128,8 +131,14 @@ async def run_evaluation_from_traces(
     progress_callback: ProgressCallback | None = None,
     trace_progress_callback: TraceProgressCallback | None = None,
     group_key: str | None = None,
+    run_id: str | None = None,
 ) -> RunResult:
-    """Evaluate already loaded traces. ``group_key`` evaluates all of them as one conversation."""
+    """Evaluate already loaded traces. ``group_key`` evaluates all of them as one conversation.
+
+    When evaluation result events are on (:mod:`agentevals.otel.emit`), each group's results are
+    emitted as ``gen_ai.evaluation.result`` events parented to the evaluated spans; ``run_id`` is
+    attached to them when known.
+    """
     result = RunResult()
     if not traces:
         result.errors.append("No traces provided.")
@@ -162,6 +171,7 @@ async def run_evaluation_from_traces(
                 eval_semaphore=eval_semaphore,
                 progress_callback=progress_callback,
                 trace_progress_callback=trace_progress_callback,
+                run_id=run_id,
             )
 
     outcomes = await asyncio.gather(
@@ -231,6 +241,7 @@ async def _evaluate_group(
     progress_callback: ProgressCallback | None = None,
     trace_progress_callback: TraceProgressCallback | None = None,
     single_pairing: bool = False,
+    run_id: str | None = None,
 ) -> TraceResult:
     trace_result = TraceResult(trace_id=traces[0].trace_id, group_key=key, trace_ids=[t.trace_id for t in traces])
     try:
@@ -288,6 +299,18 @@ async def _evaluate_group(
             await trace_progress_callback(trace_result)
 
     await asyncio.gather(*[_run(e) for e in evaluators])
+
+    emitter = emit.get_emitter()
+    if emitter is not None:
+        emitter.emit(
+            conversation=conversation,
+            metrics=trace_result.metric_results,
+            evaluators=evaluators,
+            spans={(s.trace_id, s.span_id): s for t in traces for s in t.spans.values()},
+            eval_case_id=trace_result.eval_case_id,
+            eval_set_id=eval_set.eval_set_id if eval_set is not None else None,
+            run_id=run_id,
+        )
     return trace_result
 
 

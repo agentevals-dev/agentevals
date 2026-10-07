@@ -426,6 +426,7 @@ async def evaluate_builtin_metric(
             )
 
         per_inv_scores = [r.score for r in eval_result.per_invocation_results]
+        per_inv_statuses = [r.eval_status.name for r in eval_result.per_invocation_results]
 
         details = None
         if metric_name == "tool_trajectory_avg_score":
@@ -436,6 +437,7 @@ async def evaluate_builtin_metric(
             score=eval_result.overall_score,
             eval_status=eval_result.overall_eval_status.name,
             per_invocation_scores=per_inv_scores,
+            per_invocation_statuses=per_inv_statuses,
             details=details,
         )
 
@@ -444,4 +446,5 @@ async def evaluate_builtin_metric(
         return MetricResult(
             metric_name=metric_name,
             error=str(exc),
+            error_type=type(exc).__name__,
         )

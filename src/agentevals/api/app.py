@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from agentevals import __version__
 
+from ..otel import emit
 from ..run.service import RunService
 from ..run.sinks import log_registered_sinks
 from ..run.worker import AsyncRunWorker
@@ -72,6 +73,7 @@ def _build_lifespan():
         if log_buffer not in ae_logger.handlers:
             log_buffer.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
             ae_logger.addHandler(log_buffer)
+        emit.validate_env()
         mgr = getattr(app.state, "trace_manager", None)
         if mgr:
             mgr.start()
@@ -132,6 +134,7 @@ def _build_lifespan():
             await repos.close()
         if mgr:
             await mgr.shutdown()
+        await asyncio.to_thread(emit.shutdown)
         ae_logger.removeHandler(log_buffer)
 
     return lifespan

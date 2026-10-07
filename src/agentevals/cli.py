@@ -141,6 +141,15 @@ def main(verbose: int) -> None:
         "carries agentevals.session_name or the eval set has multi turn cases."
     ),
 )
+@click.option(
+    "--emit-otel",
+    is_flag=True,
+    help=(
+        "Emit results as OpenTelemetry gen_ai.evaluation.result log events, parented to the evaluated "
+        "spans (also AGENTEVALS_EVALUATION_EVENTS=true). The exporter is configured by the standard "
+        "OTEL_EXPORTER_OTLP_* variables."
+    ),
+)
 def run(
     trace_files: tuple[str, ...],
     eval_set: str | None,
@@ -152,6 +161,7 @@ def run(
     output: str,
     config_file: str | None,
     group_by: str | None,
+    emit_otel: bool,
 ) -> None:
     """Evaluate trace file(s) against the configured evaluators."""
     from .config import EvalRunConfig, apply_builtin_overrides, make_builtin_evaluator_entries
@@ -204,7 +214,18 @@ def run(
     if group_by is not None:
         config.group_by = group_by
 
-    result = asyncio.run(run_evaluation(config))
+    from .otel import emit
+
+    try:
+        emit.validate_env()
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+    if emit_otel:
+        emit.enable()
+    try:
+        result = asyncio.run(run_evaluation(config))
+    finally:
+        emit.shutdown()
     formatted = format_results(result, fmt=config.output_format)
     click.echo(formatted)
 
@@ -534,7 +555,9 @@ async def _run_servers(
         "log_level": log_level,
     }
 
-    mgr = LiveManager()
+    from .otel import emit
+
+    mgr = LiveManager(instance_id=emit.instance_id())
     main_app = create_app(trace_manager=mgr, enable_streaming=True)
     otlp_app = create_otlp_app(trace_manager=mgr)
 
@@ -619,6 +642,15 @@ async def _run_servers(
     help="Run in headless mode (no browser launch).",
 )
 @click.option(
+    "--emit-otel",
+    is_flag=True,
+    help=(
+        "Emit results as OpenTelemetry gen_ai.evaluation.result log events, parented to the evaluated "
+        "spans (also AGENTEVALS_EVALUATION_EVENTS=true). The exporter is configured by the standard "
+        "OTEL_EXPORTER_OTLP_* variables."
+    ),
+)
+@click.option(
     "-v",
     "--verbose",
     count=True,
@@ -633,6 +665,7 @@ def serve(
     mcp_port: int | None,
     eval_sets: str | None,
     headless: bool,
+    emit_otel: bool,
     verbose: int,
 ) -> None:
     """Start the agentevals API server.
@@ -653,6 +686,14 @@ def serve(
 
     if headless:
         os.environ["AGENTEVALS_HEADLESS"] = "1"
+    if emit_otel:
+        os.environ["AGENTEVALS_EVALUATION_EVENTS"] = "true"
+    from .otel import emit
+
+    try:
+        emit.validate_env()
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
 
     static_dir = Path(__file__).parent / "_static"
     has_ui = static_dir.is_dir() and (static_dir / "index.html").exists()
