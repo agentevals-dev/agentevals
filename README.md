@@ -6,11 +6,11 @@
   </picture>
 </p>
 
-<h1 align="center">Ship Agents Reliably</h1>
+<h1 align="center">Agent evaluation, OpenTelemetry native</h1>
 
 <p align="center">
-Benchmark your agents before they hit production.<br>
-agentevals scores performance and inference quality from OpenTelemetry traces. No re-runs, no guesswork.
+Send OTLP. Score what your agent did. Get the results back as OpenTelemetry events.<br>
+No SDK, no reruns, no platform to host.
 </p>
 
 <p align="center">
@@ -26,75 +26,48 @@ agentevals scores performance and inference quality from OpenTelemetry traces. N
 </p>
 
 <p align="center">
-  <a href="#installation">Install</a> · <a href="#quick-start">Quick Start</a> · <a href="https://github.com/agentevals-dev/agentevals/releases">Releases</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="https://discord.gg/cpveEn8Ah2">Discord</a>
+  <a href="#install">Install</a> · <a href="#quick-start">Quick start</a> · <a href="#docs">Docs</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="https://discord.gg/cpveEn8Ah2">Discord</a>
 </p>
 
 ---
 
 ## What is agentevals?
 
-agentevals is a framework-agnostic evaluation solution that scores AI agent behavior directly from [OpenTelemetry](https://opentelemetry.io/) traces. Record your agent's actions once, then evaluate as many times as you want without re-executing or burning extra tokens.
+agentevals scores AI agent behavior from the OpenTelemetry telemetry your agent already produces. It is an OTLP destination like any tracing backend: point an exporter or a Collector at it, and it turns GenAI spans and log events into turns, tool calls, tokens and answers, then scores them against a golden eval set. Results can flow back into your pipeline as `gen_ai.evaluation.result` events.
 
-It works with any OTel-instrumented framework (LangChain, Strands, Google ADK, OpenAI Agents SDK, and others), supports Jaeger JSON and native OTLP trace formats, and ships with built-in evaluators, custom evaluator support, and LLM-based judges.
+* **Standard telemetry in.** OTLP over HTTP and gRPC, live or from files. Any producer that follows the [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) works: Google ADK, Strands, LangChain, OpenAI Agents SDK, Pydantic AI and the official OpenTelemetry GenAI instrumentations.
+* **Standard events out.** One `gen_ai.evaluation.result` log event per metric and turn, parented to the evaluated span, ready for your backend to query, alert on or turn into metrics.
+* **No reruns.** Scoring reads recorded telemetry, so an evaluation costs no agent tokens and can be repeated on the same run.
+* **Gates and judges.** Tool trajectory and response matching for deterministic pass/fail, LLM judges and rubrics for quality, custom evaluators in any language.
+* **Local first.** One `pip install`. CLI for CI, web UI for inspection, MCP server for assistants, Helm chart for Kubernetes.
 
-- **No re-execution**: score agents from existing traces without replaying expensive LLM calls
-- **Golden eval sets**: compare actual behavior against defined expected behaviors for deterministic pass/fail gating
-- **Custom evaluators**: write scoring logic in Python, JavaScript, or any language
-- **CI/CD ready**: gate deployments on quality thresholds directly in your pipeline
-- **Local-first**: no cloud dependency required; everything runs on your machine
-- **Multiple interfaces**: CLI for scripting and CI, Web UI for visual inspection, MCP server for conversational evaluation, Helm chart for Kubernetes environments
+```mermaid
+flowchart LR
+    A[Agent with OTel instrumentation] -->|OTLP| C[OpenTelemetry Collector]
+    C --> B[Your tracing backend]
+    C --> E[agentevals]
+    E -->|gen_ai.evaluation.result| C
+```
+
+The Collector is optional. An agent can export straight to agentevals.
 
 > [!IMPORTANT]
 > This project is under active development. Expect breaking changes.
 
-## Contents
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Use-cases and Integrations](#use-cases-and-integrations)
-- [CLI](#cli)
-- [Custom Evaluators](#custom-evaluators)
-- [Web UI](#web-ui)
-- [Deployment](#deployment)
-- [MCP Server](#mcp-server)
-- [Claude Code Skills](#claude-code-skills)
-- [Examples](#examples)
-- [Docs](#docs)
-- [Development](#development)
-- [FAQ](#faq)
-
-## Installation
-
-**From PyPI** (recommended): the published package includes the **CLI**, **REST API**, and **embedded web UI**.
+## Install
 
 ```bash
-pip install agentevals-cli
+pip install agentevals-cli                 # CLI, REST API, OTLP receivers, embedded web UI
+pip install "agentevals-cli[live]"         # adds the MCP server
 ```
 
-Optional extras:
+From a clone: `uv sync`, then use `uv run agentevals`. See [DEVELOPMENT.md](DEVELOPMENT.md).
 
-```bash
-pip install "agentevals-cli[live]"        # MCP server support
-```
+## Quick start
 
-**GitHub [releases](../../releases)** also ship **core** wheels (CLI and API only) and **bundle** wheels (with the embedded UI) if you need a specific version or offline `pip install ./path/to.whl`.
+### Score recorded traces
 
-**From source** with `uv` or Nix:
-
-```bash
-uv sync
-# or: nix develop .
-```
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions.
-
-## Quick Start
-
-Examples use `agentevals` on your PATH after `pip install agentevals-cli`. If you are working from a clone of this repo, use `uv run agentevals` instead.
-
-The `samples/` directory includes real traces from a Kubernetes Helm agent and matching eval sets that define expected behavior (which tools should be called, what the response should contain).
-
-**Score a trace against an eval set:**
+`samples/` holds traces from a Kubernetes Helm agent and eval sets that describe the expected behavior.
 
 ```bash
 agentevals run samples/helm.json \
@@ -102,17 +75,17 @@ agentevals run samples/helm.json \
   -m tool_trajectory_avg_score
 ```
 
-The agent was asked to list Helm releases. The eval set expects a call to `helm_list_releases`. It matches:
+The eval set expects a call to `helm_list_releases`, and the trace has one:
 
 ```
 Trace: 3e289017fe03ffd7c4145316d2eb3d0d
 Invocations: 1
         Metric                       Score  Status      Per-Invocation  Time
 ------  -------------------------  -------  --------  ----------------  ------
-[PASS]  tool_trajectory_avg_score        1  PASSED                   1  0ms
+[PASS]  tool_trajectory_avg_score        1  PASSED                   1  5ms
 ```
 
-**Catch a mismatch.** Run a different trace against the same eval set:
+A trace from a session that never called the tool fails, and the output says why:
 
 ```bash
 agentevals run samples/k8s.json \
@@ -120,10 +93,8 @@ agentevals run samples/k8s.json \
   -m tool_trajectory_avg_score
 ```
 
-This trace is from a different agent session that never called the expected tool. The evaluation fails:
-
 ```
-[FAIL]  tool_trajectory_avg_score        0  FAILED                   0  0ms
+[FAIL]  tool_trajectory_avg_score        0  FAILED                   0  1ms
   Invocation 1 trajectory mismatch:
     Expected:
       - helm_list_releases({})
@@ -131,36 +102,9 @@ This trace is from a different agent session that never called the expected tool
       (none)
 ```
 
-**Evaluate multiple dimensions at once:**
+Add `-m response_match_score` to check the final answer as well, `--output json` for machine readable results, and `--emit-otel` to send the results into your pipeline.
 
-```bash
-agentevals run samples/helm_3.json \
-  --eval-set samples/evalset_helm_3_2026-02-23.json \
-  -m tool_trajectory_avg_score \
-  -m response_match_score
-```
-
-`tool_trajectory_avg_score` checks whether the right tools were called. `response_match_score` checks whether the agent's final answer matches the expected response.
-
-**Explore visually.** Launch the Web UI and upload traces from the browser:
-
-```bash
-agentevals serve
-# opens http://localhost:8001
-```
-
-You can also point any OTel-instrumented agent directly at the built-in receiver (`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`). The UI streams tool calls, inputs, and outputs live as your agent runs. For production setups, the same receiver slots into a Kubernetes OTel Collector pipeline as an exporter destination. See [Use-cases and Integrations](#use-cases-and-integrations) and the [Kubernetes example](examples/kubernetes/README.md) for walkthroughs.
-
-**Next steps:**
-
-- `agentevals evaluator list` to see all built-in and community evaluators
-- [Custom Evaluators](#custom-evaluators) to write your own scoring logic
-
-## Use-cases and Integrations
-
-### Zero-Code (Recommended)
-
-Point any OTel-instrumented agent at the agentevals receiver. No SDK, no code changes:
+### Evaluate a live agent
 
 ```bash
 # Terminal 1
@@ -172,20 +116,27 @@ export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent,service.instan
 python your_agent.py
 ```
 
-For OTLP/gRPC exporters, use:
+Sessions appear in the UI at `http://localhost:8001` as the agent runs, with tool calls, inputs and outputs, and can be evaluated there. For gRPC exporters use port 4317 with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`.
+
+Sessions are grouped by `agentevals.session_name`, then `gen_ai.conversation.id`, then `session.id`. `service.instance.id` tells a rerun from the next turn. Set `agentevals.eval_set_id` to associate a session with an eval set.
+
+Per producer settings, such as turning on message content capture, are in [OpenTelemetry Compatibility](docs/otel-compatibility.md). Working setups for each framework are in [examples/zero-code-examples/](examples/zero-code-examples/).
+
+### Send results back to your pipeline
 
 ```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+agentevals run trace.json --eval-set eval_set.json -m tool_trajectory_avg_score --emit-otel
 ```
 
-Traces stream to the UI in real time. Works with LangChain, Strands, Google ADK, OpenAI Agents SDK, or any framework that emits OTel GenAI spans (`http/protobuf`, `http/json` and gRPC, gzip supported). Sessions are grouped by `agentevals.session_name` (or `gen_ai.conversation.id` / `session.id`); `service.instance.id` tells a rerun from the next turn. Set `agentevals.eval_set_id` to associate traces with an eval set. Per framework settings: [OpenTelemetry Compatibility](docs/otel-compatibility.md).
+The exporter is configured by the standard `OTEL_EXPORTER_OTLP_*` variables. `agentevals serve --emit-otel` does the same for evaluations started from the UI and the API. Collector recipes for forwarding telemetry to agentevals and for routing the results are in [OpenTelemetry Pipelines](docs/opentelemetry-pipeline.md).
 
-See [examples/zero-code-examples/](examples/zero-code-examples/) for working examples.
+## What agentevals reads
 
-### AgentEvals SDK
+Turns come from `invoke_agent` spans, tool calls from `execute_tool` spans, tokens and the model from model call spans, and messages from `gen_ai.input.messages` and `gen_ai.output.messages` as span attributes, span events or log events. Google ADK's `gcp.vertex.agent.*` attributes are read as well. Files can be OTLP JSON, Jaeger JSON or Collector `file` exporter output. Details, including what is ignored and the receiver limits: [OpenTelemetry Compatibility](docs/otel-compatibility.md).
 
-For programmatic session lifecycle and decorator API:
+## SDK (optional)
+
+The Python SDK wraps the OTel boilerplate in a session when you want the session name, eval set and run id set from code:
 
 ```python
 from agentevals import AgentEvals
@@ -196,38 +147,15 @@ with app.session(eval_set_id="my-eval"):
     agent.invoke("Roll a 20-sided die for me")
 ```
 
-The session's spans and GenAI log events go to the agentevals receiver over OTLP, tagged with the session name, eval set id and a run id; your own exporters are not affected. The SDK sends to `http://localhost:4318`, or to `endpoint=` / `AGENTEVALS_OTLP_ENDPOINT`, and never reads `OTEL_EXPORTER_OTLP_*`, so credentials meant for another backend are not sent to agentevals. Entering a session raises `ConnectionError` if the receiver is not reachable. See [examples/sdk_example/](examples/sdk_example/) for framework specific patterns.
+Spans and GenAI log events produced inside the session go to agentevals over OTLP. Your own exporters are untouched, and the SDK never reads `OTEL_EXPORTER_OTLP_*`, so credentials for another backend are not sent to agentevals. Endpoint: `endpoint=` or `AGENTEVALS_OTLP_ENDPOINT`, default `http://localhost:4318`. See [examples/sdk_example/](examples/sdk_example/).
 
-## CLI
+## Custom evaluators
 
-```bash
-# Multiple traces, JSON output
-agentevals run samples/helm.json samples/k8s.json \
-  --eval-set samples/eval_set_helm.json \
-  -m tool_trajectory_avg_score \
-  --output json
-
-# List available evaluators
-agentevals evaluator list
-
-# Flexible trajectory matching (EXACT | IN_ORDER | ANY_ORDER)
-agentevals run trace.json \
-  --eval-set eval_set.json \
-  -m tool_trajectory_avg_score \
-  --trajectory-match-type IN_ORDER
-```
-
-Run `agentevals run --help` for all options.
-
-## Custom Evaluators
-
-Write scoring logic in Python, JavaScript, or any language. Scaffold a new evaluator with:
+An evaluator is any program that reads JSON from stdin and writes a score to stdout. Scaffold one and reference it next to the built in metrics:
 
 ```bash
 agentevals evaluator init my_evaluator
 ```
-
-Reference it alongside built-in metrics in an eval config:
 
 ```yaml
 evaluators:
@@ -239,25 +167,17 @@ evaluators:
     threshold: 0.7
 ```
 
-Evaluators with a `requirements.txt` get automatic virtual environment management. You can also use `type: remote` for community evaluators from GitHub.
+`type: remote` pulls community evaluators from GitHub. Protocol, SDK helpers and runtimes: [Custom Evaluators](docs/custom-evaluators.md).
 
-See the [Custom Evaluators guide](docs/custom-evaluators.md) for the full protocol reference, SDK helpers, and how to contribute evaluators.
+## Run it
 
-## Web UI
+**CLI.** `agentevals run --help` lists everything: multiple traces, `--group-by trace|conversation`, `--trajectory-match-type`, judge model selection and eval config files. `agentevals evaluator list` shows built in and community evaluators.
 
-```bash
-agentevals serve            # bundled UI on http://localhost:8001
-```
+**Web UI.** `agentevals serve` on `http://localhost:8001`. Upload traces and eval sets, pick evaluators, inspect span trees, watch live sessions. API docs at `/docs`.
 
-Upload traces and eval sets, select evaluators, and view results with interactive span trees. Live-streamed traces appear in the "Local Dev" tab, grouped by session ID. With the Postgres backend enabled, the "Run History" tab persists every evaluation and lets you group and trend runs by eval set or agent over time; see the [Run History guide](docs/run-history.md). For running from source, see [DEVELOPMENT.md](DEVELOPMENT.md).
+**MCP server.** `agentevals mcp` exposes `list_metrics`, `evaluate_traces`, `list_sessions`, `summarize_session` and `evaluate_sessions` to MCP clients. A `.mcp.json` at the repo root lets Claude Code pick it up, and the `/eval` and `/inspect` skills in `.claude/skills/` build on it.
 
-Interactive API docs are available at `/docs` (Swagger) and `/redoc` while the server is running. The OTLP receiver on port 4318 serves its own docs at `http://localhost:4318/docs`.
-
-## Deployment
-
-### Docker
-
-A `Dockerfile` is included at the project root. The image bundles the API, web UI, and OTLP receiver:
+**Docker.**
 
 ```bash
 docker build -t agentevals .
@@ -271,171 +191,77 @@ docker run -p 8001:8001 -p 4317:4317 -p 4318:4318 agentevals
 | 4318 | OTLP HTTP receiver (traces and logs) |
 | 8080 | MCP (Streamable HTTP) |
 
-### Helm
-
-The Helm chart is published as an OCI artifact to GitHub Container Registry:
+**Helm.**
 
 ```bash
 helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals
 ```
 
-Pass `--version <x.y.z>` to pin to a specific release. Available versions are listed under [packages](https://github.com/agentevals-dev/agentevals/pkgs/container/agentevals%2Fhelm%2Fagentevals).
-
-The source for the chart lives in [`charts/agentevals/`](charts/agentevals/) if you want to install from a local checkout instead.
-
-See the [Kubernetes example](examples/kubernetes/README.md) for an end-to-end walkthrough deploying agentevals alongside kagent and an OTel Collector on Kubernetes.
-
-#### Postgres backend (`/api/runs`)
-
-> **Preview.** Persisting evaluations and exploring them in the UI works end
-> to end (see the [Run History guide](docs/run-history.md)), but the storage
-> layer is still stabilizing. The `storage.*` and `database.postgres.*` chart
-> values, the `/api/runs` HTTP surface, and the database schema may change
-> incompatibly in upcoming releases. Operators evaluating this feature should
-> plan to recreate the agentevals schema when upgrading between minor versions.
-> Default in-memory mode is unaffected.
-
-By default the chart deploys agentevals with an in-memory backend; runs and results are not persisted. To enable the async `POST /api/runs` pipeline with durable Postgres-backed state:
-
-```bash
-# Bundled Postgres (dev / evaluation only):
-helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals \
-    --set storage.backend=postgres \
-    --set database.postgres.bundled.enabled=true
-
-# Or supply an external Postgres DSN:
-helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals \
-    --set storage.backend=postgres \
-    --set database.postgres.url='postgresql://user:pass@host:5432/dbname'
-```
-
-When `storage.backend=postgres` the app applies any pending schema migrations on startup (advisory-lock protected, safe across replicas) and starts an in-process worker that processes the run queue. Without `storage.backend=postgres` the `/api/runs` endpoints return 503 with a hint pointing at the env var.
-
-Persisted runs power the **Run History** view in the UI, where you can group and trend evaluations by eval set or agent and drill into per-run detail. See the [Run History guide](docs/run-history.md) for the full feature walkthrough and local-dev setup.
-
-## MCP Server
-
-Exposes evaluation tools to MCP clients. A `.mcp.json` at the project root lets Claude Code pick it up automatically.
-
-| Tool | Requires `serve` | Description |
-|------|:---:|-------------|
-| `list_metrics` | yes | List available metrics |
-| `evaluate_traces` | no | Evaluate local trace files (OTLP or Jaeger) |
-| `list_sessions` | yes | List streaming sessions |
-| `summarize_session` | yes | Structured summary of a session's tool calls |
-| `evaluate_sessions` | yes | Evaluate sessions against a golden reference |
-
-```bash
-# Custom server URL (requires pip install "agentevals-cli[live]")
-AGENTEVALS_SERVER_URL=http://localhost:9000 agentevals mcp
-```
-
-The React UI and MCP server share the same in-memory session state and can run simultaneously.
-
-## Claude Code Skills
-
-Two slash-command workflows in `.claude/skills/`, available automatically in this repo:
-
-| Skill | What it does |
-|-------|-------------|
-| `/eval` | Score traces or compare sessions against a golden reference |
-| `/inspect` | Turn-by-turn narrative of a live session with anomaly detection |
+The chart runs in memory by default. `--set storage.backend=postgres` with a bundled or external Postgres enables the async `/api/runs` pipeline and the Run History view. That storage layer is a preview and its schema may change between minor versions. See [Run History](docs/run-history.md) and the [Kubernetes example](examples/kubernetes/README.md) for a full walkthrough with kagent and an OpenTelemetry Collector.
 
 ## Examples
 
-Working examples are in the [`examples/`](examples/) directory:
-
-| Example | Description |
-|---------|-------------|
-| [ADK](examples/zero-code-examples/adk/) | Google ADK agent with zero-code OTel export |
-| [LangChain](examples/zero-code-examples/langchain/) | LangChain agent with zero-code OTel export |
-| [Strands](examples/zero-code-examples/strands/) | Strands SDK agent with zero-code OTel export |
-| [OpenAI Agents](examples/zero-code-examples/openai-agents/) | OpenAI Agents SDK with zero-code OTel export |
-| [Ollama](examples/zero-code-examples/ollama/) | LangChain + Ollama for local LLM evaluation |
-| [Kubernetes](examples/kubernetes/) | End-to-end deployment with kagent and OTel Collector |
+| Example | What it shows |
+|---------|---------------|
+| [ADK](examples/zero-code-examples/adk/) | Google ADK agent, standard OTLP export |
+| [LangChain](examples/zero-code-examples/langchain/) | LangChain agent, OTLP traces and logs |
+| [Strands](examples/zero-code-examples/strands/) | Strands agent, standard OTLP export |
+| [OpenAI Agents](examples/zero-code-examples/openai-agents/) | OpenAI Agents SDK, standard OTLP export |
+| [Pydantic AI](examples/zero-code-examples/pydantic-ai/) | Pydantic AI agent, standard OTLP export |
+| [Ollama](examples/zero-code-examples/ollama/) | LangChain with a local model |
+| [SDK sessions](examples/README.md#sdk-integration) | LangChain, Strands and ADK agents through `AgentEvals` sessions |
+| [Kubernetes](examples/kubernetes/) | agentevals with kagent and an OpenTelemetry Collector |
 
 ## Docs
 
 | Guide | Description |
 |-------|-------------|
-| [Eval Set Format](docs/eval-set-format.md) | Schema, field reference, and examples for golden eval set JSON files |
-| [Custom Evaluators](docs/custom-evaluators.md) | Write your own scoring logic in Python, JavaScript, or any language |
-| [OpenTelemetry Pipelines](docs/opentelemetry-pipeline.md) | Collector recipes, and evaluation results as OpenTelemetry events |
-| [Run History](docs/run-history.md) | Persisting evaluations to Postgres and exploring them over time in the UI |
-| [OpenTelemetry Compatibility](docs/otel-compatibility.md) | What to send, per framework setup, live sessions and evaluating them, receiver limits |
+| [OpenTelemetry Compatibility](docs/otel-compatibility.md) | What to send, per framework setup, sessions, receiver limits |
+| [OpenTelemetry Pipelines](docs/opentelemetry-pipeline.md) | Collector recipes and evaluation results as OpenTelemetry events |
+| [Eval Set Format](docs/eval-set-format.md) | Schema and examples for golden eval sets |
+| [Custom Evaluators](docs/custom-evaluators.md) | Write scoring logic in any language |
+| [Run History](docs/run-history.md) | Persist evaluations to Postgres and trend them in the UI |
 
 ## Development
 
 ```bash
-uv run pytest                      # run tests
+uv run pytest                      # tests
 uv run agentevals serve --dev      # backend
-cd ui && npm run dev               # frontend (separate terminal)
+cd ui && npm run dev               # frontend, separate terminal
 ```
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for build tiers, Makefile targets, and Nix setup. To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
+See [DEVELOPMENT.md](DEVELOPMENT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## FAQ
 
-**Do I need a database or any infrastructure to run agentevals?**
+**Do I need a database or any infrastructure?**
 
-No. agentevals is a single `pip install` with no database, no message queue, and no external services. The CLI evaluates trace files directly from disk. The web UI and live streaming use in-memory session state.
+No. The CLI evaluates trace files from disk. The server keeps live sessions in memory. Postgres is optional and only backs run history.
 
-**Does the CLI require a running server?**
+**Does the CLI need a running server?**
 
-No. `agentevals run` evaluates trace files entirely offline. The server (`agentevals serve`) is only needed for the web UI, live OTLP streaming, and server-dependent MCP tools like `list_sessions`.
+No. `agentevals run` works offline. The server is for the web UI, live OTLP sessions and the MCP tools that read sessions.
 
-**Can I use agentevals in CI/CD?**
+**Can I use it in CI?**
 
-Yes. Pass trace files and an eval set, set a threshold, and let the exit code gate your deployment. Combine with `--output json` for machine-readable results. No server process needed.
+Yes. Pass trace files and an eval set, set a threshold, and let the exit code gate the deployment. `--output json` gives machine readable results.
 
-**What if I switch agent frameworks?**
+**Can I plug it into an existing OpenTelemetry pipeline?**
 
-Because agentevals uses OpenTelemetry as its universal interface, switching frameworks does not require changing your evaluation setup. As long as your new framework emits OTel spans, the same eval sets and metrics work as before.
+Yes. agentevals accepts OTLP over HTTP (`http/protobuf` and `http/json`, gzip included) and gRPC, so a default Collector exporter works. With `--emit-otel` it sends evaluation results back as `gen_ai.evaluation.result` events. See [OpenTelemetry Pipelines](docs/opentelemetry-pipeline.md).
 
-**Can I write evaluators in my own language?**
+**Can I evaluate Claude Code, Codex or OpenCode?**
 
-Yes. A custom evaluator is any program that reads JSON from stdin and writes a score to stdout. Python and JavaScript have first-class scaffolding support (`agentevals evaluator init`), but any language works.
+Not today. They do not emit GenAI semantic convention spans. agentevals is built for instrumented agents whose success is measurable through tool trajectories and responses, not for scoring long coding sessions end to end.
 
-**Can I plug agentevals into an existing OTel pipeline?**
+**How is this different from LangSmith, Langfuse, Opik or Bedrock AgentCore evaluation?**
 
-Yes. agentevals is an OTLP destination like any other: HTTP on port 4318 (`http/protobuf` or `http/json`, gzip included, so a default Collector exporter works) and gRPC on port 4317. It can also send its evaluation results back into your pipeline as `gen_ai.evaluation.result` events (`--emit-otel`). See [OpenTelemetry Pipelines](docs/opentelemetry-pipeline.md) and the [Kubernetes example](examples/kubernetes/README.md).
-
-**Can I use agentevals to evaluate Claude Code, Codex, or OpenCode?**
-
-Not today. agentevals scores agent behavior from OpenTelemetry GenAI traces (spans for model calls, tool calls, agent invocations following the [OTel GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)). The major coding agents do not currently emit telemetry in that shape:
-
-- **Claude Code** ships OTel telemetry as logs, not GenAI spans. A prior proof of concept on a feature branch made it work by stitching hook events into synthetic traces. Reviving that path is on the backlog, not a near-term commitment.
-- **Codex** exposes OTel, but in a different shape we have not yet validated against the GenAI semconv.
-- **OpenCode** did not have OTel support merged the last time we checked.
-
-Retrofitting agentevals to ingest each harness's bespoke telemetry is multiple thousands of lines of glue code per agent, for a use case where the dominant signal is "did the final output feel right," not "did the agent call the right tool with the right arguments in the right order." That kind of vibes evaluation is interesting work for harness and coding-agent vendors themselves, but it is not what agentevals is optimized for.
-
-agentevals is built for the opposite end of the spectrum: smaller, purpose-built, properly instrumented agents (kagent, agentregistry, custom Strands / ADK / LangChain / OpenAI Agents SDK flows) running in cloud native environments, where success is measurable through tool trajectories, response matching, and deterministic pass/fail gates. If that is your use case, we are a good fit. If you are evaluating long-running coding sessions end to end, you probably want a tool built specifically for that shape.
+Those run your agent again against a dataset, or need their own SDK and storage before anything can be scored. agentevals scores the OpenTelemetry telemetry you already have, from any instrumentation, without rerunning the agent and without a platform to host.
 
 **How does this compare to ADK's evaluations?**
 
-Unlike ADK's eval method, which couples agent execution with evaluation, agentevals only handles scoring: it takes pre-recorded traces and compares them against expected behavior using metrics like tool trajectory matching, response quality, and LLM-based judgments.
-
-However, if you're iterating on your agents locally, you can point your agents to agentevals and you will see rich runtime information in your browser. For more details, use the bundled wheel and explore the Local Development option in the UI.
-
-**How does this compare to Bedrock AgentCore's evaluation?**
-
-AgentCore's evaluation integration (via `strands-agents-evals`) also couples agent execution with evaluation. It re-invokes the agent for each test case, converts the resulting OTel spans to AWS's ADOT format, and scores them against 4 built-in evaluators (Helpfulness, Accuracy, Harmfulness, Relevance) via a cloud API call. This means you need an AWS account, valid credentials, and network access for every evaluation.
-
-agentevals scores pre-recorded traces locally without re-running anything. It works with standard Jaeger JSON and OTLP formats from any framework, supports open-ended metrics (tool trajectory matching, LLM-based judges, custom scorers), and ships with a CLI, web UI, and MCP server. No cloud dependency required, though we do include all ADK's GCP-based evals as of now.
-
-**How does this compare to LangSmith?**
-
-LangSmith is a cloud platform (self-hosting requires an Enterprise plan) where offline evaluation re-executes your application against curated datasets. Its deepest integration is with LangChain/LangGraph, though it can work with other frameworks. agentevals scores pre-recorded OTel traces without re-execution, requires no cloud account or enterprise license, and uses OpenTelemetry as the universal interface rather than a proprietary SDK.
-
-**How does this compare to Langfuse?**
-
-Langfuse is a full observability platform (requires Postgres, ClickHouse, Redis, and S3 for self-hosting) that supports both offline experiments (re-execution) and online evaluation of ingested traces. Traces must be ingested into Langfuse first via its SDK or OTel integration before they can be scored. agentevals evaluates raw OTel trace files or live OTLP streams directly with no database or platform infrastructure required.
-
-**How does this compare to Opik?**
-
-Opik's primary evaluation path re-runs your application code against a dataset, incurring additional LLM costs per eval run. It also supports online evaluation rules that auto-score production traces. While Opik supports OpenTelemetry ingestion alongside its own SDK, its evaluation workflow still centers on re-execution against datasets. agentevals evaluates pre-recorded OTel traces from any framework without re-execution, and runs entirely locally with no cloud dependency.
+ADK eval runs the agent and scores it in one step. agentevals only scores, from telemetry, and uses ADK's metrics and eval set format to do it. Point an ADK agent at agentevals and you get live inspection and scoring without changing the agent.
 
 ## Acknowledgements
 
-agentevals is built on top of [Google's Agent Development Kit](https://github.com/google/adk-python). ADK provides the evaluator protocol and the canonical eval data model (`Invocation`, `EvalSet`, `Evaluator`, prebuilt metrics) that this project extends. `google-adk` is licensed under [Apache 2.0](https://github.com/google/adk-python/blob/main/LICENSE), the same license as agentevals. Thanks to the ADK team and contributors.
+The built in metrics and the eval set format come from [Google's Agent Development Kit](https://github.com/google/adk-python), licensed under [Apache 2.0](https://github.com/google/adk-python/blob/main/LICENSE) like agentevals. Thanks to the ADK team and contributors.
