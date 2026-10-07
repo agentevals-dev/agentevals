@@ -620,7 +620,7 @@ def _maybe_continues(previous: Turn, turn: Turn) -> bool:
 def _merge(previous: Turn, turn: Turn) -> Turn:
     calls = sorted([*previous.llm_calls, *turn.llm_calls], key=lambda c: (c.start_ns, c.end_ns))
     warnings = [*previous.warnings, *turn.warnings]
-    span_tools = [t for t in (*previous.tool_calls, *turn.tool_calls) if t.ref is not None]
+    span_tools = [t.model_copy() for t in (*previous.tool_calls, *turn.tool_calls) if t.ref is not None]
     if span_tools:
         tools = span_tools
         _fill_from_parts(tools, calls, warnings)
@@ -667,10 +667,11 @@ def _join_continuations(turns: list[Turn]) -> list[Turn]:
             out[-1] = _merge(out[-1], turn)
             continue
         if out and _maybe_continues(out[-1], turn):
-            turn.warnings.append(
+            warning = (
                 f"turn {turn.ref.span_id} may continue turn {out[-1].ref.span_id} after a tool call, "
                 "but message content was not captured; kept as its own turn"
             )
+            turn = turn.model_copy(update={"warnings": [*turn.warnings, warning]})
         out.append(turn)
     return out
 
@@ -678,16 +679,23 @@ def _join_continuations(turns: list[Turn]) -> list[Turn]:
 def extract_conversation(traces: Iterable[Trace], key: str | None = None) -> Conversation:
     """All turns of ``traces`` in start time order, indexed, with tool round continuations joined."""
     traces = list(traces)
-    turns = [t for trace in traces for t in extract_turns(trace)]
+    return conversation_from_turns(traces, [extract_turns(t) for t in traces], key)
+
+
+def conversation_from_turns(
+    traces: Sequence[Trace], turns_per_trace: Iterable[Sequence[Turn]], key: str | None = None
+) -> Conversation:
+    """Join already extracted per trace turns into a conversation. The input turns are never mutated,
+    so callers may memoize :func:`extract_turns` per trace."""
+    traces = list(traces)
+    turns = [t for per_trace in turns_per_trace for t in per_trace]
     turns.sort(key=lambda t: (t.start_ns, t.ref.span_id))
-    turns = _join_continuations(turns)
-    for i, turn in enumerate(turns):
-        turn.index = i
+    turns = [t.model_copy(update={"index": i}) for i, t in enumerate(_join_continuations(turns))]
     conversation_id = next((t.conversation_id for t in turns if t.conversation_id), None)
-    trace_ids = sorted(
-        {t.trace_id for t in traces},
-        key=lambda tid: next(tr.start_time_unix_nano for tr in traces if tr.trace_id == tid),
-    )
+    starts: dict[str, int] = {}
+    for trace in traces:
+        starts.setdefault(trace.trace_id, trace.start_time_unix_nano)
+    trace_ids = sorted(starts, key=starts.__getitem__)
     return Conversation(
         key=key or (traces[0].trace_id if traces else ""),
         conversation_id=conversation_id,

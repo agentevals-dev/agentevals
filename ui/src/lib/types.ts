@@ -89,6 +89,8 @@ export interface TraceConversionMetadata {
 
 export interface TraceConversionEntry {
   traceId: string;
+  /** Every trace this entry covers; more than one when traces are grouped into a conversation. */
+  traceIds?: string[];
   invocations: Invocation[];
   warnings: string[];
   metadata: TraceConversionMetadata;
@@ -144,6 +146,8 @@ export interface PerformanceMetrics {
 
 export interface TraceResult {
   traceId: string;
+  /** Every trace of the evaluation group; ``traceId`` is the earliest. */
+  traceIds?: string[];
   sessionId?: string;
   numInvocations: number;
   metricResults: MetricResult[];

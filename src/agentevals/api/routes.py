@@ -31,6 +31,7 @@ from ..resolvers import (
 )
 from ..runner import (
     RunResult,
+    evaluation_groups,
     load_eval_set,
     load_eval_set_from_dict,
     run_evaluation,
@@ -126,13 +127,30 @@ def _camel_keys(obj: Any) -> Any:
     return obj
 
 
-def _trace_views(trace) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Performance metrics and metadata of one trace, as camelCase wire dicts."""
-    conversation = extract_conversation([trace], trace.trace_id)
+def _group_views(key: str, traces: list) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Performance metrics and metadata of one evaluation group, as camelCase wire dicts."""
+    conversation = extract_conversation(traces, key)
     return (
-        _camel_keys(extract_performance_metrics(conversation, [trace])),
-        _camel_keys(extract_trace_metadata([trace], conversation)),
+        _camel_keys(extract_performance_metrics(conversation, traces)),
+        _camel_keys(extract_trace_metadata(traces, conversation)),
     )
+
+
+def _performance_events(traces: list, group_by: str, eval_set) -> list[str]:
+    """One early ``performance_metrics`` event per evaluation group, keyed by the group's trace id."""
+    events = []
+    for key, members in evaluation_groups(traces, group_by, eval_set):
+        try:
+            perf_metrics, trace_metadata = _group_views(key, members)
+            evt = SSEPerformanceMetricsEvent(
+                trace_id=members[0].trace_id,
+                performance_metrics=perf_metrics,
+                trace_metadata=trace_metadata,
+            )
+            events.append(f"event: performance_metrics\ndata: {evt.model_dump_json(by_alias=True)}\n\n")
+        except Exception as e:
+            logger.error(f"Failed to extract early performance metrics for {key}: {e}")
+    return events
 
 
 def _safe_upload_path(temp_dir: str, filename: str, idx: int = 0) -> str:
@@ -431,8 +449,16 @@ def _serialize_invocation(inv) -> dict[str, Any]:
 async def convert_trace_files(
     trace_files: list[UploadFile] = File(...),
     trace_format: str | None = Form(None),
+    group_by: str = Form("trace"),
 ):
-    """Convert trace files to invocations and metadata without running evaluation."""
+    """Convert trace files to invocations and metadata without running evaluation.
+
+    One entry per trace by default. ``group_by`` (``conversation`` or ``auto``, with the evaluation
+    meaning) returns one entry per evaluation group instead, keyed by the group's earliest trace
+    and listing its members in ``traceIds``, so a client can show what an evaluation will score.
+    """
+    if group_by not in ("trace", "conversation", "auto"):
+        raise HTTPException(status_code=400, detail="group_by must be one of trace, conversation, auto")
     temp_dir = tempfile.mkdtemp()
     try:
         saved_files: list[tuple[str, str]] = []  # (path, original_filename)
@@ -485,11 +511,12 @@ async def convert_trace_files(
             raise HTTPException(status_code=400, detail=detail)
 
         entries: list[TraceConversionEntry] = []
-        for trace in all_traces:
-            conversation = extract_conversation([trace], trace.trace_id)
+        for key, members in evaluation_groups(all_traces, group_by):
+            first = members[0]
+            conversation = extract_conversation(members, key)
             invocations = [_serialize_invocation(inv) for inv in to_adk_invocations(conversation.turns)]
-            warnings = list(trace.warnings) + [w for t in conversation.turns for w in t.warnings]
-            meta_dict = extract_trace_metadata([trace], conversation)
+            warnings = [w for t in members for w in t.warnings] + [w for t in conversation.turns for w in t.warnings]
+            meta_dict = extract_trace_metadata(members, conversation)
             meta = TraceConversionMetadata(
                 agent_name=meta_dict.get("agent_name"),
                 model=meta_dict.get("model"),
@@ -497,11 +524,12 @@ async def convert_trace_files(
                 start_time=meta_dict.get("start_time"),
                 user_input_preview=meta_dict.get("user_input_preview"),
                 final_output_preview=meta_dict.get("final_output_preview"),
-                session_name=_session_name_from_filename(trace_to_filename.get(trace.trace_id, "")),
+                session_name=_session_name_from_filename(trace_to_filename.get(first.trace_id, "")),
             )
             entries.append(
                 TraceConversionEntry(
-                    trace_id=trace.trace_id,
+                    trace_id=first.trace_id,
+                    trace_ids=[t.trace_id for t in members],
                     invocations=invocations,
                     warnings=warnings,
                     metadata=meta,
@@ -733,24 +761,15 @@ async def evaluate_traces_stream(
                     loaded_traces.extend(load_traces(trace_file_path, format=eval_config.trace_format))
                 except Exception as exc:
                     load_errors.append(f"Failed to load trace file '{os.path.basename(trace_file_path)}': {exc}")
-            for trace in loaded_traces:
-                try:
-                    perf_metrics, trace_metadata = _trace_views(trace)
-                    evt = SSEPerformanceMetricsEvent(
-                        trace_id=trace.trace_id,
-                        performance_metrics=perf_metrics,
-                        trace_metadata=trace_metadata,
-                    )
-                    yield f"event: performance_metrics\ndata: {evt.model_dump_json(by_alias=True)}\n\n"
-                except Exception as e:
-                    logger.error(f"Failed to extract early performance metrics for trace {trace.trace_id}: {e}")
-
             stream_eval_set = None
             if eval_set_path:
                 try:
                     stream_eval_set = load_eval_set(eval_set_path)
                 except Exception as exc:
                     load_errors.append(f"Failed to load eval set: {exc}")
+
+            for event in _performance_events(loaded_traces, eval_config.group_by, stream_eval_set):
+                yield event
 
             queue: asyncio.Queue = asyncio.Queue()
 
@@ -923,17 +942,8 @@ async def evaluate_traces_json_stream(request: EvaluateJsonRequest, raw_request:
                 yield _sse_error(exc.detail)
                 return
 
-            for trace in traces:
-                try:
-                    perf_metrics, trace_metadata = _trace_views(trace)
-                    evt = SSEPerformanceMetricsEvent(
-                        trace_id=trace.trace_id,
-                        performance_metrics=perf_metrics,
-                        trace_metadata=trace_metadata,
-                    )
-                    yield f"event: performance_metrics\ndata: {evt.model_dump_json(by_alias=True)}\n\n"
-                except Exception as e:
-                    logger.error(f"Failed to extract early performance metrics: {e}")
+            for event in _performance_events(traces, request.config.group_by, eval_set):
+                yield event
 
             queue: asyncio.Queue = asyncio.Queue()
 

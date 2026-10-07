@@ -30,9 +30,17 @@ async function unwrap<T>(response: Response): Promise<T> {
   return json.data;
 }
 
-export async function convertTraces(traceFiles: File[]): Promise<ConvertTracesResponse> {
+/**
+ * ``groupBy`` 'auto' returns one entry per evaluation group (the grouping an evaluation applies),
+ * so rows line up with results; the default 'trace' returns one entry per trace.
+ */
+export async function convertTraces(
+  traceFiles: File[],
+  groupBy: 'trace' | 'conversation' | 'auto' = 'trace',
+): Promise<ConvertTracesResponse> {
   const formData = new FormData();
   traceFiles.forEach(file => formData.append('trace_files', file));
+  formData.append('group_by', groupBy);
 
   const response = await fetch(`${API_BASE_URL}/convert`, {
     method: 'POST',

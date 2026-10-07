@@ -68,8 +68,8 @@ postgres = [
     { name = "asyncpg" },
 ]
 streaming = [
+    { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-sdk" },
-    { name = "websockets" },
 ]
 
 [package.dev-dependencies]
@@ -108,8 +108,9 @@ requires-dist = [
     { name = "litellm", specifier = ">=1.85.7" },
     { name = "mcp", marker = "extra == 'live'", specifier = ">=1.28.1,<2" },
     { name = "nltk", specifier = ">=3.10.2" },
+    { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'streaming'", specifier = ">=1.38" },
     { name = "opentelemetry-proto", specifier = ">=1.36.0" },
-    { name = "opentelemetry-sdk", marker = "extra == 'streaming'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'streaming'", specifier = ">=1.38" },
     { name = "pyasn1", specifier = ">=0.6.4" },
     { name = "pydantic-settings", marker = "extra == 'live'", specifier = ">=2.15.0" },
     { name = "pygments", specifier = ">=2.20.0" },
@@ -121,7 +122,6 @@ requires-dist = [
     { name = "tabulate", specifier = ">=0.9.0" },
     { name = "urllib3", specifier = ">=2.7.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
-    { name = "websockets", marker = "extra == 'streaming'", specifier = ">=12.0" },
 ]
 provides-extras = ["kubernetes", "live", "postgres", "streaming"]
 
@@ -1081,12 +1081,12 @@ resolution-markers = [
     "python_full_version < '3.13' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "google-api-core" },
-    { name = "google-auth" },
-    { name = "google-cloud-core" },
-    { name = "google-crc32c" },
-    { name = "google-resumable-media" },
-    { name = "requests" },
+    { name = "google-api-core", marker = "python_full_version < '3.13'" },
+    { name = "google-auth", marker = "python_full_version < '3.13'" },
+    { name = "google-cloud-core", marker = "python_full_version < '3.13'" },
+    { name = "google-crc32c", marker = "python_full_version < '3.13'" },
+    { name = "google-resumable-media", marker = "python_full_version < '3.13'" },
+    { name = "requests", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/36/76/4d965702e96bb67976e755bed9828fa50306dca003dbee08b67f41dd265e/google_cloud_storage-2.19.0.tar.gz", hash = "sha256:cd05e9e7191ba6cb68934d8eb76054d9be4562aa89dbc4236feee4d7d51342b2", size = 5535488, upload-time = "2024-12-05T01:35:06.49Z" }
 wheels = [
@@ -1106,12 +1106,12 @@ resolution-markers = [
     "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "google-api-core" },
-    { name = "google-auth" },
-    { name = "google-cloud-core" },
-    { name = "google-crc32c" },
-    { name = "google-resumable-media" },
-    { name = "requests" },
+    { name = "google-api-core", marker = "python_full_version >= '3.13'" },
+    { name = "google-auth", marker = "python_full_version >= '3.13'" },
+    { name = "google-cloud-core", marker = "python_full_version >= '3.13'" },
+    { name = "google-crc32c", marker = "python_full_version >= '3.13'" },
+    { name = "google-resumable-media", marker = "python_full_version >= '3.13'" },
+    { name = "requests", marker = "python_full_version >= '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ce/7e/73bb7512df1d1aad6ce3f9aed847cd40e0cd400ba4a85d86ab8eb412e9cc/google_cloud_storage-3.13.1.tar.gz", hash = "sha256:a80bf8cac2794808aa61c50c5f769ecbbe2d10331bacd0d69d30e59b14b346b2", size = 17341051, upload-time = "2026-08-06T06:24:42.229Z" }
 wheels = [

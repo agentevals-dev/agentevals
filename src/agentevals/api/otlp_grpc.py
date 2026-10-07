@@ -1,30 +1,32 @@
 """OTLP gRPC receiver services for traces and logs.
 
 Receives standard OTLP/gRPC Export requests on port 4317 and forwards them
-into the same StreamingTraceManager pipeline used by OTLP/HTTP routes.
+into the same live store pipeline used by the OTLP/HTTP routes.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
-from google.protobuf.json_format import MessageToDict
 from opentelemetry.proto.collector.logs.v1 import logs_service_pb2_grpc
 from opentelemetry.proto.collector.trace.v1 import trace_service_pb2_grpc
 
+from ..otel.decode import DecodeResult, decode_logs_proto, decode_traces_proto
+from .otlp_http import PARSE_THREAD_THRESHOLD
 from .otlp_processing import (
     build_logs_response,
     build_traces_response,
-    fix_protobuf_id_fields,
-    process_logs,
-    process_traces,
+    ingest_logs,
+    ingest_traces,
 )
 
 if TYPE_CHECKING:
     from grpc import aio
 
-    from ..streaming.ws_server import StreamingTraceManager
+    from ..streaming.manager import LiveManager
 
 logger = logging.getLogger(__name__)
 
@@ -33,34 +35,48 @@ DEFAULT_GRPC_MAX_CONCURRENT_RPCS = 32
 DEFAULT_GRPC_MAX_MESSAGE_BYTES = 8 * 1024 * 1024
 
 
+async def _decode(request: Any, decode: Callable[[Any], DecodeResult]) -> DecodeResult:
+    if request.ByteSize() < PARSE_THREAD_THRESHOLD:
+        return decode(request)
+    return await asyncio.to_thread(decode, request)
+
+
+async def _abort_overloaded(context: Any, signal: str) -> None:
+    import grpc
+
+    await context.abort(grpc.StatusCode.UNAVAILABLE, f"Live store is at capacity; {signal} not accepted, retry later")
+
+
 class OtlpTraceService(trace_service_pb2_grpc.TraceServiceServicer):
     """OTLP TraceService gRPC implementation."""
 
-    def __init__(self, manager: StreamingTraceManager):
+    def __init__(self, manager: LiveManager):
         self._manager = manager
 
     async def Export(self, request, context):  # noqa: N802 (gRPC method name)
-        body = MessageToDict(request, preserving_proto_field_name=False)
-        fix_protobuf_id_fields(body)
-        return build_traces_response(await process_traces(body, self._manager))
+        result = await ingest_traces(await _decode(request, decode_traces_proto), self._manager)
+        if result.overloaded:
+            await _abort_overloaded(context, "spans")
+        return build_traces_response(result)
 
 
 class OtlpLogsService(logs_service_pb2_grpc.LogsServiceServicer):
     """OTLP LogsService gRPC implementation."""
 
-    def __init__(self, manager: StreamingTraceManager):
+    def __init__(self, manager: LiveManager):
         self._manager = manager
 
     async def Export(self, request, context):  # noqa: N802 (gRPC method name)
-        body = MessageToDict(request, preserving_proto_field_name=False)
-        fix_protobuf_id_fields(body)
-        return build_logs_response(await process_logs(body, self._manager))
+        result = await ingest_logs(await _decode(request, decode_logs_proto), self._manager)
+        if result.overloaded:
+            await _abort_overloaded(context, "log records")
+        return build_logs_response(result)
 
 
 def create_otlp_grpc_server(
     host: str,
     port: int,
-    manager: StreamingTraceManager,
+    manager: LiveManager,
     *,
     max_concurrent_rpcs: int = DEFAULT_GRPC_MAX_CONCURRENT_RPCS,
     max_message_bytes: int = DEFAULT_GRPC_MAX_MESSAGE_BYTES,

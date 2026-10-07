@@ -89,9 +89,8 @@ class TestLangchainZeroCode:
         session = mgr.sessions[session_name]
 
         assert session.is_complete
-        assert session.source == "otlp"
-        assert len(session.spans) > 0, "Expected spans from LLM calls"
-        assert len(session.logs) > 0, "LangChain uses logs for message content"
+        assert session.span_count > 0, "Expected spans from LLM calls"
+        assert session.log_count > 0, "LangChain uses logs for message content"
 
     def test_invocations_extracted_with_content(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
@@ -153,8 +152,7 @@ class TestStrandsZeroCode:
         session = mgr.sessions[session_name]
 
         assert session.is_complete
-        assert session.source == "otlp"
-        assert len(session.spans) > 0, "Expected spans from LLM calls"
+        assert session.span_count > 0, "Expected spans from LLM calls"
 
     def test_invocations_extracted(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
@@ -216,8 +214,7 @@ class TestAdkZeroCode:
         session = mgr.sessions[session_name]
 
         assert session.is_complete
-        assert session.source == "otlp"
-        assert len(session.spans) > 0, "Expected spans from ADK agent"
+        assert session.span_count > 0, "Expected spans from ADK agent"
 
     def test_invocations_extracted(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
@@ -273,8 +270,7 @@ class TestOpenAIAgentsZeroCode:
         session = mgr.sessions[session_name]
 
         assert session.is_complete
-        assert session.source == "otlp"
-        assert len(session.spans) > 0, "Expected spans from LLM calls"
+        assert session.span_count > 0, "Expected spans from LLM calls"
 
     def test_invocations_extracted(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
@@ -331,8 +327,7 @@ class TestPydanticAIZeroCode:
         session = mgr.sessions[session_name]
 
         assert session.is_complete
-        assert session.source == "otlp"
-        assert len(session.spans) > 0, "Expected spans from LLM calls"
+        assert session.span_count > 0, "Expected spans from LLM calls"
 
     def test_invocations_extracted_with_content(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
@@ -412,9 +407,11 @@ class TestAgentRerun:
         s2 = mgr.sessions[f"{session_name}-2"]
 
         assert s1.is_complete and s2.is_complete
-        assert len(s1.spans) > 0
-        assert len(s2.spans) > 0
-        assert s1.trace_ids.isdisjoint(s2.trace_ids), f"Sessions share trace_ids: {s1.trace_ids & s2.trace_ids}"
+        assert s1.span_count > 0
+        assert s2.span_count > 0
+        assert set(s1.trace_ids).isdisjoint(s2.trace_ids), (
+            f"Sessions share trace_ids: {set(s1.trace_ids) & set(s2.trace_ids)}"
+        )
 
     def test_langchain_rerun_creates_separate_sessions(self, live_servers):
         """Run the LangChain agent twice with the same session_name.
@@ -442,9 +439,11 @@ class TestAgentRerun:
         s2 = mgr.sessions[f"{session_name}-2"]
 
         assert s1.is_complete and s2.is_complete
-        assert len(s1.spans) > 0
-        assert len(s2.spans) > 0
-        assert s1.trace_ids.isdisjoint(s2.trace_ids), f"Sessions share trace_ids: {s1.trace_ids & s2.trace_ids}"
+        assert s1.span_count > 0
+        assert s2.span_count > 0
+        assert set(s1.trace_ids).isdisjoint(s2.trace_ids), (
+            f"Sessions share trace_ids: {set(s1.trace_ids) & set(s2.trace_ids)}"
+        )
 
     def test_rerun_sessions_visible_via_api(self, live_servers):
         """Both rerun sessions are visible in the API response."""

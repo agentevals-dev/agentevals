@@ -15,10 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..adk_bridge import eval_set_from_turns, load_eval_set_from_dict
 from ..config import BuiltinMetricDef, EvalParams, EvaluatorDef
 from ..genai.extract import extract_conversation
-from ..otel.encode import encode_traces
 from ..runner import RunResult, run_evaluation_from_traces
 from ..streaming.exports import EXPORT_DIR, export_name
-from ..trace_attrs import OTEL_GENAI_INPUT_MESSAGES, OTEL_GENAI_REQUEST_MODEL
 from .dependencies import require_trace_manager
 from .models import (
     CreateEvalSetData,
@@ -31,7 +29,7 @@ from .models import (
 )
 
 if TYPE_CHECKING:
-    from ..streaming.ws_server import StreamingTraceManager
+    from ..streaming.manager import LiveManager
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +59,7 @@ class GetTraceRequest(BaseModel):
 
 
 async def _do_create_eval_set(
-    request: CreateEvalSetRequest, manager: StreamingTraceManager
+    request: CreateEvalSetRequest, manager: LiveManager
 ) -> StandardResponse[CreateEvalSetData]:
     """Shared logic for creating an EvalSet from a session's trace."""
     session = manager.sessions.get(request.session_id)
@@ -74,8 +72,8 @@ async def _do_create_eval_set(
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"No traces found in session (spans={len(session.spans)}, "
-                    f"logs={len(session.logs)}). If using the SDK with langchain/openai, "
+                    f"No traces found in session (spans={session.span_count}, "
+                    f"logs={session.log_count}). If using the SDK with langchain/openai, "
                     f"ensure opentelemetry-instrumentation-openai-v2 is installed."
                 ),
             )
@@ -97,29 +95,16 @@ async def _do_create_eval_set(
 
 
 @streaming_router.get("/sessions", response_model=StandardResponse[list[SessionInfo]])
-async def list_sessions(manager: StreamingTraceManager = Depends(require_trace_manager)):
-    sessions_data = []
-
-    for session_id, session in manager.sessions.items():
-        info = SessionInfo(
-            session_id=session_id,
-            trace_id=session.trace_id,
-            eval_set_id=session.eval_set_id,
-            span_count=len(session.spans),
-            is_complete=session.is_complete,
-            started_at=session.started_at.isoformat(),
-            metadata=session.metadata,
-            invocations=session.invocations if session.is_complete and session.invocations else None,
-        )
-        sessions_data.append(info)
-
-    return StandardResponse(data=sessions_data)
+async def list_sessions(manager: LiveManager = Depends(require_trace_manager)):
+    return StandardResponse(
+        data=[manager.session_info(session, with_invocations=True) for session in manager.sessions.values()]
+    )
 
 
 @streaming_router.post("/create-eval-set", response_model=StandardResponse[CreateEvalSetData])
 async def create_eval_set_from_session(
     request: CreateEvalSetRequest,
-    manager: StreamingTraceManager = Depends(require_trace_manager),
+    manager: LiveManager = Depends(require_trace_manager),
 ):
     """Convert a session's trace into an EvalSet."""
     return await _do_create_eval_set(request, manager)
@@ -166,7 +151,7 @@ async def _persist_sessions_run(
 async def evaluate_sessions(
     request: EvaluateSessionsRequest,
     http_request: Request,
-    manager: StreamingTraceManager = Depends(require_trace_manager),
+    manager: LiveManager = Depends(require_trace_manager),
 ):
     """Evaluate all sessions against a golden session converted to EvalSet."""
     golden_session = manager.sessions.get(request.golden_session_id)
@@ -258,7 +243,7 @@ async def evaluate_sessions(
 @streaming_router.post("/prepare-evaluation", response_model=StandardResponse[PrepareEvaluationData])
 async def prepare_evaluation(
     request: PrepareEvaluationRequest,
-    manager: StreamingTraceManager = Depends(require_trace_manager),
+    manager: LiveManager = Depends(require_trace_manager),
 ):
     """Prepare evaluation by saving traces and eval set as downloadable files."""
     golden_session = manager.sessions.get(request.golden_session_id)
@@ -284,7 +269,9 @@ async def prepare_evaluation(
             if not session or not session.is_complete:
                 continue
 
-            trace_file = await manager._save_spans_to_temp_file(session)
+            trace_file = EXPORT_DIR / export_name(session_id, prefix="agentevals_", suffix=".json")
+            with open(trace_file, "w", encoding="utf-8") as f:  # noqa: ASYNC230
+                json.dump(manager.session_document(session), f)
             trace_files.append(
                 {
                     "session_id": session_id,
@@ -331,54 +318,34 @@ async def download_file(filename: str):
 
 
 @streaming_router.get("/sessions/{session_id}/otlp")
-async def export_session_otlp(session_id: str, manager: StreamingTraceManager = Depends(require_trace_manager)) -> dict:
-    """The session's spans and joined logs as one OTLP/JSON document (``resourceSpans`` and ``resourceLogs``)."""
+async def export_session_otlp(session_id: str, manager: LiveManager = Depends(require_trace_manager)) -> dict:
+    """The session's spans and logs as one OTLP/JSON document (``resourceSpans`` and ``resourceLogs``).
+
+    Every resource carries ``agentevals.session_name``, so the document loads back through
+    ``agentevals run`` as one conversation.
+    """
     session = manager.sessions.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    return encode_traces(manager.session_traces(session))
+    return manager.session_document(session)
 
 
 @streaming_router.post("/get-trace", response_model=StandardResponse[GetTraceData])
 async def get_trace(
     request: GetTraceRequest,
-    manager: StreamingTraceManager = Depends(require_trace_manager),
+    manager: LiveManager = Depends(require_trace_manager),
 ):
+    """The session export (see ``/sessions/{id}/otlp``) as a string, for clients that upload it as a file."""
     session = manager.sessions.get(request.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
     try:
-        has_genai_spans = any(
-            span.get("attributes", [])
-            and any(
-                attr.get("key") in (OTEL_GENAI_REQUEST_MODEL, OTEL_GENAI_INPUT_MESSAGES)
-                for attr in span.get("attributes", [])
-            )
-            for span in session.spans
-        )
-
-        if has_genai_spans and not session.logs:
-            logger.warning(
-                "Session %s has GenAI spans but no logs. "
-                "Message content will be missing unless spans already enriched.",
-                request.session_id,
-            )
-
-        # Reuse the canonical serializer so the trace handed to the UI (and
-        # re-uploaded to /api/evaluate) carries service.name, exactly like the
-        # evaluate-sessions path. Serializing spans here independently would
-        # drop the resource attribute and lose agent identity on the run.
-        trace_file = await manager._save_spans_to_temp_file(session)
-        with open(trace_file, encoding="utf-8") as f:  # noqa: ASYNC230
-            trace_content = f.read()
-        num_spans = sum(1 for line in trace_content.splitlines() if line.strip())
-
         return StandardResponse(
             data=GetTraceData(
                 session_id=request.session_id,
-                trace_content=trace_content,
-                num_spans=num_spans,
+                trace_content=json.dumps(manager.session_document(session)),
+                num_spans=session.span_count,
             )
         )
 

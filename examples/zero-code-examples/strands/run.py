@@ -17,6 +17,7 @@ Usage:
 
 import os
 import sys
+import uuid
 
 from dotenv import load_dotenv
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -45,6 +46,9 @@ def main():
         "OTEL_RESOURCE_ATTRIBUTES",
         "agentevals.eval_set_id=strands_agent_eval,agentevals.session_name=strands-zero-code",
     )
+    # A process level identity, so agentevals can tell a rerun of this script from the next turn.
+    if "service.instance.id=" not in os.environ["OTEL_RESOURCE_ATTRIBUTES"]:
+        os.environ["OTEL_RESOURCE_ATTRIBUTES"] += f",service.instance.id={uuid.uuid4()}"
 
     telemetry = StrandsTelemetry()
 

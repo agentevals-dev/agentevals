@@ -17,6 +17,7 @@ Usage:
 
 import os
 import random
+import uuid
 
 from agents import Agent, Runner, function_tool
 from dotenv import load_dotenv
@@ -63,6 +64,9 @@ def main():
         "OTEL_RESOURCE_ATTRIBUTES",
         "agentevals.eval_set_id=openai_agents_eval,agentevals.session_name=openai-agents-zero-code",
     )
+    # A process level identity, so agentevals can tell a rerun of this script from the next turn.
+    if "service.instance.id=" not in os.environ["OTEL_RESOURCE_ATTRIBUTES"]:
+        os.environ["OTEL_RESOURCE_ATTRIBUTES"] += f",service.instance.id={uuid.uuid4()}"
 
     resource = Resource.create()
 

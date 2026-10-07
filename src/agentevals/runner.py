@@ -31,6 +31,7 @@ __all__ = [
     "MetricResult",
     "RunResult",
     "TraceResult",
+    "evaluation_groups",
     "load_eval_set",
     "load_eval_set_from_dict",
     "run_evaluation",
@@ -94,12 +95,20 @@ class RunResult(BaseModel):
     run_id: str | None = None
 
 
-def _group_by_conversation(config: EvalParams, traces: list[Trace], eval_set: EvalSet | None) -> bool:
-    if config.group_by == "conversation":
-        return True
-    if config.group_by == "trace":
-        return False
-    return has_session_name(traces) or multi_turn_cases(eval_set)
+def evaluation_groups(
+    traces: list[Trace], group_by: str, eval_set: EvalSet | None = None
+) -> list[tuple[str, list[Trace]]]:
+    """The evaluation groups for ``group_by``: one per trace, or one per conversation key.
+
+    ``auto`` groups by conversation when any trace carries ``agentevals.session_name`` or the eval
+    set has a case with more than one invocation. Every view of the same traces (results, early
+    performance events, ``/api/convert`` with ``group_by``) uses this, so they line up by trace id.
+    """
+    if group_by == "auto":
+        by_conversation = has_session_name(traces) or multi_turn_cases(eval_set)
+    else:
+        by_conversation = group_by == "conversation"
+    return group_traces(traces, by_conversation)
 
 
 def _explicit_case_id(traces: list[Trace]) -> str | None:
@@ -130,7 +139,7 @@ async def run_evaluation_from_traces(
     if group_key is not None:
         groups = [(group_key, sorted(traces, key=lambda t: t.start_time_unix_nano))]
     else:
-        groups = group_traces(traces, _group_by_conversation(config, traces, eval_set))
+        groups = evaluation_groups(traces, config.group_by, eval_set)
     total = len(groups)
     if progress_callback:
         await progress_callback(f"Evaluating {total} trace{'s' if total != 1 else ''}...")

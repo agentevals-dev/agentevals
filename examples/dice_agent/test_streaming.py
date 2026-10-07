@@ -1,62 +1,43 @@
-"""Quick test to verify streaming setup works."""
+"""Quick check that this machine can stream to the agentevals dev server.
+
+Opens an AgentEvals session, records one span inside it and closes the session, which flushes
+the span to the OTLP receiver. The session then shows up in the UI.
+
+Prerequisites:
+    $ agentevals serve --dev
+
+Usage:
+    $ python examples/dice_agent/test_streaming.py
+"""
 
 import asyncio
-import os
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 
+from agentevals import AgentEvals
+
 
 async def test_streaming():
-    """Test that streaming processor connects and shuts down cleanly."""
-
     provider = TracerProvider()
     trace.set_tracer_provider(provider)
+    app = AgentEvals(auto_instrument=False)
 
     try:
-        from agentevals.streaming.processor import AgentEvalsStreamingProcessor
-
-        print("✓ Imported streaming processor")
-
-        processor = AgentEvalsStreamingProcessor(
-            ws_url="ws://localhost:8001/ws/traces",
-            session_id="test-session",
-            trace_id="test-trace-123",
-        )
-
-        print("✓ Created processor")
-
-        await processor.connect(
+        async with app.session_async(
             eval_set_id="test-eval",
+            session_name="streaming-check",
             metadata={"test": True},
-        )
-
-        print("✓ Connected to server")
-
-        provider.add_span_processor(processor)
-
-        print("✓ Added processor to provider")
-
-        tracer = trace.get_tracer("test")
-        with tracer.start_as_current_span("test_span"):
-            print("✓ Created test span")
-
-        print("✓ Span sent")
-
-        await processor.shutdown_async()
-
-        print("✓ Clean shutdown")
+            tracer_provider=provider,
+        ):
+            print("✓ Reached the OTLP receiver")
+            with provider.get_tracer("streaming-check").start_as_current_span("test_span"):
+                print("✓ Created test span")
+        print("✓ Session flushed")
         print()
-        print("All tests passed! Streaming is working correctly.")
-
-    except ImportError:
-        print("❌ agentevals not installed")
-        print("   Run: pip install -e .")
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        print()
-        print("Make sure dev server is running:")
-        print("  agentevals serve --dev --port 8001")
+        print("Streaming works. Look for the 'streaming-check' session in the UI.")
+    except ConnectionError as exc:
+        print(f"❌ {exc}")
 
 
 if __name__ == "__main__":

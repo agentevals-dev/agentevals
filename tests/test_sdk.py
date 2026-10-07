@@ -1,25 +1,39 @@
-"""Tests for the AgentEvals SDK.
+"""Tests for the AgentEvals SDK: session scoped OTLP export, isolated from the application pipeline.
 
-Mocking strategy: ``AgentEvalsStreamingProcessor`` is imported inside
-``_setup_otel`` via a local import, so we patch at the source module
-(``agentevals.streaming.processor``) rather than at ``agentevals.sdk``.
+The session exporters are replaced by in memory exporters, so the tests read what agentevals
+would receive. The receiver preflight is stubbed except where a failure is under test.
 """
 
 import asyncio
-import os
 import threading
-from unittest.mock import AsyncMock, MagicMock, call, patch
+import warnings
+from unittest.mock import patch
 
 import pytest
+from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from agentevals.otel import sdk_export
 from agentevals.sdk import AgentEvals
 
-PROC_PATH = "agentevals.streaming.processor.AgentEvalsStreamingProcessor"
+
+@pytest.fixture
+def exported(monkeypatch):
+    """Session exporters write to memory; the receiver preflight always succeeds."""
+    exporter = InMemorySpanExporter()
+    monkeypatch.setattr(sdk_export, "_span_exporter", lambda endpoint: exporter)
+    monkeypatch.setattr(sdk_export, "preflight", lambda endpoint: None)
+    return exporter
+
+
+def _resource(span) -> dict:
+    return dict(span.resource.attributes)
 
 
 # ---------------------------------------------------------------------------
-# Construction & configuration
+# Constructor and decorator
 # ---------------------------------------------------------------------------
 
 
@@ -27,34 +41,25 @@ class TestInit:
     def test_defaults(self):
         app = AgentEvals()
         assert app.ws_url == "ws://localhost:8001/ws/traces"
+        assert app.endpoint is None
         assert app.eval_set_id is None
         assert app.metadata == {}
         assert app.auto_instrument is True
-        assert app.capture_message_content is True
         assert app.streaming is True
 
     def test_custom_config(self):
-        app = AgentEvals(
-            ws_url="ws://other:9999/ws/traces",
-            eval_set_id="my-eval",
-            metadata={"model": "gpt-4o"},
-            auto_instrument=False,
-            capture_message_content=False,
+        app = AgentEvals(endpoint="http://other:4318", eval_set_id="e1", metadata={"k": "v"}, auto_instrument=False)
+        assert (app.endpoint, app.eval_set_id, app.metadata, app.auto_instrument) == (
+            "http://other:4318",
+            "e1",
+            {"k": "v"},
+            False,
         )
-        assert app.ws_url == "ws://other:9999/ws/traces"
-        assert app.eval_set_id == "my-eval"
-        assert app.metadata == {"model": "gpt-4o"}
 
     def test_metadata_default_is_not_shared(self):
-        a = AgentEvals()
-        b = AgentEvals()
+        a, b = AgentEvals(), AgentEvals()
         a.metadata["x"] = 1
-        assert "x" not in b.metadata
-
-
-# ---------------------------------------------------------------------------
-# @app.agent decorator
-# ---------------------------------------------------------------------------
+        assert b.metadata == {}
 
 
 class TestAgentDecorator:
@@ -62,396 +67,301 @@ class TestAgentDecorator:
         app = AgentEvals()
 
         @app.agent
-        def my_fn(prompt):
-            return prompt.upper()
+        def fn(prompt):
+            return prompt
 
-        assert app._agent_fn is my_fn
+        assert app._agent_fn is fn
         assert app._is_async is False
-        assert my_fn("hi") == "HI"
 
     def test_registers_async_function(self):
         app = AgentEvals()
 
         @app.agent
-        async def my_fn(prompt):
-            return prompt.upper()
+        async def fn(prompt):
+            return prompt
 
-        assert app._agent_fn is my_fn
         assert app._is_async is True
 
     def test_run_without_agent_raises(self):
-        app = AgentEvals()
         with pytest.raises(RuntimeError, match="No agent registered"):
-            app.run(["hello"])
-
-
-# ---------------------------------------------------------------------------
-# Session ID generation
-# ---------------------------------------------------------------------------
+            AgentEvals().run(["hi"])
 
 
 class TestSessionId:
     def test_format(self):
-        sid = AgentEvals()._generate_session_id()
-        assert sid.startswith("session-")
-        assert len(sid.split("-")) >= 3
+        assert AgentEvals()._generate_session_id().startswith("session-")
 
     def test_uniqueness(self):
         app = AgentEvals()
-        ids = {app._generate_session_id() for _ in range(100)}
-        assert len(ids) == 100
+        assert len({app._generate_session_id() for _ in range(50)}) == 50
 
 
 # ---------------------------------------------------------------------------
-# _setup_otel — provider resolution
+# Endpoint resolution
+# ---------------------------------------------------------------------------
+
+
+class TestEndpoint:
+    def test_explicit_endpoint_wins(self, monkeypatch):
+        monkeypatch.setenv("AGENTEVALS_OTLP_ENDPOINT", "http://env:4318")
+        assert sdk_export.resolve_endpoint("http://explicit:4318/", None) == "http://explicit:4318"
+
+    def test_agentevals_env_next(self, monkeypatch):
+        monkeypatch.setenv("AGENTEVALS_OTLP_ENDPOINT", "http://env:4318")
+        assert sdk_export.resolve_endpoint(None, None) == "http://env:4318"
+
+    def test_legacy_ws_url_maps_to_otlp_http_with_a_warning(self, monkeypatch):
+        monkeypatch.delenv("AGENTEVALS_OTLP_ENDPOINT", raising=False)
+        with pytest.warns(DeprecationWarning, match="ws_url is deprecated"):
+            assert sdk_export.resolve_endpoint(None, "ws://agent-host:8001/ws/traces") == "http://agent-host:4318"
+
+    def test_default_ws_url_is_not_deprecated(self, monkeypatch):
+        monkeypatch.delenv("AGENTEVALS_OTLP_ENDPOINT", raising=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert sdk_export.resolve_endpoint(None, sdk_export.LEGACY_WS_URL) == "http://localhost:4318"
+
+    def test_otel_exporter_endpoint_is_never_read(self, monkeypatch):
+        monkeypatch.delenv("AGENTEVALS_OTLP_ENDPOINT", raising=False)
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://observability.example.com")
+        assert sdk_export.resolve_endpoint(None, None) == "http://localhost:4318"
+
+
+class TestExporterIsolation:
+    """The OTLP exporters fill unset options from OTEL_EXPORTER_OTLP_*; none of it may apply."""
+
+    def test_span_exporter_ignores_application_otlp_settings(self, monkeypatch):
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", "authorization=Bearer app-token")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_HEADERS", "x-api-key=app-key")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://observability.example.com")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_CLIENT_KEY", "/etc/app/client.key")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE", "/etc/app/client.crt")
+        exporter = sdk_export._span_exporter("http://localhost:4318")
+        assert exporter._endpoint == "http://localhost:4318/v1/traces"
+        assert exporter._headers == {"x-agentevals-sdk": "1"}
+        assert "authorization" not in {k.lower() for k in exporter._session.headers}
+        assert exporter._client_key_file is None
+        assert exporter._client_certificate_file is None
+        assert exporter._session.trust_env is False
+
+    def test_log_exporter_ignores_application_otlp_settings(self, monkeypatch):
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", "authorization=Bearer app-token")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_HEADERS", "x-api-key=app-key")
+        exporter = sdk_export._log_exporter("http://localhost:4318")
+        assert exporter._endpoint == "http://localhost:4318/v1/logs"
+        assert exporter._headers == {"x-agentevals-sdk": "1"}
+        assert exporter._session.trust_env is False
+
+
+# ---------------------------------------------------------------------------
+# Provider setup
 # ---------------------------------------------------------------------------
 
 
 class TestSetupOtel:
-    @patch(PROC_PATH)
-    def test_creates_tracer_provider_when_none_exists(self, MockProc):
-        MockProc.return_value = MagicMock()
-        app = AgentEvals(auto_instrument=False)
-        setup = app._setup_otel("s1")
+    def test_creates_tracer_provider_when_none_exists(self, exported):
+        with patch.object(trace, "get_tracer_provider", return_value=trace.NoOpTracerProvider()):
+            with patch.object(trace, "set_tracer_provider") as set_provider:
+                setup = AgentEvals(auto_instrument=False)._setup_otel("s1")
         assert isinstance(setup.tracer_provider, TracerProvider)
+        set_provider.assert_called_once_with(setup.tracer_provider)
 
-    @patch(PROC_PATH)
-    def test_uses_explicit_tracer_provider(self, MockProc):
-        MockProc.return_value = MagicMock()
+    def test_uses_explicit_tracer_provider(self, exported):
         explicit = TracerProvider()
-        app = AgentEvals(auto_instrument=False)
-        setup = app._setup_otel("s1", explicit_tracer_provider=explicit)
+        setup = AgentEvals(auto_instrument=False)._setup_otel("s1", explicit_tracer_provider=explicit)
         assert setup.tracer_provider is explicit
 
-    @patch(PROC_PATH)
-    def test_reuses_existing_global_tracer_provider(self, MockProc):
-        MockProc.return_value = MagicMock()
+    def test_reuses_existing_global_tracer_provider(self, exported):
         existing = TracerProvider()
-        with patch("opentelemetry.trace.get_tracer_provider", return_value=existing):
-            app = AgentEvals(auto_instrument=False)
-            setup = app._setup_otel("s1")
-            assert setup.tracer_provider is existing
+        with patch.object(trace, "get_tracer_provider", return_value=existing):
+            setup = AgentEvals(auto_instrument=False)._setup_otel("s1")
+        assert setup.tracer_provider is existing
 
-    @patch(PROC_PATH)
-    def test_processor_gets_correct_ws_url_and_session(self, MockProc):
-        MockProc.return_value = MagicMock()
-        app = AgentEvals(ws_url="ws://custom:1234/ws/traces", auto_instrument=False)
-        app._setup_otel("my-session")
-        MockProc.assert_called_once()
-        assert MockProc.call_args.kwargs["ws_url"] == "ws://custom:1234/ws/traces"
-        assert MockProc.call_args.kwargs["session_id"] == "my-session"
+    def test_session_processor_is_registered_once_per_provider(self, exported):
+        provider = TracerProvider()
+        app = AgentEvals(auto_instrument=False)
+        first = app._setup_otel("s1", provider)
+        second = app._setup_otel("s2", provider)
+        assert first.export is second.export
+        processors = provider._active_span_processor._span_processors
+        assert sum(isinstance(p, sdk_export.SessionSpanProcessor) for p in processors) == 1
 
-    @patch(PROC_PATH)
-    def test_sets_capture_message_content_env_var(self, MockProc):
-        MockProc.return_value = MagicMock()
-        env_key = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"
-        original = os.environ.pop(env_key, None)
-        try:
-            app = AgentEvals(auto_instrument=False, capture_message_content=True)
-            app._setup_otel("s1")
-            assert os.environ.get(env_key) == "true"
-        finally:
-            if original is not None:
-                os.environ[env_key] = original
-            else:
-                os.environ.pop(env_key, None)
+    def test_sets_capture_message_content_env_var(self, exported, monkeypatch):
+        monkeypatch.delenv("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", raising=False)
+        AgentEvals(auto_instrument=False, capture_message_content=True)._setup_otel("s1", TracerProvider())
+        import os
 
-    @patch(PROC_PATH)
-    def test_does_not_override_existing_capture_env_var(self, MockProc):
-        MockProc.return_value = MagicMock()
-        env_key = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"
-        os.environ[env_key] = "false"
-        try:
-            app = AgentEvals(auto_instrument=False, capture_message_content=True)
-            app._setup_otel("s1")
-            assert os.environ[env_key] == "false"
-        finally:
-            os.environ.pop(env_key, None)
+        assert os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] == "true"
 
+    def test_does_not_override_existing_capture_env_var(self, exported, monkeypatch):
+        monkeypatch.setenv("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "false")
+        AgentEvals(auto_instrument=False, capture_message_content=True)._setup_otel("s1", TracerProvider())
+        import os
 
-# ---------------------------------------------------------------------------
-# Auto-instrumentation
-# ---------------------------------------------------------------------------
+        assert os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] == "false"
 
 
 class TestAutoInstrument:
     def test_does_not_raise_when_nothing_installed(self):
-        app = AgentEvals()
-        app._auto_instrument()
-
-    def test_should_setup_log_provider_returns_bool(self):
-        result = AgentEvals()._should_setup_log_provider()
-        assert isinstance(result, bool)
+        AgentEvals()._auto_instrument()
 
 
 # ---------------------------------------------------------------------------
-# Sync session lifecycle
+# Sync session
 # ---------------------------------------------------------------------------
-
-
-def _make_mock_processor():
-    proc = MagicMock()
-    proc.connect = AsyncMock()
-    proc.shutdown_async = AsyncMock()
-    proc.force_flush = MagicMock(return_value=True)
-    return proc
 
 
 class TestSyncSession:
-    @patch(PROC_PATH)
-    def test_connects_adds_processor_and_shuts_down(self, MockProc):
-        mock_proc = _make_mock_processor()
-        MockProc.return_value = mock_proc
+    def test_session_spans_carry_the_session_resource(self, exported):
+        provider = TracerProvider()
+        app = AgentEvals(auto_instrument=False, metadata={"a": 1})
+        with app.session(eval_set_id="e1", session_name="s1", metadata={"b": "two"}, tracer_provider=provider):
+            with provider.get_tracer("t").start_as_current_span("work"):
+                pass
+        spans = exported.get_finished_spans()
+        assert [s.name for s in spans] == ["work"]
+        resource = _resource(spans[0])
+        assert resource["agentevals.session_name"] == "s1"
+        assert resource["agentevals.eval_set_id"] == "e1"
+        assert resource["agentevals.metadata.a"] == 1
+        assert resource["agentevals.metadata.b"] == "two"
+        assert len(resource["agentevals.session.run_id"]) == 32
 
-        app = AgentEvals(auto_instrument=False)
+    def test_eval_set_id_falls_back_to_instance(self, exported):
+        provider = TracerProvider()
+        app = AgentEvals(auto_instrument=False, eval_set_id="from-init")
+        with app.session(session_name="s1", tracer_provider=provider):
+            provider.get_tracer("t").start_span("work").end()
+        assert _resource(exported.get_finished_spans()[0])["agentevals.eval_set_id"] == "from-init"
 
-        with app.session(eval_set_id="e1", session_name="s1", metadata={"k": "v"}):
-            mock_proc.connect.assert_called_once_with(eval_set_id="e1", metadata={"k": "v"})
-
-        mock_proc.shutdown_async.assert_called_once()
-
-    @patch(PROC_PATH)
-    def test_processor_registered_on_tracer_provider(self, MockProc):
-        mock_proc = _make_mock_processor()
-        MockProc.return_value = mock_proc
-
+    def test_each_session_gets_its_own_run_id(self, exported):
         provider = TracerProvider()
         app = AgentEvals(auto_instrument=False)
+        for _ in range(2):
+            with app.session(session_name="same", tracer_provider=provider):
+                provider.get_tracer("t").start_span("work").end()
+        runs = {_resource(s)["agentevals.session.run_id"] for s in exported.get_finished_spans()}
+        assert len(runs) == 2
 
-        with app.session(session_name="s1", tracer_provider=provider):
-            assert mock_proc in provider._active_span_processor._span_processors
-
-    @patch(PROC_PATH)
-    def test_yields_session_name(self, MockProc):
-        MockProc.return_value = _make_mock_processor()
+    def test_spans_outside_a_session_are_not_exported(self, exported):
+        provider = TracerProvider()
         app = AgentEvals(auto_instrument=False)
+        with app.session(session_name="s1", tracer_provider=provider):
+            pass
+        provider.get_tracer("t").start_span("after").end()
+        sdk_export.flush(sdk_export._exports[provider])
+        assert exported.get_finished_spans() == ()
 
-        with app.session(session_name="custom-name") as name:
+    def test_application_exporters_never_see_session_attributes(self, exported):
+        provider = TracerProvider()
+        own = InMemorySpanExporter()
+        provider.add_span_processor(SimpleSpanProcessor(own))
+        app = AgentEvals(auto_instrument=False)
+        with app.session(session_name="s1", tracer_provider=provider):
+            provider.get_tracer("t").start_span("work").end()
+        assert [s.name for s in own.get_finished_spans()] == ["work"]
+        assert not any(k.startswith("agentevals.") for k in _resource(own.get_finished_spans()[0]))
+
+    def test_spans_on_other_threads_join_the_only_active_session(self, exported):
+        provider = TracerProvider()
+        app = AgentEvals(auto_instrument=False)
+        with app.session(session_name="s1", tracer_provider=provider):
+            worker = threading.Thread(target=lambda: provider.get_tracer("t").start_span("threaded").end())
+            worker.start()
+            worker.join()
+        assert [_resource(s)["agentevals.session_name"] for s in exported.get_finished_spans()] == ["s1"]
+
+    def test_yields_session_name(self, exported):
+        with AgentEvals(auto_instrument=False).session(
+            session_name="custom-name", tracer_provider=TracerProvider()
+        ) as name:
             assert name == "custom-name"
 
-    @patch(PROC_PATH)
-    def test_generates_session_name_when_omitted(self, MockProc):
-        MockProc.return_value = _make_mock_processor()
-        app = AgentEvals(auto_instrument=False)
-
-        with app.session() as name:
+    def test_generates_session_name_when_omitted(self, exported):
+        with AgentEvals(auto_instrument=False).session(tracer_provider=TracerProvider()) as name:
             assert name.startswith("session-")
 
-    @patch(PROC_PATH)
-    def test_merges_instance_and_call_metadata(self, MockProc):
-        mock_proc = _make_mock_processor()
-        MockProc.return_value = mock_proc
+    def test_unreachable_receiver_raises_with_helpful_message(self, monkeypatch):
+        def refuse(endpoint):
+            raise ConnectionError("refused")
 
-        app = AgentEvals(auto_instrument=False, metadata={"a": 1})
-
-        with app.session(session_name="s1", metadata={"b": 2}):
-            pass
-
-        connect_kwargs = mock_proc.connect.call_args.kwargs
-        assert connect_kwargs["metadata"] == {"a": 1, "b": 2}
-
-    @patch(PROC_PATH)
-    def test_eval_set_id_falls_back_to_instance(self, MockProc):
-        mock_proc = _make_mock_processor()
-        MockProc.return_value = mock_proc
-
-        app = AgentEvals(auto_instrument=False, eval_set_id="from-init")
-
-        with app.session(session_name="s1"):
-            pass
-
-        connect_kwargs = mock_proc.connect.call_args.kwargs
-        assert connect_kwargs["eval_set_id"] == "from-init"
-
-    @patch(PROC_PATH)
-    def test_connection_failure_raises_with_helpful_message(self, MockProc):
-        mock_proc = _make_mock_processor()
-        mock_proc.connect = AsyncMock(side_effect=ConnectionRefusedError("refused"))
-        MockProc.return_value = mock_proc
-
-        app = AgentEvals(auto_instrument=False)
-
+        monkeypatch.setattr(sdk_export, "preflight", refuse)
         with pytest.raises(ConnectionError, match="agentevals serve --dev"):
-            with app.session():
+            with AgentEvals(auto_instrument=False).session(tracer_provider=TracerProvider()):
                 pass
 
-    @patch(PROC_PATH)
-    def test_background_thread_is_joined_on_exit(self, MockProc):
-        MockProc.return_value = _make_mock_processor()
-        app = AgentEvals(auto_instrument=False)
-
-        threads_before = threading.active_count()
-        with app.session(session_name="s1"):
-            assert threading.active_count() > threads_before
-
-        # Give the thread a moment to fully terminate after join
-        import time
-
-        time.sleep(0.1)
-        assert threading.active_count() <= threads_before + 1
-
-    @patch(PROC_PATH)
-    def test_background_thread_joined_on_connection_failure(self, MockProc):
-        mock_proc = _make_mock_processor()
-        mock_proc.connect = AsyncMock(side_effect=ConnectionRefusedError("refused"))
-        MockProc.return_value = mock_proc
-
-        app = AgentEvals(auto_instrument=False)
-        threads_before = threading.active_count()
-
-        with pytest.raises(ConnectionError):
-            with app.session():
-                pass
-
-        import time
-
-        time.sleep(0.1)
-        assert threading.active_count() <= threads_before + 1
-
-    @patch(PROC_PATH)
-    def test_force_flush_called_before_shutdown(self, MockProc):
-        mock_proc = _make_mock_processor()
-        MockProc.return_value = mock_proc
-
+    def test_no_background_thread_is_left_running(self, exported):
         provider = TracerProvider()
-        provider.force_flush = MagicMock()
         app = AgentEvals(auto_instrument=False)
-
+        app._setup_otel("warmup", provider)
+        before = threading.active_count()
         with app.session(session_name="s1", tracer_provider=provider):
             pass
-
-        provider.force_flush.assert_called()
-        # force_flush must happen before shutdown
-        assert provider.force_flush.call_count >= 1
+        assert threading.active_count() == before
 
 
 # ---------------------------------------------------------------------------
-# Async session lifecycle
+# Async session
 # ---------------------------------------------------------------------------
 
 
 class TestAsyncSession:
-    @patch(PROC_PATH)
-    def test_connects_adds_processor_and_shuts_down(self, MockProc):
-        mock_proc = _make_mock_processor()
-        MockProc.return_value = mock_proc
+    async def test_session_spans_carry_the_session_resource(self, exported):
+        provider = TracerProvider()
+        async with AgentEvals(auto_instrument=False).session_async(
+            eval_set_id="e1", session_name="async-s1", tracer_provider=provider
+        ) as name:
+            assert name == "async-s1"
+            provider.get_tracer("t").start_span("work").end()
+        resource = _resource(exported.get_finished_spans()[0])
+        assert (resource["agentevals.session_name"], resource["agentevals.eval_set_id"]) == ("async-s1", "e1")
 
-        app = AgentEvals(auto_instrument=False)
-
-        async def _test():
-            async with app.session_async(eval_set_id="e1", session_name="s1", metadata={"k": "v"}):
-                mock_proc.connect.assert_called_once_with(eval_set_id="e1", metadata={"k": "v"})
-            mock_proc.shutdown_async.assert_called_once()
-
-        asyncio.run(_test())
-
-    @patch(PROC_PATH)
-    def test_processor_registered_on_tracer_provider(self, MockProc):
-        mock_proc = _make_mock_processor()
-        MockProc.return_value = mock_proc
-
+    async def test_concurrent_sessions_stay_apart(self, exported):
         provider = TracerProvider()
         app = AgentEvals(auto_instrument=False)
 
-        async def _test():
-            async with app.session_async(session_name="s1", tracer_provider=provider):
-                assert mock_proc in provider._active_span_processor._span_processors
+        async def run(name):
+            async with app.session_async(session_name=name, tracer_provider=provider):
+                await asyncio.sleep(0.01)
+                provider.get_tracer("t").start_span(f"work-{name}").end()
 
-        asyncio.run(_test())
+        await asyncio.gather(run("a"), run("b"))
+        by_name = {s.name: _resource(s)["agentevals.session_name"] for s in exported.get_finished_spans()}
+        assert by_name == {"work-a": "a", "work-b": "b"}
 
-    @patch(PROC_PATH)
-    def test_connection_failure_raises_with_helpful_message(self, MockProc):
-        mock_proc = _make_mock_processor()
-        mock_proc.connect = AsyncMock(side_effect=ConnectionRefusedError("refused"))
-        MockProc.return_value = mock_proc
+    async def test_unreachable_receiver_raises_with_helpful_message(self, monkeypatch):
+        def refuse(endpoint):
+            raise ConnectionError("refused")
 
-        app = AgentEvals(auto_instrument=False)
-
-        async def _test():
-            with pytest.raises(ConnectionError, match="agentevals serve --dev"):
-                async with app.session_async():
-                    pass
-
-        asyncio.run(_test())
-
-    @patch(PROC_PATH)
-    def test_yields_session_name(self, MockProc):
-        MockProc.return_value = _make_mock_processor()
-        app = AgentEvals(auto_instrument=False)
-
-        async def _test():
-            async with app.session_async(session_name="async-s1") as name:
-                assert name == "async-s1"
-
-        asyncio.run(_test())
-
-    @patch(PROC_PATH)
-    def test_shutdown_error_is_logged_not_raised(self, MockProc):
-        mock_proc = _make_mock_processor()
-        mock_proc.shutdown_async = AsyncMock(side_effect=RuntimeError("ws closed"))
-        MockProc.return_value = mock_proc
-
-        app = AgentEvals(auto_instrument=False)
-
-        async def _test():
-            async with app.session_async(session_name="s1"):
+        monkeypatch.setattr(sdk_export, "preflight", refuse)
+        with pytest.raises(ConnectionError, match="agentevals serve --dev"):
+            async with AgentEvals(auto_instrument=False).session_async(tracer_provider=TracerProvider()):
                 pass
-
-        asyncio.run(_test())
 
 
 # ---------------------------------------------------------------------------
-# streaming=False (disabled mode)
+# streaming=False
 # ---------------------------------------------------------------------------
 
 
 class TestStreamingDisabled:
     def test_sync_session_is_noop(self):
-        app = AgentEvals(streaming=False, auto_instrument=False)
-
-        with app.session(eval_set_id="e1", session_name="s1") as name:
-            assert name == "s1"
-
-    def test_sync_session_does_not_create_processor(self):
-        app = AgentEvals(streaming=False, auto_instrument=False)
-
-        with patch(PROC_PATH) as MockProc:
-            with app.session():
-                pass
-            MockProc.assert_not_called()
+        with patch.object(sdk_export, "install") as install:
+            with AgentEvals(streaming=False, auto_instrument=False).session(
+                eval_set_id="e1", session_name="s1"
+            ) as name:
+                assert name == "s1"
+        install.assert_not_called()
 
     def test_sync_session_generates_session_name(self):
-        app = AgentEvals(streaming=False, auto_instrument=False)
-
-        with app.session() as name:
+        with AgentEvals(streaming=False, auto_instrument=False).session() as name:
             assert name.startswith("session-")
 
-    def test_async_session_is_noop(self):
-        app = AgentEvals(streaming=False, auto_instrument=False)
-
-        async def _test():
-            async with app.session_async(eval_set_id="e1", session_name="s1") as name:
+    async def test_async_session_is_noop(self):
+        with patch.object(sdk_export, "install") as install:
+            async with AgentEvals(streaming=False, auto_instrument=False).session_async(session_name="s1") as name:
                 assert name == "s1"
-
-        asyncio.run(_test())
-
-    def test_async_session_does_not_create_processor(self):
-        app = AgentEvals(streaming=False, auto_instrument=False)
-
-        async def _test():
-            with patch(PROC_PATH) as MockProc:
-                async with app.session_async():
-                    pass
-                MockProc.assert_not_called()
-
-        asyncio.run(_test())
-
-    def test_no_background_thread_when_disabled(self):
-        app = AgentEvals(streaming=False, auto_instrument=False)
-        threads_before = threading.active_count()
-
-        with app.session(session_name="s1"):
-            assert threading.active_count() == threads_before
+        install.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

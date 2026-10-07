@@ -13,18 +13,20 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, Request, Response
 
 from .dependencies import require_trace_manager
-from .otlp_http import build_export_response, read_export_request
+from .otlp_http import build_export_response, overload_error, read_export_request
 from .otlp_processing import (
     build_logs_response,
     build_traces_response,
-    decode_protobuf_logs,
-    decode_protobuf_traces,
-    process_logs,
-    process_traces,
+    decode_logs_json,
+    decode_logs_protobuf,
+    decode_traces_json,
+    decode_traces_protobuf,
+    ingest_logs,
+    ingest_traces,
 )
 
 if TYPE_CHECKING:
-    from ..streaming.ws_server import StreamingTraceManager
+    from ..streaming.manager import LiveManager
 
 otlp_router = APIRouter()
 
@@ -32,20 +34,26 @@ otlp_router = APIRouter()
 @otlp_router.post("/v1/traces")
 async def receive_traces(
     request: Request,
-    manager: StreamingTraceManager = Depends(require_trace_manager),
+    manager: LiveManager = Depends(require_trace_manager),
 ) -> Response:
     """OTLP HTTP trace receiver (ExportTraceServiceRequest)."""
-    body, media_type = await read_export_request(request, decode_protobuf_traces, "resourceSpans")
-    result = await process_traces(body, manager)
+    decoded, media_type = await read_export_request(
+        request, decode_traces_json, decode_traces_protobuf, "resourceSpans"
+    )
+    result = await ingest_traces(decoded, manager)
+    if result.overloaded:
+        raise overload_error("spans")
     return build_export_response(build_traces_response(result), media_type)
 
 
 @otlp_router.post("/v1/logs")
 async def receive_logs(
     request: Request,
-    manager: StreamingTraceManager = Depends(require_trace_manager),
+    manager: LiveManager = Depends(require_trace_manager),
 ) -> Response:
     """OTLP HTTP log receiver (ExportLogsServiceRequest)."""
-    body, media_type = await read_export_request(request, decode_protobuf_logs, "resourceLogs")
-    result = await process_logs(body, manager)
+    decoded, media_type = await read_export_request(request, decode_logs_json, decode_logs_protobuf, "resourceLogs")
+    result = await ingest_logs(decoded, manager)
+    if result.overloaded:
+        raise overload_error("log records")
     return build_export_response(build_logs_response(result), media_type)

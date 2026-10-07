@@ -15,10 +15,10 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any, Literal
 
+from ..otel.identity import SESSION_NAME
 from ..otel.model import Trace
 from .semconv import CONVERSATION_ID, SESSION_ID
 
-SESSION_NAME = "agentevals.session_name"
 MAX_KEY_LENGTH = 256
 
 KeyKind = Literal["name", "conversation", "session_id", "trace"]
@@ -42,17 +42,23 @@ def _first(attr_maps: Iterable[Mapping[str, Any]], key: str) -> str | None:
     return None
 
 
-def conversation_key(trace: Trace) -> tuple[KeyKind, str]:
-    spans = list(trace.spans.values())
-    resources = [s.resource.attributes for s in spans]
+def identity_key(items: Iterable[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> tuple[KeyKind, str] | None:
+    """The identity key of a set of spans or log records, given as ``(attributes, resource attributes)``."""
+    items = list(items)
+    resources = [r for _, r in items]
     name = _first(resources, SESSION_NAME)
     if name:
         return "name", name
     for key, kind in ((CONVERSATION_ID, "conversation"), (SESSION_ID, "session_id")):
-        value = _first((s.attributes for s in spans), key) or _first(resources, key)
+        value = _first((a for a, _ in items), key) or _first(resources, key)
         if value:
             return kind, value
-    return "trace", trace.trace_id
+    return None
+
+
+def conversation_key(trace: Trace) -> tuple[KeyKind, str]:
+    key = identity_key((s.attributes, s.resource.attributes) for s in trace.spans.values())
+    return key or ("trace", trace.trace_id)
 
 
 def has_session_name(traces: Iterable[Trace]) -> bool:

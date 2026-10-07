@@ -119,10 +119,9 @@ class TestOtlpGrpcReceiver:
             session = trace_manager.sessions[session_name]
 
             assert session.is_complete
-            assert session.source == "otlp"
-            assert session.trace_ids == {trace_id_hex}
-            assert len(session.spans) == 1
-            assert len(session.logs) >= 1
-            assert session.logs[0]["event_name"] == "gen_ai.user.message"
+            assert session.trace_ids == [trace_id_hex]
+            assert session.span_count == 1
+            assert session.log_count == 1
+            assert trace_manager.store.traces[trace_id_hex].logs[0].event_name == "gen_ai.user.message"
         finally:
             await server.stop(grace=1)

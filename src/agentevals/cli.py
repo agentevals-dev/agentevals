@@ -527,14 +527,14 @@ async def _run_servers(
 
     from .api.app import create_app
     from .api.otlp_app import create_otlp_app
-    from .streaming.ws_server import StreamingTraceManager
+    from .streaming.manager import LiveManager
 
     shared_kwargs: dict = {
         "host": host,
         "log_level": log_level,
     }
 
-    mgr = StreamingTraceManager()
+    mgr = LiveManager()
     main_app = create_app(trace_manager=mgr, enable_streaming=True)
     otlp_app = create_otlp_app(trace_manager=mgr)
 
@@ -576,7 +576,7 @@ async def _run_servers(
 @click.option(
     "--dev",
     is_flag=True,
-    help="Enable dev mode with WebSocket support for live streaming.",
+    help="Enable dev mode for live streaming (prints the receiver endpoints).",
 )
 @click.option(
     "--host",
@@ -670,7 +670,6 @@ def serve(
         click.echo("agentevals dev server starting...")
         click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}  (OTEL_EXPORTER_OTLP_ENDPOINT default)")
         click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}  (OTEL_EXPORTER_OTLP_PROTOCOL=grpc)")
-        click.echo(f"  WebSocket: ws://{host}:{port}/ws/traces")
         click.echo(f"  API:       http://{host}:{port}/api")
         if mcp_port is not None:
             click.echo(f"  MCP:       http://{host}:{mcp_port}/mcp")

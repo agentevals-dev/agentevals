@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -27,7 +27,7 @@ from .routes import router
 from .runs_routes import runs_router
 
 if TYPE_CHECKING:
-    from ..streaming.ws_server import StreamingTraceManager
+    from ..streaming.manager import LiveManager
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ def _build_lifespan():
             ae_logger.addHandler(log_buffer)
         mgr = getattr(app.state, "trace_manager", None)
         if mgr:
-            mgr.start_cleanup_task()
+            mgr.start()
 
         storage_settings: StorageSettings | None = None
         worker: AsyncRunWorker | None = None
@@ -139,7 +139,7 @@ def _build_lifespan():
 
 def create_app(
     *,
-    trace_manager: StreamingTraceManager | None = None,
+    trace_manager: LiveManager | None = None,
     enable_streaming: bool = False,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -191,26 +191,22 @@ def create_app(
 
         app.include_router(streaming_router, prefix="/api/streaming")
 
-        @app.websocket("/ws/traces")
-        async def websocket_endpoint(websocket: WebSocket):
-            await websocket.app.state.trace_manager.handle_connection(websocket)
-
         @app.get("/stream/ui-updates")
         async def ui_updates_stream(request: Request):
             mgr = request.app.state.trace_manager
 
             async def event_generator():
-                queue = mgr.register_sse_client()
+                client = mgr.register_sse_client()
                 try:
                     while True:
-                        event = await queue.get()
+                        event = await client.queue.get()
                         if event is None:
                             break
                         yield f"data: {json.dumps(event)}\n\n"
                 except asyncio.CancelledError:
                     pass
                 finally:
-                    mgr.unregister_sse_client(queue)
+                    mgr.unregister_sse_client(client)
 
             return StreamingResponse(
                 event_generator(),

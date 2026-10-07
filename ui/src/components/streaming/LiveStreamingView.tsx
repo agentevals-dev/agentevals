@@ -193,7 +193,7 @@ export function LiveStreamingView() {
               const newMap = new Map(prev);
               newMap.set(data.sessionId, {
                 ...session,
-                spans: [...session.spans, data.span],
+                spans: [...session.spans, ...(data.spans ?? [data.span])],
               });
               return newMap;
             });

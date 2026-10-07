@@ -107,7 +107,7 @@ async def test_run_servers_shares_one_trace_manager_across_live_servers(monkeypa
     assert created_servers[1].handle_exit is not None
     main_paths = _route_paths(main_app)
     otlp_paths = _route_paths(otlp_app)
-    assert "/ws/traces" in main_paths
+    assert "/ws/traces" not in main_paths
     assert "/stream/ui-updates" in main_paths
     assert "/v1/traces" in otlp_paths
     assert "/v1/logs" in otlp_paths
