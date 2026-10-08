@@ -374,7 +374,7 @@ class LiveManager:
             is_complete=session.is_complete,
             started_at=session.started_at.isoformat(),
             metadata=session.metadata,
-            invocations=session.invocations if with_invocations and session.is_complete else None,
+            invocations=session.invocations if with_invocations else None,
         )
 
     def session_traces(self, session: LiveSession | str) -> list[Trace]:

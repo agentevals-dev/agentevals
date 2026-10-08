@@ -9,9 +9,11 @@ What the telemetry means is the :class:`RoutingPolicy`'s business (``genai.routi
 this module holds only the mechanics. Routing (``otel_native_core_202610.md`` 16.2), for spans of
 trace T with session key K from the policy:
 
-* R1, membership first: a trace already in a session stays there. A session that learns a
-  stronger key from its own trace (any key, for a provisional session) is promoted into the head
-  session for that key. Spans reopen a complete session; logs never do.
+* R1, membership first: a trace already in a session stays there, with two exceptions. A session
+  that learns a stronger key from its own trace (any key, for a provisional session) is promoted
+  into the head session for that key. A trace that receives a span starting before every span it
+  holds, with a different key of the same kind, moves to that key's head: the earliest span owns
+  the trace. Spans reopen a complete session; logs never do.
 * R2, a new trace with a key joins the head session for the key. A new SDK run id starts a new
   generation (``name-2``) at once. A complete head whose key kind splits on reruns starts a new
   generation for a rerun: a different ``service.instance.id`` when both sides carry one, otherwise
@@ -52,7 +54,8 @@ class RoutingPolicy(Protocol):
     its traces is promoted into the head for the stronger key. Unlisted kinds rank lowest."""
 
     def session_key(self, items: Iterable[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> SessionKey | None:
-        """The key of spans or log records given as ``(attributes, resource attributes)``."""
+        """The key of spans or log records given as ``(attributes, resource attributes)``. Spans come
+        in start order, so the result does not depend on the order they arrived in."""
         ...
 
     def opens_session(self, spans: Sequence[Span]) -> bool:
@@ -82,8 +85,8 @@ REASON_PENDING_FULL = "log record(s) rejected: pending log buffer full"
 REASON_FEEDBACK = "log record(s) rejected: evaluation result emitted by agentevals"
 
 # Refusals that may clear on their own (memory and session slots free up as sessions complete
-# and expire), so an export refused only for these is answered as retryable overload. Per trace
-# and per session caps are permanent and are reported through partial success instead.
+# and expire), so an export with any of these is answered as retryable overload. Per trace and per
+# session caps are permanent and are reported through partial success instead.
 TRANSIENT_REASONS = frozenset(
     {
         REASON_SPAN_MEMORY,
@@ -136,8 +139,10 @@ class IngestResult:
 
     @property
     def overloaded(self) -> bool:
-        """Every item was refused, and only for transient capacity reasons."""
-        return self.rejected > 0 and self.accepted == 0 and all(r in TRANSIENT_REASONS for r in self.reasons)
+        """Some item was refused for a transient capacity reason. The whole export is then answered as
+        retryable: partial success would tell the client never to resend those items, and resending
+        the ones already stored is harmless because spans and logs are deduplicated."""
+        return any(r in TRANSIENT_REASONS for r in self.reasons)
 
 
 @dataclass(slots=True)
@@ -250,6 +255,22 @@ def span_size(span: Span) -> int:
 
 def log_size(log: LogRecord) -> int:
     return 192 + estimate_size(log.body) + estimate_size(log.attributes)
+
+
+def envelope_size(items: Iterable[Span | LogRecord]) -> int:
+    """Bytes of the resources and scopes of decoded items, each distinct object once.
+
+    Every export decodes its own resource and scope objects and stored items keep them alive, so
+    large resources (Kubernetes attributes, say) count against the budget like the items do.
+    """
+    seen: set[int] = set()
+    total = 0
+    for item in items:
+        for part in (item.resource, item.scope):
+            if id(part) not in seen:
+                seen.add(id(part))
+                total += 64 + estimate_size(part.attributes)
+    return total
 
 
 def log_fingerprint(log: LogRecord) -> bytes:
@@ -380,9 +401,14 @@ class TelemetryStore:
         return f"{base}-{n}"
 
     def _new_session(
-        self, base_id: str, key: SessionKey | None, run_id: str | None, resource: Mapping
+        self,
+        base_id: str,
+        key: SessionKey | None,
+        run_id: str | None,
+        resource: Mapping,
+        exclude: str | None = None,
     ) -> LiveSession | None:
-        if len(self.sessions) >= self.limits.max_sessions and not self._evict_oldest_complete(exclude=None):
+        if len(self.sessions) >= self.limits.max_sessions and not self._evict_oldest_complete(exclude):
             return None
         session = LiveSession(
             session_id=self._unique_id(base_id),
@@ -413,13 +439,40 @@ class TelemetryStore:
         strength = self.policy.key_strength
         return strength.get(key[0], 0) > strength.get(other[0], 0)
 
-    def _head(self, key: SessionKey, run_id: str | None, resource: Mapping) -> LiveSession | None:
+    def _head(
+        self, key: SessionKey, run_id: str | None, resource: Mapping, exclude: str | None = None
+    ) -> LiveSession | None:
+        """The session for ``key``, created when needed. ``exclude`` is never evicted to make room."""
         head = self.sessions.get(self.heads.get(key, ""))
         if head is not None:
             new_run = run_id is not None and head.run_id != run_id
             if not new_run and not self._is_rerun(head, resource):
                 return head
-        return self._new_session(key[1], key, run_id, resource)
+        return self._new_session(key[1], key, run_id, resource, exclude)
+
+    def _discard_if_empty(self, session: LiveSession) -> None:
+        """Drop a session this call created when it ends up holding nothing. Its start was never
+        observed outside the store, so its ``started`` event is withdrawn rather than answered with
+        a removal."""
+        if session.trace_ids:
+            return
+        self.sessions.pop(session.session_id, None)
+        if session.key is not None and self.heads.get(session.key) == session.session_id:
+            del self.heads[session.key]
+        started = ("started", session.session_id)
+        if started in self.events:
+            self.events.remove(started)
+        else:
+            self.events.append(("removed", session.session_id, None))
+
+    def _detach_if_empty(self, trace: LiveTrace, session: LiveSession) -> None:
+        if trace.spans or trace.logs:
+            return
+        if trace.trace_id in session.trace_ids:
+            session.trace_ids.remove(trace.trace_id)
+        if self.traces.get(trace.trace_id) is trace:
+            del self.traces[trace.trace_id]
+        self._discard_if_empty(session)
 
     def _remove_session(self, session_id: str, absorbed_by: str | None) -> None:
         session = self.sessions.pop(session_id, None)
@@ -446,10 +499,13 @@ class TelemetryStore:
         self._remove_session(oldest.session_id, None)
         return True
 
-    def _make_room(self, size: int, exclude: str | None) -> bool:
+    def _make_room(self, size: int, exclude: str | None, keep_staged: str | None = None) -> bool:
+        """Evict staged traces, then complete sessions, until ``size`` fits. Neither the session
+        ``exclude`` nor the staged trace ``keep_staged`` (the one being written) is evicted."""
         while self.nbytes + size > self.limits.max_bytes:
-            if self.staged:
-                _, trace = self.staged.popitem(last=False)
+            victim = next((t for t in self.staged if t != keep_staged), None)
+            if victim is not None:
+                trace = self.staged.pop(victim)
                 self.nbytes -= trace.nbytes
                 self.counters["staged traces evicted"] += 1
             elif not self._evict_oldest_complete(exclude):
@@ -464,23 +520,37 @@ class TelemetryStore:
         session.log_count += len(trace.logs)
         session.nbytes += trace.nbytes
 
+    def _fits(self, target: LiveSession, traces: int, spans: int, logs: int) -> bool:
+        return (
+            len(target.trace_ids) + traces <= self.limits.traces_per_session
+            and target.span_count + spans <= self.limits.spans_per_session
+            and target.log_count + logs <= self.limits.logs_per_session
+        )
+
     def _merge_into(self, source: LiveSession, target: LiveSession) -> bool:
-        if (
-            len(target.trace_ids) + len(source.trace_ids) > self.limits.traces_per_session
-            or target.span_count + source.span_count > self.limits.spans_per_session
-            or target.log_count + source.log_count > self.limits.logs_per_session
-        ):
+        if not self._fits(target, len(source.trace_ids), source.span_count, source.log_count):
             return False
-        moved = [self.traces[t] for t in source.trace_ids]
-        source.trace_ids = []
-        for trace in moved:
-            self._attach(trace, target)
-        self._remove_session(source.session_id, target.session_id)
-        target.last_activity = self.clock()
-        if target.is_complete and any(not t.complete for t in moved):
-            self._reopen(target)
-        self._dirty(target)
+        for trace_id in list(source.trace_ids):
+            self._move_trace(self.traces[trace_id], source, target)
         return True
+
+    def _move_trace(self, trace: LiveTrace, source: LiveSession, target: LiveSession) -> None:
+        """Move one trace between sessions. A source left with no trace is absorbed by the target."""
+        source.trace_ids.remove(trace.trace_id)
+        source.span_count -= len(trace.spans)
+        source.log_count -= len(trace.logs)
+        source.nbytes -= trace.nbytes
+        self._attach(trace, target)
+        if source.trace_ids:
+            self._dirty(source)
+        else:
+            self._remove_session(source.session_id, target.session_id)
+        target.last_activity = self.clock()
+        if target.is_complete and not trace.complete:
+            self._reopen(target)
+        if not target.is_complete:
+            heapq.heappush(self._deadlines, (target.last_activity, "session", target.session_id))
+        self._dirty(target)
 
     def _reopen(self, session: LiveSession) -> None:
         session.is_complete = False
@@ -501,24 +571,42 @@ class TelemetryStore:
         now = self.clock()
         trace_id = spans[0].trace_id
         resource = spans[0].resource.attributes
-        key = self.policy.session_key((s.attributes, resource) for s in spans)
+        in_start_order = sorted(spans, key=lambda s: (s.start_time_unix_nano, s.span_id))
+        key = self.policy.session_key((s.attributes, resource) for s in in_start_order)
         run_id = coerce_key(resource.get(SESSION_RUN_ID))
 
         trace = self.traces.get(trace_id)
         session = self.sessions.get(trace.session_id) if trace and trace.session_id else None
+        attached_now = False
         if session is not None:
             if key is not None and self._outranks(key, session.key):
-                target = self._head(key, run_id, resource)
+                target = self._head(key, run_id, resource, exclude=session.session_id)
                 if target is None:
                     result.reject(REASON_SPAN_SESSIONS, len(spans))
                     return result
                 if target is not session:
                     if not self._merge_into(session, target):
+                        self._discard_if_empty(target)
                         result.reject(REASON_MERGE_REFUSED, len(spans))
                         return result
                     session = target
             elif key is not None and key != session.key and not self._outranks(session.key, key):
-                self.counters["session key conflicts"] += 1
+                if trace.min_start is None or in_start_order[0].start_time_unix_nano >= trace.min_start:
+                    self.counters["session key conflicts"] += 1
+                else:
+                    # Spans export as they end, so a delegate with its own conversation id usually
+                    # arrives before the span that encloses it; the earliest span owns the trace.
+                    target = self._head(key, run_id, resource, exclude=session.session_id)
+                    if target is None:
+                        result.reject(REASON_SPAN_SESSIONS, len(spans))
+                        return result
+                    if target is not session:
+                        if not self._fits(target, 1, len(trace.spans), len(trace.logs)):
+                            self._discard_if_empty(target)
+                            result.reject(REASON_MERGE_REFUSED, len(spans))
+                            return result
+                        self._move_trace(trace, session, target)
+                        session = target
         else:
             staged = self.staged.pop(trace_id, None)
             if staged is not None:
@@ -543,10 +631,15 @@ class TelemetryStore:
             if staged is not None:
                 self.nbytes += staged.nbytes
             self._attach(trace, session)
-            for log in self.pending.take(trace_id):
-                self._add_log(trace, session, log, IngestResult())
+            attached_now = True
+            pending = self.pending.take(trace_id)
+            envelope = envelope_size(pending)
+            for log in pending:
+                if self._add_log(trace, session, log, IngestResult(), extra=envelope):
+                    envelope = 0
 
         added: list[Span] = []
+        envelope = envelope_size(spans)
         for span in spans:
             if span.span_id in trace.spans:
                 result.accepted += 1
@@ -557,10 +650,11 @@ class TelemetryStore:
             if session.span_count >= self.limits.spans_per_session:
                 result.reject(REASON_SESSION_SPANS)
                 continue
-            size = span_size(span)
+            size = span_size(span) + envelope
             if not self._make_room(size, exclude=session.session_id):
                 result.reject(REASON_SPAN_MEMORY)
                 continue
+            envelope = 0
             trace.spans[span.span_id] = span
             trace.nbytes += size
             session.nbytes += size
@@ -569,6 +663,8 @@ class TelemetryStore:
             trace.note_span(span)
             result.accepted += 1
             added.append(span)
+        if attached_now:
+            self._detach_if_empty(trace, session)
         if added:
             if session.is_complete:
                 self._reopen(session)
@@ -582,6 +678,7 @@ class TelemetryStore:
         return result
 
     def _stage(self, trace: LiveTrace, spans: Sequence[Span], now: float, result: IngestResult) -> IngestResult:
+        envelope = envelope_size(spans)
         for span in spans:
             if span.span_id in trace.spans:
                 result.accepted += 1
@@ -589,10 +686,11 @@ class TelemetryStore:
             if len(trace.spans) >= self.limits.spans_per_trace:
                 result.reject(REASON_TRACE_SPANS)
                 continue
-            size = span_size(span)
+            size = span_size(span) + envelope
             if not self._make_room(size + trace.nbytes, exclude=None):
                 result.reject(REASON_SPAN_MEMORY)
                 continue
+            envelope = 0
             trace.spans[span.span_id] = span
             trace.nbytes += size
             trace.note_span(span)
@@ -614,7 +712,16 @@ class TelemetryStore:
 
     # ------------------------------------------------------------ logs
 
-    def _add_log(self, trace: LiveTrace, session: LiveSession | None, log: LogRecord, result: IngestResult) -> bool:
+    def _add_log(
+        self,
+        trace: LiveTrace,
+        session: LiveSession | None,
+        log: LogRecord,
+        result: IngestResult,
+        extra: int = 0,
+    ) -> bool:
+        """Store ``log`` in ``trace``; ``extra`` bytes (its export's envelope) are charged with it.
+        A staged ``trace`` (``session`` is None) is protected from the eviction that makes room."""
         key = log_fingerprint(log)
         if key in trace.log_keys:
             result.accepted += 1
@@ -625,8 +732,9 @@ class TelemetryStore:
         if session is not None and session.log_count >= self.limits.logs_per_session:
             result.reject(REASON_SESSION_LOGS)
             return False
-        size = log_size(log)
-        if not self._make_room(size, exclude=session.session_id if session else None):
+        size = log_size(log) + extra
+        keep = trace.trace_id if session is None else None
+        if not self._make_room(size, exclude=session.session_id if session else None, keep_staged=keep):
             result.reject(REASON_LOG_MEMORY)
             return False
         trace.logs.append(log)
@@ -663,10 +771,12 @@ class TelemetryStore:
         trace_id = kept[0].trace_id
         trace = self.traces.get(trace_id)
         session = self.sessions.get(trace.session_id) if trace and trace.session_id else None
+        envelope = envelope_size(kept)
         if trace is None and trace_id in self.staged:
             trace = self.staged[trace_id]
             for log in kept:
-                self._add_log(trace, None, log, result)
+                if self._add_log(trace, None, log, result, extra=envelope):
+                    envelope = 0
             return result
         if trace is None:
             resource = kept[0].resource.attributes
@@ -685,10 +795,18 @@ class TelemetryStore:
             trace = LiveTrace(trace_id=trace_id)
             self._attach(trace, session)
             self._schedule_session(session, now)
+            attached_now = True
+        else:
+            attached_now = False
 
         before = result.accepted
         for log in kept:
-            self._add_log(trace, session, log, result)
+            if self._add_log(trace, session, log, result, extra=envelope):
+                envelope = 0
+        if attached_now:
+            self._detach_if_empty(trace, session)
+            if trace.trace_id not in self.traces:
+                return result
         if result.accepted > before and session is not None:
             if not session.is_complete:
                 session.last_activity = now
@@ -734,6 +852,7 @@ class TelemetryStore:
                 if session is None or session.is_complete:
                     continue
                 if any(self.traces[t].has_spans for t in session.trace_ids):
+                    touched.add(ident)
                     continue
                 due = session.last_activity + self.limits.idle_timeout_seconds
                 if due > now:
@@ -807,6 +926,8 @@ class TelemetryStore:
             if len(trace.logs) < self.limits.logs_per_trace:
                 trace.logs.append(log)
                 trace.nbytes += log_size(log)
+        for trace in by_trace.values():
+            trace.nbytes += envelope_size([*trace.spans.values(), *trace.logs])
         size = sum(t.nbytes for t in by_trace.values())
         if not self._make_room(size, exclude=None):
             return None

@@ -231,3 +231,100 @@ class TestLoadSession:
         assert (first.session_id, second.session_id) == ("bundle", "bundle-2")
         assert first.is_complete and first.completed_once
         assert "ignored" not in store.sessions
+
+
+def _owned_bytes(store) -> int:
+    return sum(t.nbytes for t in store.traces.values()) + sum(t.nbytes for t in store.staged.values())
+
+
+def _big_reply(size: int) -> list[dict]:
+    return [{"role": "assistant", "parts": [{"type": "text", "content": "z" * size}]}]
+
+
+def _agent_with_conversation(
+    trace: str, span_id: str, conversation: str, start: int, parent: str | None = None
+) -> dict:
+    attrs = {"gen_ai.operation.name": "invoke_agent", "gen_ai.conversation.id": conversation}
+    return span(trace=trace, span_id=span_id, parent=parent, attrs=attrs, start=start, end=9_000)
+
+
+class TestRollback:
+    def test_a_session_whose_spans_are_all_refused_leaves_nothing_behind(self):
+        store, _ = make_store(max_bytes=2_000)
+        result = ingest(store, request([chat(outputs=_big_reply(5_000))], named("a")))
+        assert result.reasons[REASON_SPAN_MEMORY] == 1
+        assert (store.sessions, store.traces, store.nbytes) == ({}, {}, 0)
+        assert not [e for e in store.events if e[0] == "started"]
+
+    def test_memory_refusals_do_not_use_up_session_slots(self):
+        store, _ = make_store(max_bytes=2_000, max_sessions=2)
+        for n in range(3):
+            ingest(store, request([chat(trace=f"big{n}", outputs=_big_reply(5_000))], named(f"big{n}")))
+        assert ingest(store, request([chat(trace="small")], named("small"))).accepted == 1
+        assert list(store.sessions) == ["small"]
+
+    def test_a_retry_that_promotes_a_finished_session_completes_again(self):
+        store, clock = make_store()
+        ingest(store, request([chat(trace="t1", span_id="c1")]))
+        _complete(store, clock)
+        ingest(store, request([chat(trace="t1", span_id="c1")], named("run")))
+        assert list(store.sessions) == ["run"]
+        assert _complete(store, clock) == ["run"]
+
+
+class TestPromotion:
+    def test_promotion_never_evicts_the_session_being_promoted(self):
+        store, clock = make_store(max_sessions=1)
+        ingest(store, request([chat(trace="t1", span_id="c1")]))
+        _complete(store, clock)
+        keyed = span(trace="t1", span_id="x", parent="c1", attrs={"gen_ai.conversation.id": "conv-1"})
+        result = ingest(store, request([keyed]))
+        assert result.reasons[REASON_SPAN_SESSIONS] == 1
+        assert result.overloaded
+        assert [s.span_count for s in store.sessions.values()] == [1]
+
+    def test_the_earliest_span_owns_the_trace_key_across_exports(self):
+        store, _ = make_store()
+        ingest(store, request([_agent_with_conversation("t1", "d", "conv-delegate", 2_000, parent="r")]))
+        ingest(store, request([_agent_with_conversation("t1", "r", "conv-parent", 1_000)]))
+        assert list(store.sessions) == ["conv-parent"]
+        assert store.sessions["conv-parent"].span_count == 2
+
+    def test_only_the_trace_whose_earliest_span_arrives_moves(self):
+        store, _ = make_store()
+        for trace in ("t1", "t2"):
+            ingest(store, request([_agent_with_conversation(trace, f"d-{trace}", "conv-delegate", 2_000)]))
+        ingest(store, request([_agent_with_conversation("t1", "r", "conv-parent", 1_000)]))
+        assert store.session_of_trace(tid("t1")).session_id == "conv-parent"
+        assert store.session_of_trace(tid("t2")).session_id == "conv-delegate"
+
+    def test_a_later_enclosed_span_does_not_move_the_trace(self):
+        store, _ = make_store()
+        ingest(store, request([_agent_with_conversation("t1", "r", "conv-parent", 1_000)]))
+        ingest(store, request([_agent_with_conversation("t1", "d", "conv-delegate", 2_000, parent="r")]))
+        assert list(store.sessions) == ["conv-parent"]
+        assert store.counters["session key conflicts"] == 1
+
+
+class TestAccounting:
+    def test_a_log_never_evicts_the_staged_trace_it_is_written_to(self):
+        store, _ = make_store(max_bytes=2_000)
+        ingest(store, request([span(trace="st", name="GET /")]))
+        ingest(store, log_request([log_record(trace="st", body={"content": "y" * 1_600})]))
+        assert tid("st") in store.staged
+        assert store.nbytes == _owned_bytes(store)
+
+    def test_resource_attributes_count_against_the_budget(self):
+        store, _ = make_store()
+        ingest(store, request([chat(content=False)], {**named("r"), "k8s.pod.annotations": "r" * 10_000}))
+        assert store.nbytes > 10_000
+        assert store.nbytes == _owned_bytes(store)
+
+    def test_a_transient_refusal_makes_the_whole_export_retryable(self):
+        store, _ = make_store(max_bytes=2_000)
+        document = request([chat(trace="a")], named("a"))
+        document["resourceSpans"] += request([chat(trace="b", outputs=_big_reply(5_000))], named("b"))["resourceSpans"]
+        result = ingest(store, document)
+        assert result.accepted == 1
+        assert result.reasons[REASON_SPAN_MEMORY] == 1
+        assert result.overloaded

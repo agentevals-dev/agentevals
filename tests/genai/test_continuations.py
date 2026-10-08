@@ -98,3 +98,22 @@ def test_joining_never_mutates_the_input_turns():
     for _ in range(2):
         conversation_from_turns(traces, per_trace, "s")
     assert [(t.index, list(t.warnings)) for turns in per_trace for t in turns] == before
+
+
+def test_a_tool_result_for_another_call_does_not_continue_the_turn():
+    asks = chat(trace="a", span_id="c1", inputs=[user("Roll")], outputs=[assistant(tool_calls=[ROLL])])
+    unrelated = chat(
+        trace="b",
+        span_id="c2",
+        start=3_000,
+        end=4_000,
+        inputs=[
+            user("Weather?"),
+            assistant(tool_calls=[("call_9", "weather", {})]),
+            tool_result("call_9", "weather", "sunny"),
+        ],
+        outputs=[assistant("sunny")],
+    )
+    conversation = extract_conversation(_traces(asks, unrelated), "s")
+    assert [text_of(t.user_input) for t in conversation.turns] == ["Roll", "Weather?"]
+    assert [t.name for t in conversation.turns[0].tool_calls] == ["roll_die"]

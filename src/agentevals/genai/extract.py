@@ -10,19 +10,20 @@ Rules, in brief (``otel_native_core_202610.md`` sections 4.5 and 16):
 * Inference spans nested without an agent or tool in between collapse into one logical call
   when the chain has exactly one leaf (wrapper spans over provider spans); with several leaves
   each leaf is its own call. Usage is counted once per logical call.
-* Tool spans nested in a tool span of the same call (the same ``gen_ai.tool.call.id`` when both
-  carry one, else the same tool name) with no agent or model call between are one logical call:
+* Tool spans nested in a tool span with the same tool name (or the same ``gen_ai.tool.call.id``)
+  with no agent or model call between are one logical call:
   a framework tool span over the MCP client and MCP server spans of the call it makes. The
   outermost span is the call's ref, since it covers what the agent observed.
-* The trajectory comes from tool spans when the turn has any, otherwise from ``tool_call``
-  parts of the model outputs, with results joined from later ``tool_call_response`` parts.
-  Tool spans without arguments or result are completed from those parts (by call id, else by
-  tool name in order), never overriding what the span carries.
+* The trajectory comes from tool spans plus the ``tool_call`` parts of the model outputs that no
+  span claims, with results joined from ``tool_call_response`` parts of later calls. Tool spans
+  without arguments or result are completed from those parts (by call id, else by tool name in
+  order), never overriding what the span carries.
 * Outputs of calls under a tool span (AgentTool delegates) are not the turn's own speech: they
   are excluded from intermediate and final outputs, but their usage still counts.
 * Within a conversation, a root anchored turn whose first call's input ends with a tool response,
   following a turn whose last call requested tools, continues that turn (provider only telemetry
-  puts each model call of a tool round in its own trace). This reads message content; with
+  puts each model call of a tool round in its own trace). When both sides carry call ids, the
+  response must answer one of the requested calls. This reads message content; with
   content capture off the turns stay split and the later one carries a warning.
 
 Every walk is iterative, so adversarial nesting depth cannot exhaust the stack.
@@ -337,11 +338,13 @@ def _json_or_raw(value: Any) -> Any:
 
 
 def _same_tool_call(outer: SpanView, inner: SpanView) -> bool:
-    outer_id, inner_id = attr_str(outer.attrs, sc.TOOL_CALL_ID), attr_str(inner.attrs, sc.TOOL_CALL_ID)
-    if outer_id and inner_id:
-        return outer_id == inner_id
+    """Equal names, or equal call ids. Differing ids prove nothing: each layer stamps its own (an MCP
+    server never sees the model's call id and records the JSON-RPC request id instead)."""
     name = attr_str(outer.attrs, sc.TOOL_NAME)
-    return name is not None and name == attr_str(inner.attrs, sc.TOOL_NAME)
+    if name is not None and name == attr_str(inner.attrs, sc.TOOL_NAME):
+        return True
+    outer_id = attr_str(outer.attrs, sc.TOOL_CALL_ID)
+    return outer_id is not None and outer_id == attr_str(inner.attrs, sc.TOOL_CALL_ID)
 
 
 def _tool_chains(analysis: TraceAnalysis, ordered: list[str]) -> list[list[str]]:
@@ -406,37 +409,34 @@ def _tool_calls_from_parts(calls: list[LlmCall], warnings: list[str] | None = No
 
     A response pairs with its call by id. A response whose id matches no call in the turn (some
     producers number call and response parts independently) pairs with the next unclaimed call
-    in order, by tool name when the response names one.
+    in order, by tool name when the response names one. Either way the response must first appear
+    in a later call's input than the one that requested the tool: a result already in a call's own
+    input answers an earlier request, never the ones that call makes.
     """
-    responses: list[dict[str, Any]] = []
+    responses: list[tuple[int, dict[str, Any]]] = []
     seen: set = set()
-    for call in calls:
+    for index, call in enumerate(calls):
         for response in tool_responses_of(call.input_messages):
             key = response["id"] or (response.get("name"), repr(response["response"]))
             if key not in seen:
                 seen.add(key)
-                responses.append(response)
-    requested = [(call, tc) for call in calls for tc in tool_calls_of(call.output_messages)]
-    call_ids = {tc["id"] for _, tc in requested if tc["id"]}
+                responses.append((index, response))
+    requested = [(index, call, tc) for index, call in enumerate(calls) for tc in tool_calls_of(call.output_messages)]
+    call_ids = {tc["id"] for _, _, tc in requested if tc["id"]}
     claimed: set[int] = set()
     out = []
-    for call, tc in requested:
-        match = next(
-            (i for i, r in enumerate(responses) if i not in claimed and tc["id"] and r["id"] == tc["id"]),
-            None,
-        )
+    for index, call, tc in requested:
+        open_ = [(i, r) for i, (at, r) in enumerate(responses) if i not in claimed and at > index]
+        match = next((i for i, r in open_ if tc["id"] and r["id"] == tc["id"]), None)
         if match is None:
             match = next(
-                (
-                    i
-                    for i, r in enumerate(responses)
-                    if i not in claimed and r["id"] not in call_ids and r.get("name") in (None, tc["name"])
-                ),
+                (i for i, r in open_ if r["id"] not in call_ids and r.get("name") in (None, tc["name"])),
                 None,
             )
-            if match is not None and responses[match]["id"] and warnings is not None:
+            if match is not None and responses[match][1]["id"] and warnings is not None:
                 warnings.append(
-                    f"tool {tc['name']} result joined by order (response id {responses[match]['id']!r} matches no call)"
+                    f"tool {tc['name']} result joined by order"
+                    f" (response id {responses[match][1]['id']!r} matches no call)"
                 )
         if match is not None:
             claimed.add(match)
@@ -447,7 +447,7 @@ def _tool_calls_from_parts(calls: list[LlmCall], warnings: list[str] | None = No
                 name=tc["name"],
                 call_id=tc["id"],
                 arguments=tc["arguments"],
-                result=responses[match]["response"] if match is not None else None,
+                result=responses[match][1]["response"] if match is not None else None,
                 start_ns=call.end_ns,
             )
         )
@@ -458,8 +458,11 @@ def _is_empty(value: Any) -> bool:
     return value is None or value == {} or value == "" or value == []
 
 
-def _fill_from_parts(span_tools: list[ToolCall], calls: list[LlmCall], warnings: list[str]) -> None:
-    """Complete tool spans that carry no arguments or result from the turn's message parts.
+def _fill_from_parts(span_tools: list[ToolCall], calls: list[LlmCall], warnings: list[str]) -> list[ToolCall]:
+    """Complete tool spans that carry no arguments or result from the turn's message parts, and
+    return them together with the part tool calls no span claimed (a client side tool without a
+    span, say). An unclaimed call goes right after the call requested before it, so the trajectory
+    keeps the order the model asked for.
 
     Some producers (ADK with legacy content off) record arguments and results only as
     ``tool_call`` / ``tool_call_response`` parts and give the span a different call id than
@@ -468,8 +471,8 @@ def _fill_from_parts(span_tools: list[ToolCall], calls: list[LlmCall], warnings:
     """
     part_tools = _tool_calls_from_parts(calls, warnings)
     if not part_tools:
-        return
-    claimed: set[int] = set()
+        return span_tools
+    claimed: dict[int, ToolCall] = {}
     for tool in span_tools:
         match = next(
             (i for i, p in enumerate(part_tools) if i not in claimed and tool.call_id and p.call_id == tool.call_id),
@@ -481,7 +484,7 @@ def _fill_from_parts(span_tools: list[ToolCall], calls: list[LlmCall], warnings:
             by_name = match is not None
         if match is None:
             continue
-        claimed.add(match)
+        claimed[match] = tool
         part = part_tools[match]
         filled = []
         if _is_empty(tool.arguments) and not _is_empty(part.arguments):
@@ -494,6 +497,17 @@ def _fill_from_parts(span_tools: list[ToolCall], calls: list[LlmCall], warnings:
             warnings.append(
                 f"tool {tool.name} {' and '.join(filled)} joined from message parts by name (call ids differ)"
             )
+    out = list(span_tools)
+    previous: ToolCall | None = None
+    for index, part in enumerate(part_tools):
+        if index in claimed:
+            previous = claimed[index]
+            continue
+        warnings.append(f"tool {part.name} appears only in message parts, without a tool span")
+        position = next(i for i, t in enumerate(out) if t is previous) + 1 if previous is not None else 0
+        out.insert(position, part)
+        previous = part
+    return out
 
 
 # ---------------------------------------------------------------- external evaluations
@@ -540,8 +554,7 @@ def _turn(analysis: TraceAnalysis, anchor: str) -> Turn:
     calls = _llm_calls(analysis, ordered)
     tool_chains = _tool_chains(analysis, ordered)
     if tool_chains:
-        tools = _tool_calls_from_spans(analysis, tool_chains, warnings)
-        _fill_from_parts(tools, calls, warnings)
+        tools = _fill_from_parts(_tool_calls_from_spans(analysis, tool_chains, warnings), calls, warnings)
     else:
         tools = _tool_calls_from_parts(calls, warnings)
 
@@ -643,12 +656,14 @@ def _continues(previous: Turn, turn: Turn) -> bool:
     if turn.anchor_kind != "root":
         return False
     first, last = _first_call(turn), _last_call(previous)
-    return (
-        first is not None
-        and last is not None
-        and ends_with_tool_response(first.input_messages)
-        and bool(tool_calls_of(last.output_messages))
-    )
+    if first is None or last is None or not ends_with_tool_response(first.input_messages):
+        return False
+    requested = tool_calls_of(last.output_messages)
+    requested_ids = {tc["id"] for tc in requested if tc["id"]}
+    answered_ids = {r["id"] for r in tool_responses_of(first.input_messages) if r["id"]}
+    if requested_ids and answered_ids:
+        return bool(requested_ids & answered_ids)
+    return bool(requested)
 
 
 def _maybe_continues(previous: Turn, turn: Turn) -> bool:
@@ -669,8 +684,7 @@ def _merge(previous: Turn, turn: Turn) -> Turn:
     warnings = [*previous.warnings, *turn.warnings]
     span_tools = [t.model_copy() for t in (*previous.tool_calls, *turn.tool_calls) if t.ref is not None]
     if span_tools:
-        tools = span_tools
-        _fill_from_parts(tools, calls, warnings)
+        tools = _fill_from_parts(span_tools, calls, warnings)
     else:
         tools = _tool_calls_from_parts(calls, warnings)
 

@@ -729,7 +729,7 @@ class TestPartialSuccess:
         assert resp.status_code == 200
         partial = json.loads(resp.content)["partialSuccess"]
         assert int(partial["rejectedSpans"]) == 1
-        assert "invalid trace or span id" in partial["errorMessage"]
+        assert "no traceId or spanId field" in partial["errorMessage"]
 
     async def test_filtered_non_genai_logs_are_not_reported_as_rejected(self, otlp_client):
         """Non-gen_ai.* records are filtered by design, not rejected: no partial success."""

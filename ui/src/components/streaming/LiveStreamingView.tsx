@@ -98,22 +98,28 @@ export function LiveStreamingView() {
         }> = envelope.data;
         if (!mountedRef.current) return;
 
+        // The server's view replaces ours: events sent while this client was disconnected
+        // (or before it connected) are not replayed, but every session carries its current turns.
         setActiveSessions(prev => {
           const newMap = new Map(prev);
           for (const s of sessions) {
-            if (newMap.has(s.sessionId)) continue;
+            const known = newMap.get(s.sessionId);
+            const turns = s.invocations ?? [];
             newMap.set(s.sessionId, {
               sessionId: s.sessionId,
               traceId: s.traceId,
               evalSetId: s.evalSetId,
-              spans: [],
+              spans: known?.spans ?? [],
               status: s.isComplete ? 'complete' : 'active',
               metadata: (s.metadata ?? {}) as Record<string, string>,
-              invocations: s.invocations,
-              liveElements: s.invocations?.length
-                ? invocationsToElements(s.invocations)
-                : [],
-              liveStats: { totalInputTokens: 0, totalOutputTokens: 0 },
+              invocations: s.isComplete ? s.invocations : known?.invocations,
+              liveElements: turns.length ? invocationsToElements(turns) : known?.liveElements ?? [],
+              liveStats: turns.length
+                ? {
+                    totalInputTokens: turns.reduce((n, t) => n + (t.modelInfo?.inputTokens ?? 0), 0),
+                    totalOutputTokens: turns.reduce((n, t) => n + (t.modelInfo?.outputTokens ?? 0), 0),
+                  }
+                : known?.liveStats ?? { totalInputTokens: 0, totalOutputTokens: 0 },
               startedAt: s.startedAt,
             });
           }

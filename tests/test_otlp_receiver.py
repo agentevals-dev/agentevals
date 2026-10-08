@@ -35,6 +35,7 @@ from agentevals.api.otlp_processing import (
 )
 from agentevals.cli import _install_shared_exit_handler
 from agentevals.genai.routing import GenAIRoutingPolicy
+from agentevals.otel.encode import encode_document
 from agentevals.otel.store import Limits, TelemetryStore, session_metadata
 from agentevals.streaming.manager import LiveManager
 
@@ -205,6 +206,46 @@ class TestDecodeEnvelopes:
         data["spanId"] = "span1"
         decoded = decode_traces_json(_request([data]))
         assert decoded.rejected_spans == 1
+
+    def test_protobuf_field_names_are_accepted(self):
+        body = {
+            "resource_spans": [
+                {
+                    "resource": {"attributes": [{"key": "service.name", "value": {"string_value": "svc"}}]},
+                    "scope_spans": [
+                        {
+                            "scope": {"name": "protojson"},
+                            "spans": [
+                                {
+                                    "trace_id": tid("t1"),
+                                    "span_id": sid("s1"),
+                                    "name": "chat",
+                                    "start_time_unix_nano": "1",
+                                    "end_time_unix_nano": "2",
+                                    "attributes": [{"key": "gen_ai.usage.input_tokens", "value": {"int_value": "5"}}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+        span = decode_traces_json(body).spans[0]
+        assert (span.trace_id, span.start_time_unix_nano) == (tid("t1"), 1)
+        assert dict(span.attributes) == {"gen_ai.usage.input_tokens": 5}
+        assert (span.resource.attributes["service.name"], span.scope.name) == ("svc", "protojson")
+
+    def test_dropped_counts_survive_a_round_trip(self):
+        body = _request([{**_span(), "droppedAttributesCount": 5, "droppedEventsCount": 1, "droppedLinksCount": 3}])
+        body["resourceSpans"][0]["resource"]["droppedAttributesCount"] = 2
+        body["resourceSpans"][0]["scopeSpans"][0]["scope"]["droppedAttributesCount"] = 4
+        encoded = encode_document(decode_traces_json(body).spans)["resourceSpans"][0]
+        span = encoded["scopeSpans"][0]["spans"][0]
+        assert (
+            encoded["resource"]["droppedAttributesCount"],
+            encoded["scopeSpans"][0]["scope"]["droppedAttributesCount"],
+        ) == (2, 4)
+        assert (span["droppedAttributesCount"], span["droppedEventsCount"], span["droppedLinksCount"]) == (5, 1, 3)
 
     def test_log_event_name_field(self):
         log = decode_logs_json(_log_request([_log()])).logs[0]
@@ -682,6 +723,13 @@ class TestLogs:
         results = _ingest_logs(store, _log_request([record], [_attr("service.instance.id", "me")]))
         assert results[0].rejected == 1
 
+    def test_producer_logs_sharing_the_instance_id_are_kept(self):
+        store = TelemetryStore(GenAIRoutingPolicy(emitter_instance_id="me"), clock=FakeClock())
+        _ingest(store, _request([_span()], _named("s1")))
+        results = _ingest_logs(store, _log_request([_log()], [_attr("service.instance.id", "me")]))
+        assert results[0].rejected == 0
+        assert store.sessions["s1"].log_count == 1
+
     def test_third_party_evaluation_results_are_kept(self):
         store, _ = _store()
         _ingest(store, _request([_span()], _named("s1")))
@@ -722,7 +770,7 @@ class TestExportResultCounts:
         data["traceId"] = ""
         result = await ingest_traces(decode_traces_json(_request([data])), _manager())
         assert (result.accepted, result.rejected) == (0, 1)
-        assert "invalid trace or span id" in result.error_message
+        assert "no traceId or spanId field" in result.error_message
 
     async def test_log_limit_is_counted_as_rejected(self):
         mgr = _manager(logs_per_trace=1)

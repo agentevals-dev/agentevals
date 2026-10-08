@@ -12,7 +12,7 @@ from agentevals.otel.decode import decode_json_document
 from agentevals.otel.model import SpanRef, build_traces
 from agentevals.streaming import manager as manager_module
 from agentevals.streaming.manager import LiveManager, LiveState, live_events
-from otel.builders import agent, assistant, chat, named, request, sid, tid, tool_result, user
+from otel.builders import agent, assistant, chat, named, request, sid, span, tid, tool_result, user
 
 
 def _conversation(*spans: dict) -> Conversation:
@@ -94,6 +94,51 @@ class TestLiveEvents:
         ]
         events = live_events("s", _conversation(*spans), LiveState(), set())
         assert _kinds(events).count("agent_response") + _kinds(events).count("user_input") <= 2
+
+
+def _tool_layer(span_id: str, parent: str, start: int, **attrs) -> dict:
+    attrs = {"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": "search", **attrs}
+    return span(span_id=span_id, parent=parent, attrs=attrs, start=start, end=start + 500)
+
+
+FRAMEWORK = _tool_layer("fw", "a1", 1_000, **{"gen_ai.tool.call.id": "x1"})
+CLIENT = _tool_layer("client", "fw", 1_010, **{"gen_ai.tool.call.result": '{"hits": 3}'})
+SERVER = _tool_layer("server", "client", 1_020, **{"gen_ai.tool.call.result": '{"hits": 3}'})
+
+
+class TestToolLayers:
+    @pytest.mark.parametrize(
+        ("early", "late"),
+        [
+            pytest.param([FRAMEWORK, CLIENT], [SERVER], id="server-last"),
+            pytest.param([CLIENT, SERVER], [FRAMEWORK], id="framework-last"),
+        ],
+    )
+    def test_layers_of_one_call_arriving_apart_are_sent_once(self, early, late):
+        state = LiveState()
+        root = agent(span_id="a1", start=0, end=10_000)
+        sent = live_events("s", _conversation(root, *early), state, set())
+        sent += live_events("s", _conversation(root, *early, *late), state, set())
+        assert _kinds(sent).count("tool_call") == 1
+        assert _kinds(sent).count("tool_result") == 1
+
+
+class TestSessionList:
+    async def test_a_running_session_lists_its_turns(self):
+        mgr = LiveManager()
+        mgr.start()
+        waiting = chat(
+            span_id="c1", parent="not-yet-exported", inputs=[user("still there?")], outputs=[assistant("yes")]
+        )
+        await mgr.ingest_spans(decode_json_document(request([waiting], named("open")), strict=True))
+        for _ in range(100):
+            if mgr.sessions["open"].invocations:
+                break
+            await asyncio.sleep(0.02)
+        info = mgr.session_info(mgr.sessions["open"], with_invocations=True)
+        await mgr.shutdown()
+        assert info.is_complete is False
+        assert [i["userText"] for i in info.invocations] == ["still there?"]
 
 
 async def _drain_until(client, kind: str, timeout: float = 10.0) -> list[dict]:

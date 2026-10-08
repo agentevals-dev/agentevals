@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any, Literal
 
 from ..otel.identity import SESSION_NAME, coerce_key
-from ..otel.model import Trace
+from ..otel.model import Span, Trace
 from .semconv import CONVERSATION_ID, SESSION_ID
 
 KeyKind = Literal["name", "conversation", "session_id", "trace"]
@@ -44,8 +44,14 @@ def identity_key(items: Iterable[tuple[Mapping[str, Any], Mapping[str, Any]]]) -
     return None
 
 
+def by_start(spans: Iterable[Span]) -> list[Span]:
+    """Spans in start order, so the outermost span's identity wins over a delegate's whatever order
+    the spans arrived in (an A2A sub agent can carry its own ``gen_ai.conversation.id``)."""
+    return sorted(spans, key=lambda s: (s.start_time_unix_nano, s.span_id))
+
+
 def conversation_key(trace: Trace) -> tuple[KeyKind, str]:
-    key = identity_key((s.attributes, s.resource.attributes) for s in trace.spans.values())
+    key = identity_key((s.attributes, s.resource.attributes) for s in by_start(trace.spans.values()))
     return key or ("trace", trace.trace_id)
 
 

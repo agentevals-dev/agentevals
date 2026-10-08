@@ -108,6 +108,23 @@ class TestDetectFormat:
         finally:
             os.unlink(path)
 
+    def test_otlp_with_protobuf_field_names(self):
+        doc = {
+            "resource_spans": [
+                {
+                    "scope_spans": [
+                        {"spans": [{"trace_id": "t1", "span_id": "s1", "name": "op", "end_time_unix_nano": "1000"}]}
+                    ]
+                }
+            ]
+        }
+        path = _write_tmp(json.dumps(doc))
+        try:
+            assert detect_format(path) == "otlp-json"
+            assert [t.trace_id for t in load_traces(path)] == ["t1"]
+        finally:
+            os.unlink(path)
+
     def test_tempo_v1_batches(self):
         path = _write_tmp(json.dumps(_tempo_v1_doc()))
         try:

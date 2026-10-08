@@ -52,6 +52,7 @@ class SpanRef:
 class Resource:
     attributes: Mapping[str, Any] = field(default_factory=_empty_attrs)
     schema_url: str | None = None
+    dropped_attributes_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +61,7 @@ class Scope:
     version: str | None = None
     schema_url: str | None = None
     attributes: Mapping[str, Any] = field(default_factory=_empty_attrs)
+    dropped_attributes_count: int = 0
 
 
 EMPTY_RESOURCE = Resource()
@@ -71,6 +73,7 @@ class SpanEvent:
     name: str
     time_unix_nano: int
     attributes: Mapping[str, Any] = field(default_factory=_empty_attrs)
+    dropped_attributes_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +83,7 @@ class SpanLink:
     trace_state: str | None = None
     attributes: Mapping[str, Any] = field(default_factory=_empty_attrs)
     flags: int | None = None
+    dropped_attributes_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +100,7 @@ class LogRecord:
     flags: int | None
     resource: Resource
     scope: Scope
+    dropped_attributes_count: int = 0
 
     @property
     def ref(self) -> SpanRef | None:
@@ -122,6 +127,9 @@ class Span:
     flags: int | None = None
     resource: Resource = EMPTY_RESOURCE
     scope: Scope = EMPTY_SCOPE
+    dropped_attributes_count: int = 0
+    dropped_events_count: int = 0
+    dropped_links_count: int = 0
 
     @property
     def ref(self) -> SpanRef:

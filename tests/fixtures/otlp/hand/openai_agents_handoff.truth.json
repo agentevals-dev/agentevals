@@ -13,6 +13,13 @@
    ],
    "tool_calls": [
     {
+     "name": "transfer_to_billing",
+     "args": {},
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
      "name": "issue_refund",
      "args": {
       "order_id": "42"
@@ -32,8 +39,8 @@
   }
  ],
  "notes": [
-  "one turn anchored on the workflow; handoff is not a tool span, so the trajectory holds only issue_refund",
-  "the handoff tool_call part (transfer_to_billing) is ignored because the turn has tool spans (trajectory source rule)"
+  "one turn anchored on the workflow",
+  "the handoff has no tool span, so transfer_to_billing comes from its tool_call part; ADK's transfer_to_agent is a tool call too"
  ],
  "content_captured": true,
  "tokens": {

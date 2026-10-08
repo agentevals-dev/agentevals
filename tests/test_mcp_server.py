@@ -404,3 +404,29 @@ async def test_evaluate_sessions_posts_builtin_evaluator_overrides(monkeypatch):
             "judgeBaseUrl": None,
         }
     ]
+
+
+async def test_summarize_session_reads_the_live_otlp_export(monkeypatch):
+    import httpx
+
+    from agentevals import mcp_server
+    from agentevals.api.app import create_app
+    from agentevals.otel.decode import decode_json_document
+    from agentevals.streaming.manager import LiveManager
+    from genai.test_continuations import _tool_round
+    from otel.builders import request
+
+    mgr = LiveManager()
+    decoded = decode_json_document(request(list(_tool_round())), strict=True)
+    mgr.load_session("s1", decoded.spans, decoded.logs)
+    transport = httpx.ASGITransport(app=create_app(trace_manager=mgr, enable_streaming=True))
+    client = httpx.AsyncClient
+    monkeypatch.setattr(mcp_server.httpx, "AsyncClient", lambda **kwargs: client(transport=transport, **kwargs))
+
+    _, summary = await mcp_server.create_server(server_url="http://agentevals").call_tool(
+        "summarize_session", {"session_id": "s1"}
+    )
+    assert (summary["num_spans"], summary["num_invocations"]) == (2, 1)
+    turn = summary["invocations"][0]
+    assert (turn["user"], turn["response"]) == ("Roll a d20", "You rolled 7")
+    assert turn["tool_calls"] == [{"tool": "roll_die", "args": {"sides": 20}}]

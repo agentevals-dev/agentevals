@@ -99,8 +99,8 @@ Trace and span ids must be valid hex (32 and 16 characters). Records with bad id
 | Situation | Response |
 |---|---|
 | Everything accepted | `200`, no `partialSuccess` |
-| Some records refused (bad ids, a trace or session limit, full log buffer) | `200` with `partialSuccess` counts and a reason. Do not retry. |
-| Everything refused because the server is full (memory or session slots) | `503` with `Retry-After` (gRPC `UNAVAILABLE`). Retry later. |
+| Some records refused for good (bad ids, a trace or session limit) | `200` with `partialSuccess` counts and a reason. Do not retry. |
+| Any record refused because the server is full (memory, session slots, log buffer) | `503` with `Retry-After` (gRPC `UNAVAILABLE`). Retry the whole export; records already stored are not stored twice. |
 | Body cannot be decoded | `400` |
 | Unsupported `Content-Type` or `Content-Encoding` | `415`. Use `compression: gzip` or `none`. |
 | Body over 64 MiB, compressed body over 8 MiB, or more than 32 gzip members | `413` / `400` |

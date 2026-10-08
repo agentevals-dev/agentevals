@@ -36,8 +36,19 @@ def attributes_to_json(attrs: Mapping[str, Any]) -> list[dict]:
     return [{"key": k, "value": any_value_to_json(v)} for k, v in attrs.items()]
 
 
+def _dropped(out: dict, **counts: int) -> dict:
+    """Write non zero ``dropped*Count`` fields, the producer's only sign that it truncated something."""
+    for name, value in counts.items():
+        if value:
+            out[name] = value
+    return out
+
+
 def _resource_json(resource: Resource) -> dict:
-    return {"attributes": attributes_to_json(resource.attributes)}
+    return _dropped(
+        {"attributes": attributes_to_json(resource.attributes)},
+        droppedAttributesCount=resource.dropped_attributes_count,
+    )
 
 
 def _scope_json(scope: Scope) -> dict:
@@ -46,7 +57,7 @@ def _scope_json(scope: Scope) -> dict:
         out["version"] = scope.version
     if scope.attributes:
         out["attributes"] = attributes_to_json(scope.attributes)
-    return out
+    return _dropped(out, droppedAttributesCount=scope.dropped_attributes_count)
 
 
 def span_to_json(span: Span) -> dict:
@@ -67,7 +78,10 @@ def span_to_json(span: Span) -> dict:
         out["flags"] = span.flags
     if span.events:
         out["events"] = [
-            {"name": e.name, "timeUnixNano": str(e.time_unix_nano), "attributes": attributes_to_json(e.attributes)}
+            _dropped(
+                {"name": e.name, "timeUnixNano": str(e.time_unix_nano), "attributes": attributes_to_json(e.attributes)},
+                droppedAttributesCount=e.dropped_attributes_count,
+            )
             for e in span.events
         ]
     if span.links:
@@ -82,14 +96,19 @@ def span_to_json(span: Span) -> dict:
                 item["traceState"] = link.trace_state
             if link.flags is not None:
                 item["flags"] = link.flags
-            links.append(item)
+            links.append(_dropped(item, droppedAttributesCount=link.dropped_attributes_count))
         out["links"] = links
     if span.status_code or span.status_message:
         status: dict[str, Any] = {"code": span.status_code}
         if span.status_message:
             status["message"] = span.status_message
         out["status"] = status
-    return out
+    return _dropped(
+        out,
+        droppedAttributesCount=span.dropped_attributes_count,
+        droppedEventsCount=span.dropped_events_count,
+        droppedLinksCount=span.dropped_links_count,
+    )
 
 
 def log_to_json(log: LogRecord) -> dict:
@@ -112,7 +131,7 @@ def log_to_json(log: LogRecord) -> dict:
         out["spanId"] = log.span_id
     if log.flags is not None:
         out["flags"] = log.flags
-    return out
+    return _dropped(out, droppedAttributesCount=log.dropped_attributes_count)
 
 
 def _group(items: Iterable[Any]) -> list[tuple[Resource, list[tuple[Scope, list[Any]]]]]:

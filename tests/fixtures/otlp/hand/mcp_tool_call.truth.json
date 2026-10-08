@@ -1,0 +1,44 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/mcp_tool_call",
+ "source": "hand authored from the semconv mcp.md 'Tool call' example (semantic-conventions-genai 4f85037): MCP client and server spans both carry execute_tool, the server in its own service",
+ "turns": [
+  {
+   "user_text": "What is the weather in San Francisco?",
+   "final_text": "Expect 60 to 75F in San Francisco on October 1.",
+   "intermediate_texts": [],
+   "agents": [
+    "weather-forecast-agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get-weather",
+     "args": {
+      "location": "San Francisco",
+      "date": "2025-10-01"
+     },
+     "result": {
+      "temperature_range": {
+       "high": 75,
+       "low": 60
+      }
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 60,
+    "output": 20
+   }
+  }
+ ],
+ "notes": [
+  "the MCP client span and the MCP server span nested in it are one tool call"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 60,
+  "output": 20
+ }
+}

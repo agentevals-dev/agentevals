@@ -2,7 +2,8 @@
 
 Two inputs, one result shape:
 
-* OTLP/JSON documents (dicts), including legacy and vendor variants: ``batches`` and
+* OTLP/JSON documents (dicts), including legacy and vendor variants: protobuf field names
+  (``resource_spans``, ``trace_id``), ``batches`` and
   ``instrumentationLibrarySpans`` (Tempo v1), the ``{"trace": {...}}`` wrapper (Tempo v2),
   attributes given as flat or nested dicts (ClickHouse JSON columns), enum names instead of
   numbers, and bare spans with no resource envelope (one span per line).
@@ -264,8 +265,13 @@ def attributes_from_json(attrs: Any, result: DecodeResult) -> Mapping[str, Any]:
 def _resource_from_json(obj: Any, schema_url: Any, result: DecodeResult) -> Resource:
     if not isinstance(obj, Mapping) and not schema_url:
         return EMPTY_RESOURCE
-    attrs = attributes_from_json(obj.get("attributes", []) if isinstance(obj, Mapping) else [], result)
-    return Resource(attributes=attrs, schema_url=_opt_str(schema_url))
+    obj = obj if isinstance(obj, Mapping) else {}
+    attrs = attributes_from_json(obj.get("attributes", []), result)
+    return Resource(
+        attributes=attrs,
+        schema_url=_opt_str(schema_url),
+        dropped_attributes_count=_int(obj.get("droppedAttributesCount")),
+    )
 
 
 def _scope_from_json(obj: Any, schema_url: Any, result: DecodeResult) -> Scope:
@@ -279,6 +285,7 @@ def _scope_from_json(obj: Any, schema_url: Any, result: DecodeResult) -> Scope:
         version=_opt_str(obj.get("version")),
         schema_url=_opt_str(schema_url),
         attributes=attributes_from_json(obj.get("attributes", []), result),
+        dropped_attributes_count=_int(obj.get("droppedAttributesCount")),
     )
 
 
@@ -295,7 +302,10 @@ def span_from_json(
     trace_id = normalize_id(data.get("traceId"), TRACE_ID_BYTES, strict, result, "trace id")
     span_id = normalize_id(data.get("spanId"), SPAN_ID_BYTES, strict, result, "span id")
     if trace_id is None or span_id is None:
-        result.reject_span("span(s) rejected: invalid trace or span id")
+        if data.get("traceId") in (None, "") or data.get("spanId") in (None, ""):
+            result.reject_span("span(s) rejected: no traceId or spanId field")
+        else:
+            result.reject_span("span(s) rejected: invalid trace or span id")
         return None
     parent = data.get("parentSpanId")
     parent_id = normalize_id(parent, SPAN_ID_BYTES, strict, result, "parent span id") if parent else None
@@ -312,6 +322,7 @@ def span_from_json(
                 name=ev.get("name") if isinstance(ev.get("name"), str) else "",
                 time_unix_nano=_int(ev.get("timeUnixNano")),
                 attributes=attributes_from_json(ev.get("attributes", []), result),
+                dropped_attributes_count=_int(ev.get("droppedAttributesCount")),
             )
         )
     links = []
@@ -330,6 +341,7 @@ def span_from_json(
                 trace_state=_opt_str(ln.get("traceState")),
                 attributes=attributes_from_json(ln.get("attributes", []), result),
                 flags=_opt_int(ln.get("flags")),
+                dropped_attributes_count=_int(ln.get("droppedAttributesCount")),
             )
         )
     return Span(
@@ -349,6 +361,9 @@ def span_from_json(
         flags=_opt_int(data.get("flags")),
         resource=resource,
         scope=scope,
+        dropped_attributes_count=_int(data.get("droppedAttributesCount")),
+        dropped_events_count=_int(data.get("droppedEventsCount")),
+        dropped_links_count=_int(data.get("droppedLinksCount")),
     )
 
 
@@ -389,6 +404,7 @@ def log_from_json(data: Any, resource: Resource, scope: Scope, strict: bool, res
         flags=_opt_int(data.get("flags")),
         resource=resource,
         scope=scope,
+        dropped_attributes_count=_int(data.get("droppedAttributesCount")),
     )
 
 
@@ -405,10 +421,42 @@ def _severity(value: Any) -> int | None:
     return _opt_int(value)
 
 
+_PROTO_NAME_ROOTS = ("resource_spans", "resource_logs")
+
+
+def _camel(name: str) -> str:
+    head, *rest = name.split("_")
+    return head + "".join(part[:1].upper() + part[1:] for part in rest)
+
+
+def proto_names_to_json(data: Any) -> Any:
+    """Rename protobuf field names (``resource_spans``, ``trace_id``) to their OTLP/JSON spelling, in place.
+
+    protojson with proto names (Go ``UseProtoNames``) writes them and the Collector reads both.
+    Only documents rooted at ``resource_spans`` / ``resource_logs`` are touched. Keys of dict valued
+    ``attributes`` are attribute names and are kept as they are. Iterative, so nesting depth is no
+    concern.
+    """
+    if not isinstance(data, dict) or not any(k in data for k in _PROTO_NAME_ROOTS):
+        return data
+    stack: list[Any] = [data]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            for key in [k for k in item if isinstance(k, str) and "_" in k]:
+                item[_camel(key)] = item.pop(key)
+            for key, value in item.items():
+                if isinstance(value, (dict, list)) and not (key == "attributes" and isinstance(value, dict)):
+                    stack.append(value)
+        else:
+            stack.extend(v for v in item if isinstance(v, (dict, list)))
+    return data
+
+
 def is_otlp_document(data: Any) -> bool:
     if not isinstance(data, Mapping):
         return False
-    if any(k in data for k in ("resourceSpans", "resourceLogs", "batches")):
+    if any(k in data for k in ("resourceSpans", "resourceLogs", "batches", *_PROTO_NAME_ROOTS)):
         return True
     inner = data.get("trace")
     return isinstance(inner, Mapping) and ("resourceSpans" in inner or "batches" in inner)
@@ -419,6 +467,7 @@ def decode_json_document(data: Any, *, strict: bool) -> DecodeResult:
     result = DecodeResult()
     if not isinstance(data, Mapping):
         return result
+    data = proto_names_to_json(data)
     inner = data.get("trace")
     if isinstance(inner, Mapping) and ("resourceSpans" in inner or "batches" in inner):
         data = inner
@@ -504,17 +553,24 @@ def attributes_from_proto(kvs: Iterable[Any], result: DecodeResult) -> Mapping[s
 def _resource_from_proto(rs: Any, result: DecodeResult) -> Resource:
     attrs = attributes_from_proto(rs.resource.attributes, result)
     schema_url = rs.schema_url or None
-    if not attrs and not schema_url:
+    dropped = rs.resource.dropped_attributes_count
+    if not attrs and not schema_url and not dropped:
         return EMPTY_RESOURCE
-    return Resource(attributes=attrs, schema_url=schema_url)
+    return Resource(attributes=attrs, schema_url=schema_url, dropped_attributes_count=dropped)
 
 
 def _scope_from_proto(ss: Any, result: DecodeResult) -> Scope:
     sc = ss.scope
     attrs = attributes_from_proto(sc.attributes, result)
-    if not sc.name and not sc.version and not attrs and not ss.schema_url:
+    if not sc.name and not sc.version and not attrs and not ss.schema_url and not sc.dropped_attributes_count:
         return EMPTY_SCOPE
-    return Scope(name=sc.name, version=sc.version or None, schema_url=ss.schema_url or None, attributes=attrs)
+    return Scope(
+        name=sc.name,
+        version=sc.version or None,
+        schema_url=ss.schema_url or None,
+        attributes=attrs,
+        dropped_attributes_count=sc.dropped_attributes_count,
+    )
 
 
 def decode_traces_proto(request: Any) -> DecodeResult:
@@ -551,6 +607,7 @@ def decode_traces_proto(request: Any) -> DecodeResult:
                             ln.trace_state or None,
                             attributes_from_proto(ln.attributes, result),
                             ln.flags or None,
+                            ln.dropped_attributes_count,
                         )
                     )
                 result.spans.append(
@@ -566,7 +623,12 @@ def decode_traces_proto(request: Any) -> DecodeResult:
                         status_code=int(sp.status.code),
                         status_message=sp.status.message or None,
                         events=tuple(
-                            SpanEvent(ev.name, ev.time_unix_nano, attributes_from_proto(ev.attributes, result))
+                            SpanEvent(
+                                ev.name,
+                                ev.time_unix_nano,
+                                attributes_from_proto(ev.attributes, result),
+                                ev.dropped_attributes_count,
+                            )
                             for ev in sp.events
                         ),
                         links=tuple(links),
@@ -574,6 +636,9 @@ def decode_traces_proto(request: Any) -> DecodeResult:
                         flags=sp.flags or None,
                         resource=resource,
                         scope=scope,
+                        dropped_attributes_count=sp.dropped_attributes_count,
+                        dropped_events_count=sp.dropped_events_count,
+                        dropped_links_count=sp.dropped_links_count,
                     )
                 )
     return result
@@ -607,6 +672,7 @@ def decode_logs_proto(request: Any) -> DecodeResult:
                         flags=lr.flags or None,
                         resource=resource,
                         scope=scope,
+                        dropped_attributes_count=lr.dropped_attributes_count,
                     )
                 )
     return result
