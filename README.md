@@ -252,7 +252,7 @@ Yes. agentevals accepts OTLP over HTTP (`http/protobuf` and `http/json`, gzip in
 
 **Can I evaluate Claude Code, Codex or OpenCode?**
 
-Not today. They do not emit GenAI semantic convention spans. agentevals is built for instrumented agents whose success is measurable through tool trajectories and responses, not for scoring long coding sessions end to end.
+Partly. They do not emit GenAI semantic convention spans, so agentevals sees a turn only when something wraps it in one, as kagent does for its Claude Code harness. A Collector recipe can then map Claude Code's own spans to tool and model calls, see the [Kubernetes example](examples/kubernetes/README.md#claude-code-workaround). agentevals is built for instrumented agents whose success is measurable through tool trajectories and responses, not for scoring long coding sessions end to end.
 
 **How is this different from LangSmith, Langfuse, Opik or Bedrock AgentCore evaluation?**
 

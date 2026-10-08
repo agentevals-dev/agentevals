@@ -114,6 +114,7 @@ Notes:
 * `filter/not_from_agentevals` keeps agentevals' own results out of the agentevals branch. agentevals also drops them itself.
 * If you sample, sample whole traces and only on the backend branch. agentevals needs complete traces.
 * For producers that use OpenInference or OpenLLMetry attribute names, the contrib `gen_ai_normalizer` processor (alpha) can map them to GenAI conventions on the agentevals branch.
+* For Claude Code under kagent, the [Kubernetes example](../examples/kubernetes/README.md#claude-code-workaround) has a `transform` recipe that maps its spans to tool and model calls.
 
 ## Send evaluation results from agentevals
 

@@ -112,7 +112,7 @@ All of them implement the same toy agent (dice rolling and prime checking), so y
 
 | Example | Description |
 |---------|-------------|
-| [kubernetes/](./kubernetes/) | Deploy agentevals with kagent on Kubernetes using native OTLP gRPC ingestion (or optionally an OTel Collector). Includes a walkthrough for comparing two kagent agents (different models) and evaluating them with tool trajectory and response match scores. |
+| [kubernetes/](./kubernetes/) | Run agentevals and an OTel Collector next to kagent, and score a Go ADK agent against a Claude Code harness agent. Includes a Collector workaround for Claude Code spans and the evaluation results coming back as OTel events. |
 
 ## Custom result sinks
 

@@ -8,6 +8,7 @@ agentevals' own output coming back through a pipeline.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
+from types import MappingProxyType
 from typing import Any
 
 from ..otel.identity import EMITTER_SCOPE
@@ -24,11 +25,16 @@ class GenAIRoutingPolicy:
     """Sessions keyed by ``agentevals.session_name``, ``gen_ai.conversation.id`` or ``session.id``.
 
     Only ``agentevals.session_name`` sessions split into ``name-2`` on a rerun; conversation and
-    ``session.id`` keys always rejoin. ``emitter_instance_id`` is the ``service.instance.id`` this
-    process emits evaluation results with, when it emits them.
+    ``session.id`` keys always rejoin. ``key_strength`` follows the precedence of
+    :func:`~agentevals.genai.grouping.identity_key`: a session keyed by ``session.id`` moves to the
+    conversation once a span of its trace carries ``gen_ai.conversation.id``, which happens when a
+    subprocess (such as a coding agent harness) exports before the span that owns the turn.
+    ``emitter_instance_id`` is the ``service.instance.id`` this process emits evaluation results
+    with, when it emits them.
     """
 
     rerun_kinds: frozenset[str] = frozenset({"name"})
+    key_strength: Mapping[str, int] = MappingProxyType({"session_id": 1, "conversation": 2, "name": 3})
 
     def __init__(self, emitter_instance_id: str | None = None):
         self.emitter_instance_id = emitter_instance_id

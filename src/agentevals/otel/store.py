@@ -9,9 +9,9 @@ What the telemetry means is the :class:`RoutingPolicy`'s business (``genai.routi
 this module holds only the mechanics. Routing (``otel_native_core_202610.md`` 16.2), for spans of
 trace T with session key K from the policy:
 
-* R1, membership first: a trace already in a session stays there. A provisional session that
-  learns its key is promoted into the head session for that key. Spans reopen a complete session;
-  logs never do.
+* R1, membership first: a trace already in a session stays there. A session that learns a
+  stronger key from its own trace (any key, for a provisional session) is promoted into the head
+  session for that key. Spans reopen a complete session; logs never do.
 * R2, a new trace with a key joins the head session for the key. A new SDK run id starts a new
   generation (``name-2``) at once. A complete head whose key kind splits on reruns starts a new
   generation for a rerun: a different ``service.instance.id`` when both sides carry one, otherwise
@@ -46,6 +46,10 @@ class RoutingPolicy(Protocol):
 
     rerun_kinds: frozenset[str]
     """Key kinds whose complete sessions split into ``name-2`` on a rerun instead of rejoining."""
+
+    key_strength: Mapping[str, int]
+    """Rank of key kinds, higher wins. A session whose key is outranked by a later batch of one of
+    its traces is promoted into the head for the stronger key. Unlisted kinds rank lowest."""
 
     def session_key(self, items: Iterable[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> SessionKey | None:
         """The key of spans or log records given as ``(attributes, resource attributes)``."""
@@ -145,7 +149,10 @@ class LiveTrace:
     session_id: str | None = None
     version: int = 0
     nbytes: int = 0
-    has_local_root: bool = False
+    has_root: bool = False
+    remote_roots: list[tuple[int, int]] = field(default_factory=list)
+    min_start: int | None = None
+    max_end: int | None = None
     last_span_at: float | None = None
     staged_at: float = 0.0
     complete: bool = False
@@ -153,6 +160,24 @@ class LiveTrace:
     @property
     def has_spans(self) -> bool:
         return bool(self.spans)
+
+    def note_span(self, span: Span) -> None:
+        start, end = span.start_time_unix_nano, span.end_time_unix_nano
+        self.min_start = start if self.min_start is None else min(self.min_start, start)
+        self.max_end = end if self.max_end is None else max(self.max_end, end)
+        if not span.parent_span_id:
+            self.has_root = True
+        elif span.has_remote_parent:
+            self.remote_roots.append((start, end))
+
+    @property
+    def has_local_root(self) -> bool:
+        """A span with no parent, or a span with a remote parent that encloses every span received
+        for the trace. A remote parent span that does not is one process's share of a longer
+        trace (a backend call, a harness subprocess) and ends before the trace does."""
+        if self.has_root:
+            return True
+        return any(start <= self.min_start and end >= self.max_end for start, end in self.remote_roots)
 
     @property
     def start_time_unix_nano(self) -> int:
@@ -240,10 +265,6 @@ def log_fingerprint(log: LogRecord) -> bytes:
         dict(log.attributes),
     )
     return hashlib.blake2b(repr(material).encode(), digest_size=16).digest()
-
-
-def is_local_root(span: Span) -> bool:
-    return not span.parent_span_id or span.has_remote_parent
 
 
 def session_metadata(resource_attrs: Mapping[str, Any]) -> dict[str, Any]:
@@ -386,6 +407,12 @@ class TelemetryStore:
             return instance != head.instance_id
         return self.clock() - (head.completed_mono or 0.0) >= self.limits.rerun_window_seconds
 
+    def _outranks(self, key: SessionKey, other: SessionKey | None) -> bool:
+        if other is None:
+            return True
+        strength = self.policy.key_strength
+        return strength.get(key[0], 0) > strength.get(other[0], 0)
+
     def _head(self, key: SessionKey, run_id: str | None, resource: Mapping) -> LiveSession | None:
         head = self.sessions.get(self.heads.get(key, ""))
         if head is not None:
@@ -480,7 +507,7 @@ class TelemetryStore:
         trace = self.traces.get(trace_id)
         session = self.sessions.get(trace.session_id) if trace and trace.session_id else None
         if session is not None:
-            if session.provisional and key is not None:
+            if key is not None and self._outranks(key, session.key):
                 target = self._head(key, run_id, resource)
                 if target is None:
                     result.reject(REASON_SPAN_SESSIONS, len(spans))
@@ -490,7 +517,7 @@ class TelemetryStore:
                         result.reject(REASON_MERGE_REFUSED, len(spans))
                         return result
                     session = target
-            elif session.key is not None and key is not None and key != session.key:
+            elif key is not None and key != session.key and not self._outranks(session.key, key):
                 self.counters["session key conflicts"] += 1
         else:
             staged = self.staged.pop(trace_id, None)
@@ -539,7 +566,7 @@ class TelemetryStore:
             session.nbytes += size
             self.nbytes += size
             session.span_count += 1
-            trace.has_local_root = trace.has_local_root or is_local_root(span)
+            trace.note_span(span)
             result.accepted += 1
             added.append(span)
         if added:
@@ -568,7 +595,7 @@ class TelemetryStore:
                 continue
             trace.spans[span.span_id] = span
             trace.nbytes += size
-            trace.has_local_root = trace.has_local_root or is_local_root(span)
+            trace.note_span(span)
             result.accepted += 1
         trace.staged_at = now
         trace.last_span_at = now
@@ -772,7 +799,7 @@ class TelemetryStore:
                 continue
             trace.spans[span.span_id] = span
             trace.nbytes += span_size(span)
-            trace.has_local_root = trace.has_local_root or is_local_root(span)
+            trace.note_span(span)
         for log in logs:
             if not log.trace_id:
                 continue
