@@ -107,8 +107,8 @@ TYPESCRIPT_TEMPLATE = Template("""\
 import * as fs from "fs";
 
 interface IntermediateSteps {
-  tool_calls: { name: string; args: Record<string, unknown> }[];
-  tool_responses: { name: string; output: string }[];
+  tool_calls: { name: string; args: Record<string, unknown>; id?: string | null }[];
+  tool_responses: { name: string; output: string; status?: string | null; id?: string | null; response?: unknown }[];
 }
 
 interface Invocation {
@@ -116,6 +116,9 @@ interface Invocation {
   user_content: string;
   final_response: string | null;
   intermediate_steps: IntermediateSteps;
+  performance_metrics?: Record<string, unknown> | null;
+  trace_id?: string | null;
+  span_id?: string | null;
 }
 
 interface EvalInput {

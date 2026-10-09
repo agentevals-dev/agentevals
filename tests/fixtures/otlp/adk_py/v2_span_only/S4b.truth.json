@@ -1,0 +1,40 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v2_span_only/S4b",
+ "source": "adk-python 2.10 recording, mode v2_span_only, scenario S4b",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "Please research the capital of France.",
+   "final_text": "According to research: the capital of France is Paris.",
+   "intermediate_texts": [],
+   "agents": [
+    "coordinator",
+    "research_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "research_agent",
+     "args": {
+      "request": "What is the capital of France?"
+     },
+     "result": "The capital of France is Paris.",
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 82,
+    "output": 26
+   }
+  }
+ ],
+ "tokens": {
+  "input": 82,
+  "output": 26
+ },
+ "notes": [
+  "AgentTool: coordinator calls research_agent as a tool",
+  "tokens and agents cover every agent in the turn subtree (delegates included)"
+ ]
+}

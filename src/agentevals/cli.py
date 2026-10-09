@@ -131,6 +131,25 @@ def main(verbose: int) -> None:
     default=None,
     help="Path to an eval config YAML file defining evaluators.",
 )
+@click.option(
+    "--group-by",
+    type=click.Choice(["auto", "trace", "conversation"]),
+    default=None,
+    help=(
+        "Evaluation unit. 'conversation' evaluates traces sharing agentevals.session_name, "
+        "gen_ai.conversation.id or session.id together. 'auto' (default) does so when a trace "
+        "carries agentevals.session_name or the eval set has multi turn cases."
+    ),
+)
+@click.option(
+    "--emit-otel",
+    is_flag=True,
+    help=(
+        "Emit results as OpenTelemetry gen_ai.evaluation.result log events, parented to the evaluated "
+        "spans (also AGENTEVALS_EVALUATION_EVENTS=true). The exporter is configured by the standard "
+        "OTEL_EXPORTER_OTLP_* variables."
+    ),
+)
 def run(
     trace_files: tuple[str, ...],
     eval_set: str | None,
@@ -141,6 +160,8 @@ def run(
     trajectory_match_type: str | None,
     output: str,
     config_file: str | None,
+    group_by: str | None,
+    emit_otel: bool,
 ) -> None:
     """Evaluate trace file(s) against the configured evaluators."""
     from .config import EvalRunConfig, apply_builtin_overrides, make_builtin_evaluator_entries
@@ -190,8 +211,21 @@ def run(
         config.trace_format = trace_format
     if output != "table":
         config.output_format = output
+    if group_by is not None:
+        config.group_by = group_by
 
-    result = asyncio.run(run_evaluation(config))
+    from . import evaluation_events as emit
+
+    try:
+        emit.validate_env()
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+    if emit_otel:
+        emit.enable()
+    try:
+        result = asyncio.run(run_evaluation(config))
+    finally:
+        emit.shutdown()
     formatted = format_results(result, fmt=config.output_format)
     click.echo(formatted)
 
@@ -514,14 +548,16 @@ async def _run_servers(
 
     from .api.app import create_app
     from .api.otlp_app import create_otlp_app
-    from .streaming.ws_server import StreamingTraceManager
+    from .streaming.manager import LiveManager
 
     shared_kwargs: dict = {
         "host": host,
         "log_level": log_level,
     }
 
-    mgr = StreamingTraceManager()
+    from . import evaluation_events as emit
+
+    mgr = LiveManager(emitter_instance_id=emit.instance_id() if emit.enabled() else None)
     main_app = create_app(trace_manager=mgr, enable_streaming=True)
     otlp_app = create_otlp_app(trace_manager=mgr)
 
@@ -563,7 +599,7 @@ async def _run_servers(
 @click.option(
     "--dev",
     is_flag=True,
-    help="Enable dev mode with WebSocket support for live streaming.",
+    help="Enable dev mode for live streaming (prints the receiver endpoints).",
 )
 @click.option(
     "--host",
@@ -606,6 +642,15 @@ async def _run_servers(
     help="Run in headless mode (no browser launch).",
 )
 @click.option(
+    "--emit-otel",
+    is_flag=True,
+    help=(
+        "Emit results as OpenTelemetry gen_ai.evaluation.result log events, parented to the evaluated "
+        "spans (also AGENTEVALS_EVALUATION_EVENTS=true). The exporter is configured by the standard "
+        "OTEL_EXPORTER_OTLP_* variables."
+    ),
+)
+@click.option(
     "-v",
     "--verbose",
     count=True,
@@ -620,6 +665,7 @@ def serve(
     mcp_port: int | None,
     eval_sets: str | None,
     headless: bool,
+    emit_otel: bool,
     verbose: int,
 ) -> None:
     """Start the agentevals API server.
@@ -640,6 +686,14 @@ def serve(
 
     if headless:
         os.environ["AGENTEVALS_HEADLESS"] = "1"
+    if emit_otel:
+        os.environ["AGENTEVALS_EVALUATION_EVENTS"] = "true"
+    from . import evaluation_events as emit
+
+    try:
+        emit.validate_env()
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
 
     static_dir = Path(__file__).parent / "_static"
     has_ui = static_dir.is_dir() and (static_dir / "index.html").exists()
@@ -657,7 +711,6 @@ def serve(
         click.echo("agentevals dev server starting...")
         click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}  (OTEL_EXPORTER_OTLP_ENDPOINT default)")
         click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}  (OTEL_EXPORTER_OTLP_PROTOCOL=grpc)")
-        click.echo(f"  WebSocket: ws://{host}:{port}/ws/traces")
         click.echo(f"  API:       http://{host}:{port}/api")
         if mcp_port is not None:
             click.echo(f"  MCP:       http://{host}:{mcp_port}/mcp")

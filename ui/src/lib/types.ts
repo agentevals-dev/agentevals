@@ -89,6 +89,8 @@ export interface TraceConversionMetadata {
 
 export interface TraceConversionEntry {
   traceId: string;
+  /** Every trace this entry covers; more than one when traces are grouped into a conversation. */
+  traceIds?: string[];
   invocations: Invocation[];
   warnings: string[];
   metadata: TraceConversionMetadata;
@@ -142,8 +144,22 @@ export interface PerformanceMetrics {
   };
 }
 
+export interface TurnRef {
+  traceId: string;
+  spanId: string;
+}
+
 export interface TraceResult {
   traceId: string;
+  /** Every trace of the evaluation group; ``traceId`` is the earliest. */
+  traceIds?: string[];
+  /** The evaluated turns, by their anchor spans, in order. */
+  turnRefs?: TurnRef[];
+  conversationId?: string | null;
+  groupKey?: string | null;
+  evalCaseId?: string | null;
+  /** How the eval case was chosen: ``explicit``, ``user_text`` or ``single_case``. */
+  evalCaseMatch?: string | null;
   sessionId?: string;
   numInvocations: number;
   metricResults: MetricResult[];
@@ -468,12 +484,26 @@ export interface ConversationElement {
   data: any;
 }
 
+export interface ExternalEvaluation {
+  name: string;
+  scoreValue?: number | null;
+  scoreLabel?: string | null;
+  explanation?: string | null;
+  spanId: string;
+  sourceService?: string | null;
+}
+
 export interface StreamingInvocation {
+  /** Span id of the turn's anchor span. */
   invocationId: string;
+  traceId?: string;
   userText: string;
   agentText: string;
   toolCalls: Array<{ name: string; args: any; id?: string }>;
-  toolResponses?: Array<{ name: string; response: Record<string, any>; id?: string }>;
+  toolResponses?: Array<{ name: string; response: any; id?: string }>;
+  modelInfo?: Record<string, any>;
+  /** ``gen_ai.evaluation.result`` events found in the telemetry (from other evaluators). */
+  externalEvaluations?: ExternalEvaluation[];
 }
 
 export interface LiveSession {
@@ -522,12 +552,11 @@ export interface InspectorUIState {
 }
 
 // Trace editor types
-export type TraceFileFormat = 'jaeger' | 'otlp-jsonl';
+export type TraceFileFormat = 'jaeger' | 'otlp-json' | 'otlp-jsonl';
 
 export interface SpanLocationRef {
-  traceIndex?: number;
-  spanIndex?: number;
-  lineIndex?: number;
+  /** The span object inside the parsed file; patches edit it in place. */
+  raw: any;
 }
 
 export interface ParsedTraceFile {
@@ -538,13 +567,10 @@ export interface ParsedTraceFile {
 }
 
 export interface SpanEditMapping {
+  /** The turn's anchor span id. */
   invocationId: string;
-  format: 'adk' | 'genai';
   userInputSpanId: string;
   finalResponseSpanId: string;
-  toolSpanIds: string[];
-  userInputAttrKey: string;
-  finalResponseAttrKey: string;
 }
 
 // Annotation queue types

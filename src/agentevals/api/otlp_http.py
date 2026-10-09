@@ -12,7 +12,7 @@ import asyncio
 import json
 import logging
 import zlib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 from fastapi import FastAPI, Request, Response
 from google.protobuf.json_format import MessageToJson
@@ -20,6 +20,8 @@ from google.protobuf.message import DecodeError, Message
 from google.rpc import code_pb2
 from google.rpc.status_pb2 import Status
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from ..otel.decode import DecodeResult
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,9 @@ _GZIP_WBITS = 31
 # Below this size the thread hop costs more than the work it moves.
 PARSE_THREAD_THRESHOLD = 1024 * 1024
 
+# Sent with 503 when the live store refused every item for capacity.
+OVERLOAD_RETRY_AFTER_SECONDS = 5
+
 _SUPPORTED_CONTENT_ENCODINGS = frozenset({"", "identity", "gzip"})
 
 # OTLP asks servers to populate Status.code; these are the mappings from the
@@ -75,10 +80,19 @@ _GRPC_STATUS_CODE_DEFAULT = code_pb2.UNKNOWN
 class OtlpError(Exception):
     """An OTLP/HTTP failure that must be returned as a `google.rpc.Status` body."""
 
-    def __init__(self, status_code: int, message: str) -> None:
+    def __init__(self, status_code: int, message: str, headers: Mapping[str, str] | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.message = message
+        self.headers = dict(headers or {})
+
+
+def overload_error(signal: str) -> OtlpError:
+    return OtlpError(
+        503,
+        f"Live store is at capacity; {signal} not accepted, retry later",
+        {"Retry-After": str(OVERLOAD_RETRY_AFTER_SECONDS)},
+    )
 
 
 def media_type_of(content_type: str) -> str:
@@ -178,13 +192,15 @@ def _gunzip_bounded(raw: bytes) -> bytes:
 
 async def read_export_request(
     request: Request,
-    decode_protobuf: Callable[[bytes], dict],
+    decode_json: Callable[[dict], DecodeResult],
+    decode_protobuf: Callable[[bytes], DecodeResult],
     container_key: str,
-) -> tuple[dict, str]:
-    """Read, decompress and decode an OTLP/HTTP export request.
+) -> tuple[DecodeResult, str]:
+    """Read, decompress and decode an OTLP/HTTP export request into envelopes.
 
-    Returns the OTLP body as a dict plus the media type the response must use.
-    Every decoding failure is permanent, so it surfaces as a 400.
+    Returns the decoded items plus the media type the response must use. Every
+    decoding failure is permanent, so it surfaces as a 400; invalid items inside
+    a well formed body are counted on the ``DecodeResult`` instead.
 
     ``container_key`` is the top-level request list (``resourceSpans`` or
     ``resourceLogs``); its type is checked so a structurally invalid JSON body
@@ -200,15 +216,15 @@ async def read_export_request(
     raw = await asyncio.to_thread(_decode_content_encoding, request, body_bytes)
 
     if not raw:
-        return {}, media_type
+        return DecodeResult(), media_type
 
     # Parsing is proportional to the decompressed size, which is now known, so the
     # thread hop is only worth paying above the threshold.
     if len(raw) < PARSE_THREAD_THRESHOLD:
-        return _parse_body(raw, decode_protobuf, media_type, container_key), media_type
+        return _parse_body(raw, decode_json, decode_protobuf, media_type, container_key), media_type
 
-    body = await asyncio.to_thread(_parse_body, raw, decode_protobuf, media_type, container_key)
-    return body, media_type
+    decoded = await asyncio.to_thread(_parse_body, raw, decode_json, decode_protobuf, media_type, container_key)
+    return decoded, media_type
 
 
 async def _read_bounded_body(request: Request) -> bytes:
@@ -234,10 +250,11 @@ async def _read_bounded_body(request: Request) -> bytes:
 
 def _parse_body(
     raw: bytes,
-    decode_protobuf: Callable[[bytes], dict],
+    decode_json: Callable[[dict], DecodeResult],
+    decode_protobuf: Callable[[bytes], DecodeResult],
     media_type: str,
     container_key: str,
-) -> dict:
+) -> DecodeResult:
     """Decode a decompressed export body. Synchronous; callers thread it when large."""
     if media_type == PROTOBUF_MEDIA_TYPE:
         try:
@@ -258,7 +275,7 @@ def _parse_body(
     if not isinstance(containers, list) or any(not isinstance(item, dict) for item in containers):
         raise OtlpError(400, f"Malformed OTLP payload: {container_key!r} must be a list of objects")
 
-    return body
+    return decode_json(body)
 
 
 def build_export_response(message: Message, media_type: str) -> Response:
@@ -321,7 +338,9 @@ def register_otlp_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(OtlpError)
     async def _handle_otlp_error(request: Request, exc: OtlpError) -> Response:
-        return build_status_response(request, exc.status_code, exc.message)
+        response = build_status_response(request, exc.status_code, exc.message)
+        response.headers.update(exc.headers)
+        return response
 
     @app.exception_handler(Exception)
     async def _handle_unexpected_error(request: Request, exc: Exception) -> Response:

@@ -1,0 +1,163 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "fixture-agent"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.0"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.genai.anthropic",
+      "version": "1.2b0"
+     },
+     "spans": [
+      {
+       "traceId": "69244634ece3848816ecf39764e5c640",
+       "spanId": "eb86921785ed9606",
+       "name": "invoke_agent helper",
+       "kind": 1,
+       "startTimeUnixNano": "1760000000000000000",
+       "endTimeUnixNano": "1760000000050000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "helper"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "69244634ece3848816ecf39764e5c640",
+       "spanId": "23a6bb157382841e",
+       "name": "chat claude-sonnet-5",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000001000000",
+       "endTimeUnixNano": "1760000000049000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "anthropic"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "claude-sonnet-5"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "15"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "7"
+         }
+        }
+       ],
+       "parentSpanId": "eb86921785ed9606"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "fixture-agent"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.0"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.genai.anthropic",
+      "version": "1.2b0"
+     },
+     "logRecords": [
+      {
+       "timeUnixNano": "1760000000049000000",
+       "severityNumber": 5,
+       "attributes": [
+        {
+         "key": "otel.event.name",
+         "value": {
+          "stringValue": "gen_ai.client.inference.operation.details"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "claude-sonnet-5"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Say hello.\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"reasoning\",\"content\":\"Simple greeting.\"},{\"type\":\"text\",\"content\":\"Hello!\"}],\"finish_reason\":\"stop\"}]"
+         }
+        }
+       ],
+       "traceId": "69244634ece3848816ecf39764e5c640",
+       "spanId": "23a6bb157382841e"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -13,10 +13,10 @@ from .otlp_http import register_otlp_exception_handlers
 from .otlp_routes import otlp_router
 
 if TYPE_CHECKING:
-    from ..streaming.ws_server import StreamingTraceManager
+    from ..streaming.manager import LiveManager
 
 
-def create_otlp_app(*, trace_manager: StreamingTraceManager | None = None) -> FastAPI:
+def create_otlp_app(*, trace_manager: LiveManager | None = None) -> FastAPI:
     """Create the OTLP HTTP receiver app."""
     app = FastAPI(title="agentevals OTLP receiver")
     if trace_manager is not None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import glob
+import dataclasses
 import importlib.metadata
 import io
 import json
@@ -8,10 +8,10 @@ import logging
 import os
 import platform
 import sys
-import tempfile
 import zipfile
+from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi import File as FastAPIFile
@@ -20,16 +20,25 @@ from pydantic import BaseModel
 
 from agentevals import __version__
 
+from ..otel.decode import decode_bare_spans_json, decode_json_document
+from ..otel.identity import coerce_key
+from ..otel.model import EMPTY_SCOPE, LogRecord, Resource, Scope, Span
 from ..utils.log_buffer import log_buffer
 from .dependencies import get_trace_manager, require_trace_manager
-from .models import DebugLoadData, SessionInfo, StandardResponse, WSSessionCompleteEvent, WSSessionStartedEvent
+from .models import DebugLoadData, StandardResponse
 
 if TYPE_CHECKING:
-    from ..streaming.ws_server import StreamingTraceManager
+    from ..streaming.manager import LiveManager
 
 logger = logging.getLogger(__name__)
 
 debug_router = APIRouter()
+
+MAX_BUNDLE_BYTES = 64 * 1024 * 1024
+MAX_ENTRY_BYTES = 64 * 1024 * 1024
+MAX_TOTAL_ENTRY_BYTES = 256 * 1024 * 1024
+MAX_BUNDLE_SESSIONS = 200
+_SESSION_FILES = ("otlp.json", "spans.json", "logs.json", "session_meta.json")
 
 
 class FrontendDiagnostics(BaseModel):
@@ -77,54 +86,10 @@ def _collect_environment() -> dict:
     }
 
 
-def _collect_sessions(manager: StreamingTraceManager | None) -> list[dict]:
-    if not manager:
-        return []
-
-    sessions_data = []
-    for session in manager.sessions.values():
-        sessions_data.append(
-            {
-                "session_id": session.session_id,
-                "trace_id": session.trace_id,
-                "eval_set_id": session.eval_set_id,
-                "started_at": session.started_at.isoformat(),
-                "is_complete": session.is_complete,
-                "span_count": len(session.spans),
-                "log_count": len(session.logs),
-                "metadata": session.metadata,
-                "spans": session.spans,
-                "logs": session.logs,
-            }
-        )
-    return sessions_data
-
-
-def _collect_temp_files(session_ids: set[str] | None = None) -> dict[str, str]:
-    """Collect temp files, filtering JSONL files to current sessions only."""
-    tmp_dir = tempfile.gettempdir()
-    files = {}
-    for pattern in ["agentevals_*.jsonl", "eval_set_*.json"]:
-        for path in glob.glob(os.path.join(tmp_dir, pattern)):
-            basename = os.path.basename(path)
-            # Filter JSONL files to only include current sessions
-            if session_ids is not None and basename.endswith(".jsonl"):
-                # Extract session ID from filename: agentevals_{session_id}.jsonl
-                sid = basename.removeprefix("agentevals_").removesuffix(".jsonl")
-                if sid not in session_ids:
-                    continue
-            try:
-                with open(path, encoding="utf-8") as f:
-                    files[basename] = f.read()
-            except OSError:
-                logger.debug("Could not read temp file %s", path)
-    return files
-
-
 @debug_router.post("/bundle")
 async def create_debug_bundle(
     diagnostics: FrontendDiagnostics,
-    manager: StreamingTraceManager | None = Depends(get_trace_manager),
+    manager: LiveManager | None = Depends(get_trace_manager),
 ):
     timestamp = datetime.now(tz=UTC).strftime("%Y%m%d-%H%M%S")
     prefix = f"bug-report-{timestamp}"
@@ -139,42 +104,29 @@ async def create_debug_bundle(
         }
         zf.writestr(f"{prefix}/metadata.json", json.dumps(metadata, indent=2))
 
-        sessions = _collect_sessions(manager)
-        for s in sessions:
-            sid = s["session_id"]
-            zf.writestr(
-                f"{prefix}/sessions/{sid}/spans.json",
-                json.dumps(s["spans"], indent=2),
-            )
-            zf.writestr(
-                f"{prefix}/sessions/{sid}/logs.json",
-                json.dumps(s["logs"], indent=2),
-            )
-            session_meta = {k: v for k, v in s.items() if k not in ("spans", "logs")}
-            zf.writestr(
-                f"{prefix}/sessions/{sid}/session_meta.json",
-                json.dumps(session_meta, indent=2),
-            )
+        # Directories are numbered: session ids are chosen by the producer and must never
+        # become archive paths.
+        sessions = list(manager.sessions.values()) if manager else []
+        for index, session in enumerate(sessions, start=1):
+            base = f"{prefix}/sessions/{index:04d}"
+            zf.writestr(f"{base}/otlp.json", json.dumps(manager.session_document(session)))
+            session_meta = {
+                "session_id": session.session_id,
+                "trace_id": manager.store.primary_trace_id(session),
+                "trace_ids": session.trace_ids,
+                "eval_set_id": session.eval_set_id,
+                "started_at": session.started_at.isoformat(),
+                "is_complete": session.is_complete,
+                "span_count": session.span_count,
+                "log_count": session.log_count,
+                "metadata": session.metadata,
+            }
+            zf.writestr(f"{base}/session_meta.json", json.dumps(session_meta, indent=2, default=str))
 
         zf.writestr(f"{prefix}/backend_logs.txt", log_buffer.get_text())
-
-        current_session_ids = {s["session_id"] for s in sessions}
-        temp_files = _collect_temp_files(session_ids=current_session_ids)
-        for filename, content in temp_files.items():
-            zf.writestr(f"{prefix}/temp_files/{filename}", content)
-
-        zf.writestr(
-            f"{prefix}/frontend_state.json",
-            json.dumps(diagnostics.app_state, indent=2),
-        )
-        zf.writestr(
-            f"{prefix}/console_logs.json",
-            json.dumps(diagnostics.console_logs, indent=2),
-        )
-        zf.writestr(
-            f"{prefix}/network_errors.json",
-            json.dumps(diagnostics.network_errors, indent=2),
-        )
+        zf.writestr(f"{prefix}/frontend_state.json", json.dumps(diagnostics.app_state, indent=2))
+        zf.writestr(f"{prefix}/console_logs.json", json.dumps(diagnostics.console_logs, indent=2))
+        zf.writestr(f"{prefix}/network_errors.json", json.dumps(diagnostics.network_errors, indent=2))
 
     buf.seek(0)
     return StreamingResponse(
@@ -184,78 +136,134 @@ async def create_debug_bundle(
     )
 
 
+async def _read_upload(file: UploadFile) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(1024 * 1024):
+        total += len(chunk)
+        if total > MAX_BUNDLE_BYTES:
+            raise HTTPException(status_code=413, detail=f"Bundle exceeds {MAX_BUNDLE_BYTES} bytes")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _session_entries(zf: zipfile.ZipFile) -> dict[str, dict[str, zipfile.ZipInfo]]:
+    dirs: dict[str, dict[str, zipfile.ZipInfo]] = {}
+    total = 0
+    for info in zf.infolist():
+        parts = info.filename.split("/")
+        if len(parts) < 4 or parts[-3] != "sessions" or parts[-1] not in _SESSION_FILES:
+            continue
+        if info.file_size > MAX_ENTRY_BYTES:
+            raise HTTPException(status_code=413, detail=f"Bundle entry {info.filename!r} is too large")
+        total += info.file_size
+        if total > MAX_TOTAL_ENTRY_BYTES:
+            raise HTTPException(status_code=413, detail="Bundle content is too large")
+        dirs.setdefault("/".join(parts[:-1]), {})[parts[-1]] = info
+        if len(dirs) > MAX_BUNDLE_SESSIONS:
+            raise HTTPException(status_code=413, detail=f"Bundle holds more than {MAX_BUNDLE_SESSIONS} sessions")
+    return dirs
+
+
+def _read_json(zf: zipfile.ZipFile, info: zipfile.ZipInfo | None, default: Any) -> Any:
+    if info is None:
+        return default
+    try:
+        return json.loads(zf.read(info))
+    except (ValueError, RecursionError, zipfile.BadZipFile) as exc:
+        raise HTTPException(status_code=400, detail=f"Unreadable bundle entry {info.filename!r}") from exc
+
+
+def _legacy_session(spans: Any, logs: Any, metadata: Mapping[str, Any]) -> tuple[list[Span], list[LogRecord]]:
+    """Read a bundle written before the store: bare spans with the scope flattened into
+    ``otel.scope.*`` attributes, ``service.name`` in the session metadata, and internal log
+    dicts that carry only their span id."""
+    service_name = metadata.get("service.name")
+    resource = Resource(attributes={"service.name": service_name} if isinstance(service_name, str) else {})
+    decoded = decode_bare_spans_json(spans if isinstance(spans, list) else [], strict=False)
+    scopes: dict[tuple[str, str | None], Scope] = {}
+    out_spans = []
+    for span in decoded.spans:
+        name, version = span.attributes.get("otel.scope.name"), span.attributes.get("otel.scope.version")
+        key = (name if isinstance(name, str) else "", version if isinstance(version, str) else None)
+        scope = scopes.setdefault(key, Scope(name=key[0], version=key[1]))
+        out_spans.append(dataclasses.replace(span, resource=resource, scope=scope))
+
+    trace_of_span = {s.span_id: s.trace_id for s in out_spans}
+    trace_ids = {s.trace_id for s in out_spans}
+    only_trace = next(iter(trace_ids)) if len(trace_ids) == 1 else None
+    out_logs = []
+    for entry in logs if isinstance(logs, list) else []:
+        if not isinstance(entry, dict) or not isinstance(entry.get("event_name"), str):
+            continue
+        span_id = entry.get("span_id") if isinstance(entry.get("span_id"), str) else None
+        trace_id = trace_of_span.get(span_id or "") or only_trace
+        if trace_id is None:
+            continue
+        try:
+            time_ns = int(entry.get("timestamp") or 0) or None
+        except (TypeError, ValueError):
+            time_ns = None
+        attributes = entry.get("attributes")
+        out_logs.append(
+            LogRecord(
+                time_unix_nano=time_ns,
+                observed_time_unix_nano=None,
+                event_name=entry["event_name"],
+                severity_number=None,
+                severity_text=None,
+                body=entry.get("body"),
+                attributes=attributes if isinstance(attributes, dict) else {},
+                trace_id=trace_id,
+                span_id=span_id,
+                flags=None,
+                resource=resource,
+                scope=EMPTY_SCOPE,
+            )
+        )
+    return out_spans, out_logs
+
+
 @debug_router.post("/load", response_model=StandardResponse[DebugLoadData])
 async def load_debug_bundle(
     file: UploadFile = FastAPIFile(...),
-    manager: StreamingTraceManager = Depends(require_trace_manager),
+    manager: LiveManager = Depends(require_trace_manager),
 ):
-    content = await file.read()
+    content = await _read_upload(file)
     try:
         zf = zipfile.ZipFile(io.BytesIO(content))
     except zipfile.BadZipFile as exc:
         raise HTTPException(status_code=400, detail="Invalid ZIP file") from exc
 
-    session_dirs: dict[str, list[str]] = {}
-    for name in zf.namelist():
-        parts = name.split("/")
-        if len(parts) >= 4 and parts[-3] == "sessions":
-            sid = parts[-2]
-            session_dirs.setdefault(sid, []).append(name)
-
-    if not session_dirs:
+    session_dirs = _session_entries(zf)
+    if not any("otlp.json" in f or "spans.json" in f for f in session_dirs.values()):
         raise HTTPException(status_code=400, detail="No sessions found in ZIP")
 
-    from ..streaming.session import TraceSession
-
     loaded = []
-    for sid, files in session_dirs.items():
-        meta_file = next((f for f in files if f.endswith("session_meta.json")), None)
-        spans_file = next((f for f in files if f.endswith("spans.json")), None)
-        logs_file = next((f for f in files if f.endswith("logs.json")), None)
-
-        if not spans_file:
+    for directory, files in session_dirs.items():
+        meta = _read_json(zf, files.get("session_meta.json"), {})
+        meta = meta if isinstance(meta, dict) else {}
+        metadata = meta.get("metadata") if isinstance(meta.get("metadata"), dict) else {}
+        if "otlp.json" in files:
+            decoded = decode_json_document(_read_json(zf, files["otlp.json"], {}), strict=False)
+            spans, logs = decoded.spans, decoded.logs
+        elif "spans.json" in files:
+            spans, logs = _legacy_session(
+                _read_json(zf, files["spans.json"], []), _read_json(zf, files.get("logs.json"), []), metadata
+            )
+        else:
             continue
 
-        meta = json.loads(zf.read(meta_file)) if meta_file else {}
-        spans = json.loads(zf.read(spans_file))
-        logs = json.loads(zf.read(logs_file)) if logs_file else []
-
-        session = TraceSession(
-            session_id=meta.get("session_id", sid),
-            trace_id=meta.get("trace_id", sid),
-            eval_set_id=meta.get("eval_set_id"),
-            spans=spans,
-            logs=logs,
-            is_complete=True,
-            metadata=meta.get("metadata", {}),
+        session_id = coerce_key(meta.get("session_id")) or coerce_key(directory.rsplit("/", 1)[-1]) or "bundle"
+        session = manager.load_session(
+            session_id,
+            spans,
+            logs,
+            eval_set_id=coerce_key(meta.get("eval_set_id")),
+            metadata=metadata,
         )
-
-        manager.sessions[session.session_id] = session
-
-        await manager.broadcast_to_ui(
-            WSSessionStartedEvent(
-                session=SessionInfo(
-                    session_id=session.session_id,
-                    trace_id=session.trace_id,
-                    eval_set_id=session.eval_set_id,
-                    span_count=len(session.spans),
-                    is_complete=False,
-                    started_at=session.started_at.isoformat(),
-                    metadata=session.metadata,
-                ),
-            ).model_dump(by_alias=True)
-        )
-
-        invocations_data = await manager._extract_invocations(session)
-        await manager._save_spans_to_temp_file(session)
-
-        await manager.broadcast_to_ui(
-            WSSessionCompleteEvent(
-                session_id=session.session_id,
-                invocations=invocations_data,
-            ).model_dump(by_alias=True)
-        )
-
+        if session is None:
+            raise HTTPException(status_code=503, detail="Live store is at capacity")
         loaded.append(session.session_id)
         logger.info("Loaded session from bug report: %s", session.session_id)
 

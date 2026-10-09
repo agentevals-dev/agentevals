@@ -1,0 +1,244 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "fixture-agent"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.0"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.openai_v2",
+      "version": "2.4b0"
+     },
+     "spans": [
+      {
+       "traceId": "f500384be487e368c3e1cc7aea07edbd",
+       "spanId": "a6735a8e1e04bcf0",
+       "name": "agent_run",
+       "kind": 1,
+       "startTimeUnixNano": "1760000000000000000",
+       "endTimeUnixNano": "1760000000100000000",
+       "attributes": []
+      },
+      {
+       "traceId": "f500384be487e368c3e1cc7aea07edbd",
+       "spanId": "23a6bb157382841e",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000001000000",
+       "endTimeUnixNano": "1760000000030000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "40"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "parentSpanId": "a6735a8e1e04bcf0"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "fixture-agent"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.0"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.openai_v2",
+      "version": "2.4b0"
+     },
+     "logRecords": [
+      {
+       "timeUnixNano": "1760000000001000000",
+       "severityNumber": 9,
+       "attributes": [
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "gen_ai.system.message"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "openai"
+         }
+        }
+       ],
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "You answer weather questions."
+           }
+          }
+         ]
+        }
+       },
+       "traceId": "f500384be487e368c3e1cc7aea07edbd"
+      },
+      {
+       "timeUnixNano": "1760000000002000000",
+       "severityNumber": 9,
+       "attributes": [
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "gen_ai.user.message"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "openai"
+         }
+        }
+       ],
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "What is the weather in Paris?"
+           }
+          }
+         ]
+        }
+       },
+       "traceId": "f500384be487e368c3e1cc7aea07edbd"
+      },
+      {
+       "timeUnixNano": "1760000000003000000",
+       "severityNumber": 9,
+       "attributes": [
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "gen_ai.choice"
+         }
+        },
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "openai"
+         }
+        }
+       ],
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "stop"
+           }
+          },
+          {
+           "key": "message",
+           "value": {
+            "kvlistValue": {
+             "values": [
+              {
+               "key": "role",
+               "value": {
+                "stringValue": "assistant"
+               }
+              },
+              {
+               "key": "content",
+               "value": {
+                "stringValue": "It is sunny and 21C in Paris."
+               }
+              }
+             ]
+            }
+           }
+          }
+         ]
+        }
+       },
+       "traceId": "f500384be487e368c3e1cc7aea07edbd"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

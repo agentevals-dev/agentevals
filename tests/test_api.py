@@ -32,9 +32,9 @@ from agentevals.api.models import (
 )
 from agentevals.api.routes import _camel_keys, router
 from agentevals.api.streaming_routes import streaming_router
+from agentevals.otel.decode import decode_bare_spans_json
 from agentevals.runner import MetricResult, RunResult, TraceResult
 from agentevals.streaming.exports import EXPORT_DIR
-from agentevals.streaming.session import TraceSession
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -58,26 +58,18 @@ def _make_live_app(mgr) -> FastAPI:
     return app
 
 
-def _make_session(
-    session_id="sess1",
-    trace_id="trace1",
-    is_complete=True,
-    spans=None,
-    logs=None,
-    invocations=None,
-    eval_set_id=None,
-    metadata=None,
-) -> TraceSession:
-    return TraceSession(
-        session_id=session_id,
-        trace_id=trace_id,
-        eval_set_id=eval_set_id,
-        spans=spans or [],
-        logs=logs or [],
-        is_complete=is_complete,
-        metadata=metadata or {},
-        invocations=invocations or [],
-    )
+def _reset(mgr) -> None:
+    mgr.store.sessions.clear()
+    mgr.store.traces.clear()
+
+
+def _add_session(mgr, session_id="sess1", is_complete=True, spans=None, invocations=None, eval_set_id=None):
+    """Seed a live session the way a bug report replay does (no routing, no recompute)."""
+    decoded = decode_bare_spans_json(spans or [], strict=False)
+    session = mgr.store.load_session(session_id, decoded.spans, [], eval_set_id=eval_set_id)
+    session.is_complete = is_complete
+    session.invocations = invocations or []
+    return session
 
 
 def _make_run_result() -> RunResult:
@@ -218,11 +210,9 @@ def _assert_all_keys_camel(obj, path=""):
 
 
 def _make_trace_manager():
-    from agentevals.streaming.ws_server import StreamingTraceManager
+    from agentevals.streaming.manager import LiveManager
 
-    mgr = StreamingTraceManager()
-    mgr.broadcast_to_ui = AsyncMock()
-    return mgr
+    return LiveManager()
 
 
 def _eval_config_json(**overrides) -> str:
@@ -764,11 +754,11 @@ class TestEvaluateStream:
         assert "result" in done
         assert "traceResults" in done["result"]
 
-    @patch("agentevals.api.routes.run_evaluation", new_callable=AsyncMock)
+    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
     @patch("agentevals.api.routes.load_traces")
     def test_stream_resolves_credential_refs(self, mock_load_traces, mock_eval, monkeypatch):
         monkeypatch.setenv("AE_TEST_JUDGE_KEY", "sk-resolved-stream")
-        mock_load_traces.return_value = []
+        mock_load_traces.return_value = [MagicMock()]
         captured: dict = {}
         mock_eval.side_effect = _capturing_run_eval(captured)
         resp = self.client.post(
@@ -792,12 +782,24 @@ class TestEvaluateStream:
         assert '"error"' in resp.text
         assert "credentialRefs" in resp.text
 
-    @patch("agentevals.api.routes.run_evaluation", new_callable=AsyncMock)
+    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.routes.load_eval_set")
     @patch("agentevals.api.routes.load_traces")
-    def test_stream_sanitizes_traversal_filenames(self, mock_load_traces, mock_eval):
-        mock_load_traces.return_value = []
-        captured: dict = {}
-        mock_eval.side_effect = _capturing_paths(captured)
+    def test_stream_sanitizes_traversal_filenames(self, mock_load_traces, mock_load_eval_set, mock_eval):
+        captured: dict = {"trace_files": []}
+
+        def _record_trace(path, **_):
+            captured["trace_files"].append(path)
+            captured.setdefault("existed", {})[path] = os.path.exists(path)
+            return [MagicMock()]
+
+        def _record_eval_set(path):
+            captured["eval_set_file"] = path
+            return MagicMock()
+
+        mock_load_traces.side_effect = _record_trace
+        mock_load_eval_set.side_effect = _record_eval_set
+        mock_eval.return_value = _make_run_result()
         resp = self.client.post(
             "/api/evaluate/stream",
             files={
@@ -812,6 +814,7 @@ class TestEvaluateStream:
         assert ".." not in saved
         assert os.path.basename(captured["eval_set_file"]) == "evalset_outside.json"
         assert ".." not in captured["eval_set_file"]
+        assert all(captured["existed"].values())
 
 
 # ---------------------------------------------------------------------------
@@ -1153,15 +1156,15 @@ class TestStreamingSessions:
         cls.app = _make_live_app(cls.mgr)
 
     def test_list_sessions_empty(self):
-        self.mgr.sessions.clear()
+        _reset(self.mgr)
         client = TestClient(self.app)
         body = _assert_envelope(client.get("/api/streaming/sessions"))
         assert body["data"] == []
 
     def test_list_sessions_with_data(self):
-        self.mgr.sessions.clear()
-        self.mgr.sessions["s1"] = _make_session("s1", "t1", is_complete=False)
-        self.mgr.sessions["s2"] = _make_session("s2", "t2", is_complete=True)
+        _reset(self.mgr)
+        _add_session(self.mgr, "s1", is_complete=False)
+        _add_session(self.mgr, "s2", is_complete=True)
         client = TestClient(self.app)
         body = _assert_envelope(client.get("/api/streaming/sessions"))
         assert len(body["data"]) == 2
@@ -1170,9 +1173,9 @@ class TestStreamingSessions:
         assert ids == {"s1", "s2"}
 
     def test_list_sessions_complete_includes_invocations(self):
-        self.mgr.sessions.clear()
+        _reset(self.mgr)
         invs = [{"invocation_id": "inv1", "user_content": "hello"}]
-        self.mgr.sessions["s1"] = _make_session("s1", "t1", is_complete=True, invocations=invs)
+        _add_session(self.mgr, "s1", is_complete=True, invocations=invs)
         client = TestClient(self.app)
         body = _assert_envelope(client.get("/api/streaming/sessions"))
         assert body["data"][0]["invocations"] is not None
@@ -1190,7 +1193,7 @@ class TestStreamingCreateEvalSet:
         cls.app = _make_live_app(cls.mgr)
 
     def test_create_eval_set_missing_session(self):
-        self.mgr.sessions.clear()
+        _reset(self.mgr)
         client = TestClient(self.app)
         resp = client.post(
             "/api/streaming/create-eval-set",
@@ -1201,27 +1204,34 @@ class TestStreamingCreateEvalSet:
         )
         assert resp.status_code == 404
 
-    @patch("agentevals.api.streaming_routes.convert_traces")
-    @patch("agentevals.api.streaming_routes.OtlpJsonLoader")
-    def test_create_eval_set_success(self, mock_loader_cls, mock_convert):
-        self.mgr.sessions.clear()
-        self.mgr.sessions["s1"] = _make_session("s1", "t1", spans=[{"spanId": "sp1"}])
-        self.mgr._save_spans_to_temp_file = AsyncMock(return_value="/tmp/test.jsonl")
-
-        mock_inv = MagicMock()
-        mock_inv.invocation_id = "inv1"
-        mock_inv.user_content = MagicMock()
-        mock_inv.user_content.model_dump.return_value = {"role": "user", "parts": [{"text": "hi"}]}
-        mock_inv.final_response = MagicMock()
-        mock_inv.final_response.model_dump.return_value = {"role": "model", "parts": [{"text": "hey"}]}
-        mock_inv.intermediate_data = None
-
-        mock_trace = MagicMock()
-        mock_trace.trace_id = "t1"
-        mock_loader_cls.return_value.load.return_value = [mock_trace]
-        mock_conv = MagicMock()
-        mock_conv.invocations = [mock_inv]
-        mock_convert.return_value = [mock_conv]
+    def test_create_eval_set_success(self):
+        chat_span = {
+            "traceId": "a" * 32,
+            "spanId": "b" * 16,
+            "name": "chat gpt-4.1-mini",
+            "startTimeUnixNano": "1000",
+            "endTimeUnixNano": "2000",
+            "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "chat"}},
+                {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4.1-mini"}},
+                {
+                    "key": "gen_ai.input.messages",
+                    "value": {
+                        "stringValue": json.dumps([{"role": "user", "parts": [{"type": "text", "content": "hi"}]}])
+                    },
+                },
+                {
+                    "key": "gen_ai.output.messages",
+                    "value": {
+                        "stringValue": json.dumps(
+                            [{"role": "assistant", "parts": [{"type": "text", "content": "hey"}]}]
+                        )
+                    },
+                },
+            ],
+        }
+        _reset(self.mgr)
+        _add_session(self.mgr, "s1", spans=[chat_span])
 
         client = TestClient(self.app)
         body = _assert_envelope(
@@ -1233,15 +1243,15 @@ class TestStreamingCreateEvalSet:
                 },
             )
         )
-        assert "evalSet" in body["data"]
         assert body["data"]["numInvocations"] == 1
+        conversation = body["data"]["evalSet"]["eval_cases"][0]["conversation"]
+        assert conversation[0]["invocation_id"] == "b" * 16
+        assert conversation[0]["user_content"]["parts"][0]["text"] == "hi"
 
-    @patch("agentevals.api.streaming_routes.OtlpJsonLoader")
-    def test_create_eval_set_no_traces(self, mock_loader_cls):
-        self.mgr.sessions.clear()
-        self.mgr.sessions["s1"] = _make_session("s1", "t1", spans=[{"spanId": "sp1"}])
-        self.mgr._save_spans_to_temp_file = AsyncMock(return_value="/tmp/test.jsonl")
-        mock_loader_cls.return_value.load.return_value = []
+    def test_create_eval_set_no_traces(self):
+        """A span without a trace id cannot form a trace, so there is nothing to build from."""
+        _reset(self.mgr)
+        _add_session(self.mgr, "s1", spans=[{"spanId": "sp1"}])
 
         client = TestClient(self.app)
         resp = client.post(
@@ -1266,7 +1276,7 @@ class TestStreamingEvaluateSessions:
         cls.app = _make_live_app(cls.mgr)
 
     def test_evaluate_sessions_missing_golden(self):
-        self.mgr.sessions.clear()
+        _reset(self.mgr)
         client = TestClient(self.app)
         resp = client.post(
             "/api/streaming/evaluate-sessions",
@@ -1277,13 +1287,12 @@ class TestStreamingEvaluateSessions:
         )
         assert resp.status_code == 404
 
-    @patch("agentevals.api.streaming_routes.run_evaluation", new_callable=AsyncMock)
+    @patch("agentevals.api.streaming_routes.run_evaluation_from_traces", new_callable=AsyncMock)
     @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
     def test_evaluate_sessions_success(self, mock_create_eval, mock_eval):
-        self.mgr.sessions.clear()
-        self.mgr.sessions["golden"] = _make_session("golden", "tg")
-        self.mgr.sessions["other"] = _make_session("other", "to")
-        self.mgr._save_spans_to_temp_file = AsyncMock(return_value="/tmp/test.jsonl")
+        _reset(self.mgr)
+        _add_session(self.mgr, "golden")
+        _add_session(self.mgr, "other")
 
         mock_create_eval.return_value = StandardResponse(
             data=CreateEvalSetData(
@@ -1305,16 +1314,16 @@ class TestStreamingEvaluateSessions:
         )
         assert body["data"]["goldenSessionId"] == "golden"
         assert isinstance(body["data"]["results"], list)
-        assert len(body["data"]["results"]) >= 1
+        assert {r["sessionId"] for r in body["data"]["results"]} == {"golden", "other"}
+        assert sorted(c.kwargs["group_key"] for c in mock_eval.await_args_list) == ["golden", "other"]
         _assert_all_keys_camel(body)
 
-    @patch("agentevals.api.streaming_routes.run_evaluation", new_callable=AsyncMock)
+    @patch("agentevals.api.streaming_routes.run_evaluation_from_traces", new_callable=AsyncMock)
     @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
     def test_evaluate_sessions_eval_failure(self, mock_create_eval, mock_eval):
-        self.mgr.sessions.clear()
-        self.mgr.sessions["golden"] = _make_session("golden", "tg")
-        self.mgr.sessions["other"] = _make_session("other", "to")
-        self.mgr._save_spans_to_temp_file = AsyncMock(return_value="/tmp/test.jsonl")
+        _reset(self.mgr)
+        _add_session(self.mgr, "golden")
+        _add_session(self.mgr, "other")
 
         mock_create_eval.return_value = StandardResponse(
             data=CreateEvalSetData(
@@ -1350,7 +1359,7 @@ class TestStreamingPrepareEvaluation:
         cls.app = _make_live_app(cls.mgr)
 
     def test_prepare_missing_golden(self):
-        self.mgr.sessions.clear()
+        _reset(self.mgr)
         client = TestClient(self.app)
         resp = client.post(
             "/api/streaming/prepare-evaluation",
@@ -1363,10 +1372,9 @@ class TestStreamingPrepareEvaluation:
 
     @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
     def test_prepare_success(self, mock_create_eval):
-        self.mgr.sessions.clear()
-        self.mgr.sessions["golden"] = _make_session("golden", "tg")
-        self.mgr.sessions["s1"] = _make_session("s1", "t1")
-        self.mgr._save_spans_to_temp_file = AsyncMock(return_value="/tmp/test.jsonl")
+        _reset(self.mgr)
+        _add_session(self.mgr, "golden")
+        _add_session(self.mgr, "s1")
 
         mock_create_eval.return_value = StandardResponse(
             data=CreateEvalSetData(
@@ -1391,10 +1399,9 @@ class TestStreamingPrepareEvaluation:
 
     @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
     def test_prepare_skips_incomplete(self, mock_create_eval):
-        self.mgr.sessions.clear()
-        self.mgr.sessions["golden"] = _make_session("golden", "tg")
-        self.mgr.sessions["s1"] = _make_session("s1", "t1", is_complete=False)
-        self.mgr._save_spans_to_temp_file = AsyncMock(return_value="/tmp/test.jsonl")
+        _reset(self.mgr)
+        _add_session(self.mgr, "golden")
+        _add_session(self.mgr, "s1", is_complete=False)
 
         mock_create_eval.return_value = StandardResponse(
             data=CreateEvalSetData(
@@ -1523,9 +1530,9 @@ class TestStreamingDownload:
 
     @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
     def test_prepared_files_download_byte_for_byte(self, mock_create_eval):
-        self.mgr.sessions.clear()
-        self.mgr.sessions["golden"] = _make_session("golden", "tg")
-        self.mgr.sessions["s1"] = _make_session("s1", "t1", spans=[{"spanId": "sp1"}])
+        _reset(self.mgr)
+        _add_session(self.mgr, "golden")
+        _add_session(self.mgr, "s1", spans=[{"spanId": "sp1"}])
 
         mock_create_eval.return_value = StandardResponse(
             data=CreateEvalSetData(
@@ -1562,13 +1569,13 @@ class TestStreamingGetTrace:
         cls.app = _make_live_app(cls.mgr)
 
     def test_get_trace_missing(self):
-        self.mgr.sessions.clear()
+        _reset(self.mgr)
         client = TestClient(self.app)
         resp = client.post("/api/streaming/get-trace", json={"session_id": "nope"})
         assert resp.status_code == 404
 
     def test_get_trace_success(self):
-        self.mgr.sessions.clear()
+        _reset(self.mgr)
         span = {
             "traceId": "t1",
             "spanId": "sp1",
@@ -1577,7 +1584,7 @@ class TestStreamingGetTrace:
             "endTimeUnixNano": "2000000000",
             "attributes": [],
         }
-        self.mgr.sessions["s1"] = _make_session("s1", "t1", spans=[span])
+        _add_session(self.mgr, "s1", spans=[span])
 
         client = TestClient(self.app)
         body = _assert_envelope(
@@ -1591,8 +1598,8 @@ class TestStreamingGetTrace:
         assert body["data"]["numSpans"] >= 1
 
     def test_get_trace_camel_keys(self):
-        self.mgr.sessions.clear()
-        self.mgr.sessions["s1"] = _make_session("s1", "t1", spans=[{"spanId": "sp1"}])
+        _reset(self.mgr)
+        _add_session(self.mgr, "s1", spans=[{"spanId": "sp1"}])
 
         body = self.client_get_trace("s1")
         _assert_all_keys_camel(body)
@@ -1688,8 +1695,6 @@ class TestDebugLoad:
 
     def test_load_success(self):
         mgr = _make_trace_manager()
-        mgr._extract_invocations = AsyncMock(return_value=[])
-        mgr._save_spans_to_temp_file = AsyncMock(return_value="/tmp/test.jsonl")
         app = _make_live_app(mgr)
 
         buf = io.BytesIO()
@@ -1735,16 +1740,17 @@ class TestUIUpdatesSSE:
 
     def _make_streaming_app(self):
         import asyncio
+        from types import SimpleNamespace
 
         from agentevals.api.app import create_app
-        from agentevals.streaming.ws_server import StreamingTraceManager
+        from agentevals.streaming.manager import LiveManager
 
-        mgr = StreamingTraceManager()
+        mgr = LiveManager()
         # Replace register_sse_client so the queue immediately closes (None sentinel)
         # so the streaming response can be read synchronously in tests.
         q: asyncio.Queue = asyncio.Queue()
         q.put_nowait(None)
-        mgr.register_sse_client = MagicMock(return_value=q)
+        mgr.register_sse_client = MagicMock(return_value=SimpleNamespace(queue=q))
         mgr.unregister_sse_client = MagicMock()
         return create_app(enable_streaming=True, trace_manager=mgr)
 

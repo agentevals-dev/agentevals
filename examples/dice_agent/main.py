@@ -1,13 +1,13 @@
 """Main script for dice_agent with live streaming to agentevals.
 
 This example demonstrates:
-1. Setting up OpenTelemetry with agentevals streaming
+1. Streaming the agent's OpenTelemetry spans to agentevals with an AgentEvals session
 2. Running an ADK agent with the Runner API
 3. Getting real-time evaluation feedback
 
 Prerequisites:
     1. Start agentevals dev server in another terminal:
-       $ agentevals serve --dev --port 8001
+       $ agentevals serve --dev
 
     2. Start the UI (optional, to see live visualization):
        $ cd agentevals/ui && npm run dev
@@ -25,6 +25,7 @@ how the evaluation results change in real-time!
 
 import asyncio
 import os
+from datetime import datetime
 
 from agent import dice_agent
 from dotenv import load_dotenv
@@ -32,6 +33,8 @@ from google.adk.runners import InMemoryRunner
 from google.genai import types
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
+
+from agentevals import AgentEvals
 
 load_dotenv(override=True)
 
@@ -52,86 +55,57 @@ async def main():
     provider = TracerProvider()
     trace.set_tracer_provider(provider)
 
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:21]
+    session_name = f"dice-agent-{dice_agent.model}-{timestamp}"
+    app = AgentEvals(auto_instrument=False)
+
     try:
-        from datetime import datetime
-
-        from agentevals.streaming.processor import AgentEvalsStreamingProcessor
-
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:21]
-        session_id = f"dice-agent-{dice_agent.model}-{timestamp}"
-        processor = AgentEvalsStreamingProcessor(
-            ws_url="ws://localhost:8001/ws/traces",
-            session_id=session_id,
-            trace_id="dice-" + os.urandom(8).hex(),
-        )
-
-        await processor.connect(
+        async with app.session_async(
             eval_set_id="dice_agent_eval",
+            session_name=session_name,
             metadata={"model": dice_agent.model, "agent": dice_agent.name},
-        )
+            tracer_provider=provider,
+        ):
+            print("✓ Streaming to the agentevals dev server")
+            print(f"  Session: {session_name}")
+            print(f"  Model: {dice_agent.model}")
+            print("  View live: http://localhost:5173")
+            print()
 
-        provider.add_span_processor(processor)
+            app_name = "dice_agent_app"
+            user_id = "demo_user"
 
-        print("✓ Connected to agentevals dev server")
-        print(f"  Session: {session_id}")
-        print(f"  Model: {dice_agent.model}")
-        print("  View live: http://localhost:5173")
-        print()
+            runner = InMemoryRunner(agent=dice_agent, app_name=app_name)
+            session = await runner.session_service.create_session(app_name=app_name, user_id=user_id)
 
-        app_name = "dice_agent_app"
-        user_id = "demo_user"
+            test_queries = [
+                "Hi! Can you help me?",
+                "Roll a 20-sided die for me",
+                "Is the number you rolled prime?",
+            ]
 
-        runner = InMemoryRunner(agent=dice_agent, app_name=app_name)
-        session = await runner.session_service.create_session(app_name=app_name, user_id=user_id)
+            for i, query in enumerate(test_queries, 1):
+                print(f"\n[{i}/{len(test_queries)}] User: {query}")
 
-        test_queries = [
-            "Hi! Can you help me?",
-            "Roll a 20-sided die for me",
-            "Is the number you rolled prime?",
-        ]
+                content = types.Content(role="user", parts=[types.Part.from_text(text=query)])
 
-        for i, query in enumerate(test_queries, 1):
-            print(f"\n[{i}/{len(test_queries)}] User: {query}")
+                agent_response = ""
+                async for event in runner.run_async(user_id=user_id, session_id=session.id, new_message=content):
+                    if event.content.parts and event.content.parts[0].text:
+                        agent_response = event.content.parts[0].text
 
-            content = types.Content(role="user", parts=[types.Part.from_text(text=query)])
-
-            agent_response = ""
-            async for event in runner.run_async(user_id=user_id, session_id=session.id, new_message=content):
-                if event.content.parts and event.content.parts[0].text:
-                    agent_response = event.content.parts[0].text
-
-            print(f"     Agent: {agent_response}")
+                print(f"     Agent: {agent_response}")
 
         print()
         print("✓ Agent execution complete")
         print("  View in UI: http://localhost:5173")
         print()
 
-        await processor.shutdown_async()
-
-    except ImportError:
-        print("❌ agentevals streaming not installed")
-        print("   Install with: pip install -e .")
-        print()
-        print("Running agent WITHOUT streaming:")
-        print()
-
-        app_name = "dice_agent_app"
-        user_id = "demo_user"
-        runner = InMemoryRunner(agent=dice_agent, app_name=app_name)
-        session = await runner.session_service.create_session(app_name=app_name, user_id=user_id)
-
-        content = types.Content(role="user", parts=[types.Part.from_text(text="Roll a 6-sided die")])
-
-        async for event in runner.run_async(user_id=user_id, session_id=session.id, new_message=content):
-            if event.content.parts and event.content.parts[0].text:
-                print(f"Agent: {event.content.parts[0].text}")
-
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    except ConnectionError as e:
+        print(f"❌ {e}")
         print()
         print("Make sure agentevals dev server is running:")
-        print("  $ agentevals serve --dev --port 8001")
+        print("  $ agentevals serve --dev")
         print()
 
 

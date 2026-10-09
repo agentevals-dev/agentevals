@@ -8,7 +8,9 @@ Provides two transport tiers:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
+import re
 import socket
 import uuid
 
@@ -16,7 +18,24 @@ import httpx
 import pytest
 import uvicorn
 
-from agentevals.streaming.ws_server import StreamingTraceManager
+from agentevals.streaming.manager import LiveManager
+
+
+def _hex(label: str, nbytes: int) -> str:
+    if re.fullmatch(r"[0-9a-f]+", label) and len(label) == 2 * nbytes:
+        return label
+    return hashlib.sha256(f"{nbytes}:{label}".encode()).hexdigest()[: 2 * nbytes]
+
+
+def tid(label: str) -> str:
+    """A stable 32 hex trace id for a readable test label (receivers reject anything else)."""
+    return _hex(label, 16)
+
+
+def sid(label: str) -> str:
+    """A stable 16 hex span id for a readable test label."""
+    return _hex(label, 8)
+
 
 # ---------------------------------------------------------------------------
 # Tier 1: ASGI in-process fixtures (session grouping + timing stress tests)
@@ -25,13 +44,13 @@ from agentevals.streaming.ws_server import StreamingTraceManager
 
 @pytest.fixture
 async def trace_manager():
-    """Fresh StreamingTraceManager with fast timers for integration tests."""
-    mgr = StreamingTraceManager(
-        completion_grace_seconds=0.1,
-        idle_timeout_seconds=0.5,
-        reextraction_delay_seconds=0.1,
-    )
-    mgr.start_cleanup_task()
+    """Fresh LiveManager with fast timers for integration tests.
+
+    The rerun window is zero, so a new trace for a finished named session is a rerun at once;
+    the tests that simulate reruns send no ``service.instance.id``.
+    """
+    mgr = LiveManager(completion_grace_seconds=0.1, idle_timeout_seconds=0.5, rerun_window_seconds=0.0)
+    mgr.start()
     yield mgr
     await mgr.shutdown()
 
@@ -102,7 +121,7 @@ def live_servers():
     from agentevals.api.app import create_app
     from agentevals.api.otlp_app import create_otlp_app
 
-    mgr = StreamingTraceManager()
+    mgr = LiveManager()
     app = create_app(trace_manager=mgr, enable_streaming=True)
     otlp_app = create_otlp_app(trace_manager=mgr)
 
@@ -150,6 +169,11 @@ def live_servers():
             os.environ[key] = value
 
 
+def has_local_root(mgr: LiveManager, session_id: str) -> bool:
+    session = mgr.sessions[session_id]
+    return any(mgr.store.traces[t].has_local_root for t in session.trace_ids)
+
+
 # ---------------------------------------------------------------------------
 # OTLP payload builders
 # ---------------------------------------------------------------------------
@@ -192,8 +216,8 @@ def make_genai_span(
 ) -> dict:
     """Build a GenAI semconv span dict."""
     span = {
-        "traceId": trace_id,
-        "spanId": span_id or uuid.uuid4().hex[:16],
+        "traceId": tid(trace_id),
+        "spanId": sid(span_id) if span_id else uuid.uuid4().hex[:16],
         "name": name,
         "kind": "SPAN_KIND_CLIENT",
         "startTimeUnixNano": "1000000000",
@@ -207,7 +231,7 @@ def make_genai_span(
         "status": {"code": 0},
     }
     if parent_span_id:
-        span["parentSpanId"] = parent_span_id
+        span["parentSpanId"] = sid(parent_span_id)
     return span
 
 
@@ -241,7 +265,7 @@ def make_genai_log(
     record: dict = {
         "eventName": event_name,
         "observedTimeUnixNano": "1500000000",
-        "traceId": trace_id,
+        "traceId": tid(trace_id),
         "body": {
             "kvlistValue": {
                 "values": [
@@ -253,7 +277,7 @@ def make_genai_log(
         "attributes": [],
     }
     if span_id:
-        record["spanId"] = span_id
+        record["spanId"] = sid(span_id)
     return record
 
 
@@ -277,15 +301,15 @@ async def send_logs(client: httpx.AsyncClient, body: dict) -> httpx.Response:
 
 
 async def wait_for_session_complete(
-    mgr: StreamingTraceManager,
+    mgr: LiveManager,
     session_id: str,
     timeout: float = 5.0,
 ) -> None:
-    """Poll until session is complete or raise TimeoutError."""
+    """Poll until the session is complete and its ``session_complete`` was sent, or raise TimeoutError."""
     deadline = asyncio.get_event_loop().time() + timeout
     while asyncio.get_event_loop().time() < deadline:
         session = mgr.sessions.get(session_id)
-        if session and session.is_complete:
+        if session and session.is_complete and session.completed_once:
             return
         await asyncio.sleep(0.05)
     existing = list(mgr.sessions.keys())
@@ -293,7 +317,7 @@ async def wait_for_session_complete(
 
 
 async def wait_for_n_sessions(
-    mgr: StreamingTraceManager,
+    mgr: LiveManager,
     n: int,
     timeout: float = 5.0,
 ) -> None:
@@ -307,7 +331,7 @@ async def wait_for_n_sessions(
 
 
 def wait_for_session_complete_sync(
-    mgr: StreamingTraceManager,
+    mgr: LiveManager,
     session_id: str,
     timeout: float = 5.0,
 ) -> None:
@@ -317,7 +341,7 @@ def wait_for_session_complete_sync(
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         session = mgr.sessions.get(session_id)
-        if session and session.is_complete:
+        if session and session.is_complete and session.completed_once:
             return
         time.sleep(0.2)
     existing = list(mgr.sessions.keys())

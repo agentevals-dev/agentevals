@@ -18,6 +18,7 @@ from .conftest import (
     make_trace_request,
     send_logs,
     send_traces,
+    tid,
     wait_for_session_complete,
 )
 
@@ -86,9 +87,9 @@ class TestInterleavedBatches:
         await wait_for_session_complete(trace_manager, session_name)
 
         session = trace_manager.sessions[session_name]
-        assert len(session.spans) == 3
-        assert len(session.logs) == 2
-        assert session.trace_ids == {"t1", "t2", "t3"}
+        assert session.span_count == 3
+        assert session.log_count == 2
+        assert set(session.trace_ids) == {tid("t1"), tid("t2"), tid("t3")}
 
 
 class TestConcurrentRequests:
@@ -120,7 +121,7 @@ class TestConcurrentRequests:
         await wait_for_session_complete(trace_manager, session_name)
 
         session = trace_manager.sessions[session_name]
-        assert len(session.spans) == 6
+        assert session.span_count == 6
         assert len(session.trace_ids) == 6
 
     async def test_mixed_session_names_concurrent(self, trace_manager, otlp_client):
@@ -158,9 +159,9 @@ class TestConcurrentRequests:
 
         a = trace_manager.sessions["sess-a"]
         b = trace_manager.sessions["sess-b"]
-        assert len(a.spans) == 4
-        assert len(b.spans) == 4
-        assert a.trace_ids.isdisjoint(b.trace_ids)
+        assert a.span_count == 4
+        assert b.span_count == 4
+        assert set(a.trace_ids).isdisjoint(b.trace_ids)
 
 
 class TestGracePeriodInteractions:
@@ -198,8 +199,8 @@ class TestGracePeriodInteractions:
 
         await wait_for_session_complete(trace_manager, session_name)
 
-        assert len(session.logs) == 1
-        assert len(session.spans) == 2
+        assert session.log_count == 1
+        assert session.span_count == 2
 
 
 class TestRapidSequentialSessions:
@@ -230,10 +231,10 @@ class TestRapidSequentialSessions:
 
         a = trace_manager.sessions[session_name]
         b = trace_manager.sessions[f"{session_name}-2"]
-        assert a.trace_ids == {"rapid-a"}
-        assert b.trace_ids == {"rapid-b"}
-        assert len(a.spans) == 1
-        assert len(b.spans) == 1
+        assert set(a.trace_ids) == {tid("rapid-a")}
+        assert set(b.trace_ids) == {tid("rapid-b")}
+        assert a.span_count == 1
+        assert b.span_count == 1
 
     async def test_split_batch_reopens_despite_rapid_timing(self, trace_manager, otlp_client):
         """Even with rapid timing, a known trace_id reopens the session."""
@@ -268,8 +269,8 @@ class TestRapidSequentialSessions:
 
         assert len(trace_manager.sessions) == 1
         session = trace_manager.sessions[session_name]
-        assert session.trace_ids == {"rs-t1", "rs-t2"}
-        assert len(session.spans) == 3
+        assert set(session.trace_ids) == {tid("rs-t1"), tid("rs-t2")}
+        assert session.span_count == 3
 
 
 class TestLargeBatches:
@@ -291,7 +292,7 @@ class TestLargeBatches:
         await wait_for_session_complete(trace_manager, session_name)
 
         session = trace_manager.sessions[session_name]
-        assert len(session.spans) == 6
+        assert session.span_count == 6
         assert len(session.trace_ids) == 6
 
     async def test_log_batch_spans_multiple_sessions(self, trace_manager, otlp_client):
@@ -342,5 +343,5 @@ class TestLargeBatches:
 
         a = trace_manager.sessions["log-batch-a"]
         b = trace_manager.sessions["log-batch-b"]
-        assert len(a.logs) == 1
-        assert len(b.logs) == 1
+        assert a.log_count == 1
+        assert b.log_count == 1

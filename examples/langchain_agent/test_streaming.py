@@ -1,79 +1,44 @@
-"""Quick test to verify streaming connectivity with agentevals dev server.
+"""Quick check that this machine can stream to the agentevals dev server.
 
-This minimal script tests:
-1. WebSocket connection to dev server
-2. Basic OTEL span transmission
-3. Session creation and shutdown
+Opens an AgentEvals session, records one span inside it and closes the session, which flushes
+the span to the OTLP receiver. The session then shows up in the UI.
 
 Prerequisites:
-    $ agentevals serve --dev --port 8001
+    $ agentevals serve --dev
 
 Usage:
     $ python examples/langchain_agent/test_streaming.py
 """
 
 import asyncio
-import os
-from datetime import datetime
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 
+from agentevals import AgentEvals
 
-async def test_connection():
-    print("🔍 Testing connection to agentevals dev server...")
-    print()
 
+async def test_streaming():
     provider = TracerProvider()
     trace.set_tracer_provider(provider)
+    app = AgentEvals(auto_instrument=False)
 
     try:
-        from agentevals.streaming.processor import AgentEvalsStreamingProcessor
-
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:21]
-        session_id = f"test-langchain-{timestamp}"
-
-        processor = AgentEvalsStreamingProcessor(
-            ws_url="ws://localhost:8001/ws/traces",
-            session_id=session_id,
-            trace_id="test-" + os.urandom(8).hex(),
-        )
-
-        print("Connecting...")
-        await processor.connect(
-            eval_set_id="test_eval",
+        async with app.session_async(
+            eval_set_id="test-eval",
+            session_name="streaming-check",
             metadata={"test": True},
-        )
-
-        provider.add_span_processor(processor)
-
-        print("✓ Connected successfully!")
-        print(f"  Session ID: {session_id}")
+            tracer_provider=provider,
+        ):
+            print("✓ Reached the OTLP receiver")
+            with provider.get_tracer("streaming-check").start_as_current_span("test_span"):
+                print("✓ Created test span")
+        print("✓ Session flushed")
         print()
-
-        tracer = trace.get_tracer(__name__)
-        with tracer.start_as_current_span("test_span") as span:
-            span.set_attribute("test.attribute", "hello")
-            print("✓ Created test span")
-
-        await processor.shutdown_async()
-        print("✓ Shutdown complete")
-        print()
-        print("Connection test PASSED ✓")
-
-    except ImportError:
-        print("❌ agentevals not installed")
-        print("   Install with: pip install -e ../..")
-        print()
-
-    except Exception as e:
-        print("❌ Connection test FAILED")
-        print(f"   Error: {e}")
-        print()
-        print("Make sure agentevals dev server is running:")
-        print("  $ agentevals serve --dev --port 8001")
-        print()
+        print("Streaming works. Look for the 'streaming-check' session in the UI.")
+    except ConnectionError as exc:
+        print(f"❌ {exc}")
 
 
 if __name__ == "__main__":
-    asyncio.run(test_connection())
+    asyncio.run(test_streaming())

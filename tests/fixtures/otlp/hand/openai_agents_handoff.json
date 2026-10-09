@@ -1,0 +1,308 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "fixture-agent"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.0"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.genai.openai_agents",
+      "version": "1.2b0"
+     },
+     "spans": [
+      {
+       "traceId": "7c5943b2af6e28c6892570d60c398265",
+       "spanId": "ca9a05d6a3a2e97d",
+       "name": "invoke_workflow Agent workflow",
+       "kind": 1,
+       "startTimeUnixNano": "1760000000000000000",
+       "endTimeUnixNano": "1760000000100000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "Agent workflow"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "7c5943b2af6e28c6892570d60c398265",
+       "spanId": "e34c80655495f136",
+       "name": "invoke_agent triage",
+       "kind": 1,
+       "startTimeUnixNano": "1760000000001000000",
+       "endTimeUnixNano": "1760000000030000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "triage"
+         }
+        }
+       ],
+       "parentSpanId": "ca9a05d6a3a2e97d"
+      },
+      {
+       "traceId": "7c5943b2af6e28c6892570d60c398265",
+       "spanId": "6f0111ab285346ef",
+       "name": "invoke_agent billing",
+       "kind": 1,
+       "startTimeUnixNano": "1760000000031000000",
+       "endTimeUnixNano": "1760000000099000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "billing"
+         }
+        }
+       ],
+       "parentSpanId": "ca9a05d6a3a2e97d"
+      },
+      {
+       "traceId": "7c5943b2af6e28c6892570d60c398265",
+       "spanId": "9e69aa064e5f651b",
+       "name": "execute_tool issue_refund",
+       "kind": 1,
+       "startTimeUnixNano": "1760000000051000000",
+       "endTimeUnixNano": "1760000000060000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "issue_refund"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"42\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"status\":\"refunded\",\"order_id\":\"42\"}"
+         }
+        }
+       ],
+       "parentSpanId": "6f0111ab285346ef"
+      }
+     ]
+    },
+    {
+     "scope": {
+      "name": "opentelemetry.instrumentation.genai.openai",
+      "version": "1.2b0"
+     },
+     "spans": [
+      {
+       "traceId": "7c5943b2af6e28c6892570d60c398265",
+       "spanId": "23a6bb157382841e",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000002000000",
+       "endTimeUnixNano": "1760000000029000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "25"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"I need a refund for order 42.\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"tool_call\",\"name\":\"transfer_to_billing\",\"arguments\":{},\"id\":\"call_h\"}],\"finish_reason\":\"tool_calls\"}]"
+         }
+        }
+       ],
+       "parentSpanId": "e34c80655495f136"
+      },
+      {
+       "traceId": "7c5943b2af6e28c6892570d60c398265",
+       "spanId": "e43d2f49cf5ee8c6",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000032000000",
+       "endTimeUnixNano": "1760000000050000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "35"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"I need a refund for order 42.\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"tool_call\",\"name\":\"issue_refund\",\"arguments\":{\"order_id\":\"42\"},\"id\":\"call_r\"}],\"finish_reason\":\"tool_calls\"}]"
+         }
+        }
+       ],
+       "parentSpanId": "6f0111ab285346ef"
+      },
+      {
+       "traceId": "7c5943b2af6e28c6892570d60c398265",
+       "spanId": "e0169c9642b8da2c",
+       "name": "chat gpt-4.1-mini",
+       "kind": 3,
+       "startTimeUnixNano": "1760000000061000000",
+       "endTimeUnixNano": "1760000000098000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "55"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"I need a refund for order 42.\"}]},{\"role\":\"assistant\",\"parts\":[{\"type\":\"tool_call\",\"name\":\"issue_refund\",\"arguments\":{\"order_id\":\"42\"},\"id\":\"call_r\"}]},{\"role\":\"tool\",\"parts\":[{\"type\":\"tool_call_response\",\"response\":{\"status\":\"refunded\",\"order_id\":\"42\"},\"id\":\"call_r\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"Your refund for order 42 has been issued.\"}],\"finish_reason\":\"stop\"}]"
+         }
+        }
+       ],
+       "parentSpanId": "6f0111ab285346ef"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

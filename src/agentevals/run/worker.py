@@ -18,8 +18,8 @@ import socket
 from datetime import timedelta
 from uuid import UUID
 
-from google.adk.evaluation.eval_set import EvalSet
-
+from .. import evaluation_events as emit
+from ..adk_bridge import EvalSet, load_eval_set_from_dict
 from ..config import EvalParams
 from ..resolvers import (
     reset_resolved_credentials,
@@ -146,7 +146,7 @@ class AsyncRunWorker:
         params = EvalParams.model_validate(run.spec.eval_config or {})
         eval_set: EvalSet | None = None
         if run.spec.eval_set:
-            eval_set = EvalSet.model_validate(run.spec.eval_set)
+            eval_set = load_eval_set_from_dict(run.spec.eval_set)
 
         fetcher = resolve_fetcher(run.spec.target)
 
@@ -166,7 +166,9 @@ class AsyncRunWorker:
                 config=params,
                 eval_set=eval_set,
                 trace_progress_callback=_trace_progress,
+                run_id=str(run.run_id),
             )
+        await asyncio.to_thread(emit.flush)
 
         results = build_results(run.run_id, params, run_result)
         await self._results.upsert_many(run.run_id, results)

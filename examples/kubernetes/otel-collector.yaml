@@ -1,0 +1,129 @@
+# OpenTelemetry Collector between kagent and agentevals.
+#
+# traces and logs from kagent go to agentevals; evaluation results that agentevals sends back
+# are printed by the debug exporter (kubectl logs deploy/otel-collector).
+#
+# transform/claude_code is a workaround for Claude Code native telemetry, checked with
+# Claude Code 2.1.285 (kagent Claude harness). Remove it once the producer emits GenAI
+# execute_tool and chat spans itself, or both would be counted.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector
+  namespace: agentevals
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 20
+
+      transform/claude_code:
+        error_mode: ignore
+        trace_statements:
+          - context: span
+            conditions:
+              - instrumentation_scope.name == "com.anthropic.claude_code.tracing"
+            statements:
+              - set(span.attributes["gen_ai.operation.name"], "execute_tool") where span.name == "claude_code.tool"
+              - set(span.attributes["gen_ai.tool.name"], span.attributes["tool_name"]) where span.name == "claude_code.tool"
+              - replace_pattern(span.attributes["gen_ai.tool.name"], "^mcp__.+?__", "")
+              - set(span.attributes["gen_ai.operation.name"], "chat") where span.name == "claude_code.llm_request"
+              - set(span.attributes["gen_ai.response.model"], span.attributes["model"]) where span.name == "claude_code.llm_request"
+              - set(span.attributes["gen_ai.usage.input_tokens"], span.attributes["input_tokens"] + span.attributes["cache_read_tokens"] + span.attributes["cache_creation_tokens"]) where span.name == "claude_code.llm_request"
+              - set(span.attributes["gen_ai.usage.cache_read.input_tokens"], span.attributes["cache_read_tokens"]) where span.name == "claude_code.llm_request"
+              - set(span.attributes["gen_ai.usage.cache_write.input_tokens"], span.attributes["cache_creation_tokens"]) where span.name == "claude_code.llm_request"
+              - set(span.attributes["gen_ai.usage.output_tokens"], span.attributes["output_tokens"]) where span.name == "claude_code.llm_request"
+
+      filter/not_from_agentevals:
+        error_mode: ignore
+        logs:
+          log_record:
+            - resource.attributes["service.name"] == "agentevals"
+
+      filter/only_from_agentevals:
+        error_mode: ignore
+        logs:
+          log_record:
+            - resource.attributes["service.name"] != "agentevals"
+
+    exporters:
+      otlphttp/agentevals:
+        endpoint: http://agentevals.agentevals.svc.cluster.local:4318
+      debug:
+        verbosity: detailed
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, transform/claude_code]
+          exporters: [otlphttp/agentevals]
+        logs/agentevals:
+          receivers: [otlp]
+          processors: [memory_limiter, filter/not_from_agentevals]
+          exporters: [otlphttp/agentevals]
+        logs/results:
+          receivers: [otlp]
+          processors: [memory_limiter, filter/only_from_agentevals]
+          exporters: [debug]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: agentevals
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+      annotations:
+        # bump to restart the Collector after editing the ConfigMap
+        config-revision: "1"
+    spec:
+      containers:
+        - name: otelcol
+          image: otel/opentelemetry-collector-contrib:0.162.0
+          args: ["--config=/conf/config.yaml"]
+          ports:
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
+          volumeMounts:
+            - name: conf
+              mountPath: /conf
+      volumes:
+        - name: conf
+          configMap:
+            name: otel-collector
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: agentevals
+spec:
+  selector:
+    app: otel-collector
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318

@@ -1,161 +1,161 @@
 import type { Trace, Span, Invocation, ParsedTraceFile, SpanEditMapping, SpanLocationRef } from './types';
-import {
-  ADK_SCOPE,
-  detectTraceFormat,
-  findChildrenByOperation,
-  findDescendantLLMSpans,
-  USER_ROLES,
-  ASSISTANT_ROLES,
-} from './trace-helpers';
+import { USER_ROLES, ASSISTANT_ROLES } from './trace-helpers';
 
+interface RawAttr {
+  key: string;
+  value?: { stringValue?: string };
+}
+
+interface RawTag {
+  key: string;
+  value?: unknown;
+}
+
+interface RawSpan {
+  spanId?: string;
+  spanID?: string;
+  attributes?: RawAttr[];
+  events?: { attributes?: RawAttr[] }[];
+  tags?: RawTag[];
+}
+
+interface RawScopeSpans {
+  spans?: RawSpan[];
+}
+
+interface RawOtlp {
+  spanId?: string;
+  resourceSpans?: { scopeSpans?: RawScopeSpans[]; instrumentationLibrarySpans?: RawScopeSpans[] }[];
+  batches?: { scopeSpans?: RawScopeSpans[]; instrumentationLibrarySpans?: RawScopeSpans[] }[];
+}
+
+const ADK_REQUEST_KEY = 'gcp.vertex.agent.llm_request';
+const ADK_RESPONSE_KEY = 'gcp.vertex.agent.llm_response';
+
+/**
+ * Parse a trace file so its message attributes can be patched in place.
+ *
+ * Accepts Jaeger JSON, an OTLP/JSON document (``resourceSpans``), and JSONL whose lines are OTLP
+ * export requests (the Collector file exporter, live session exports) or bare OTLP spans. Every
+ * raw span object is indexed by span id, so patches edit the original structure.
+ */
 export function parseTraceFileForEditing(content: string, fileName: string): ParsedTraceFile {
   const trimmed = content.trim();
-  const isOtlpJsonl = detectOtlpJsonl(trimmed);
-
-  if (isOtlpJsonl) {
-    return parseOtlpJsonl(trimmed, fileName);
-  }
-  return parseJaegerJson(trimmed, fileName);
-}
-
-function detectOtlpJsonl(content: string): boolean {
-  if (!content.includes('\n') || content.startsWith('[')) return false;
-  try {
-    const firstLine = content.split('\n')[0].trim();
-    const parsed = JSON.parse(firstLine);
-    return !('data' in parsed);
-  } catch {
-    return false;
-  }
-}
-
-function parseOtlpJsonl(content: string, fileName: string): ParsedTraceFile {
-  const lines = content.split('\n').filter(l => l.trim());
-  const rawData = lines.map(line => JSON.parse(line));
   const spanIndex = new Map<string, SpanLocationRef>();
 
-  rawData.forEach((span, lineIndex) => {
-    if (span.spanId) {
-      spanIndex.set(span.spanId, { lineIndex });
-    }
-  });
+  const whole = parseJson(trimmed);
+  const jaeger = whole as { data?: { spans?: RawSpan[] }[] } | undefined;
 
-  return { format: 'otlp-jsonl', fileName, rawData, spanIndex };
-}
-
-function parseJaegerJson(content: string, fileName: string): ParsedTraceFile {
-  const rawData = JSON.parse(content);
-  const spanIndex = new Map<string, SpanLocationRef>();
-
-  if (rawData.data && Array.isArray(rawData.data)) {
-    rawData.data.forEach((trace: any, traceIndex: number) => {
-      if (trace.spans && Array.isArray(trace.spans)) {
-        trace.spans.forEach((span: any, spanIdx: number) => {
-          if (span.spanID) {
-            spanIndex.set(span.spanID, { traceIndex, spanIndex: spanIdx });
-          }
-        });
+  if (jaeger && typeof jaeger === 'object' && !Array.isArray(jaeger) && Array.isArray(jaeger.data)) {
+    for (const trace of jaeger.data) {
+      for (const span of trace.spans || []) {
+        if (span.spanID) spanIndex.set(span.spanID, { raw: span });
       }
-    });
+    }
+    return { format: 'jaeger', fileName, rawData: whole, spanIndex };
   }
 
-  return { format: 'jaeger', fileName, rawData, spanIndex };
+  if (whole !== undefined) {
+    indexOtlp(whole as RawOtlp, spanIndex);
+    return { format: 'otlp-json', fileName, rawData: whole, spanIndex };
+  }
+
+  const lines = trimmed.split('\n').filter(l => l.trim()).map(line => JSON.parse(line) as RawOtlp);
+  lines.forEach(line => indexOtlp(line, spanIndex));
+  return { format: 'otlp-jsonl', fileName, rawData: lines, spanIndex };
 }
 
-export function buildEditMappings(traces: Trace[], _parsedFile: ParsedTraceFile): SpanEditMapping[] {
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function indexOtlp(value: RawOtlp | null, spanIndex: Map<string, SpanLocationRef>): void {
+  if (!value || typeof value !== 'object') return;
+  const resources = value.resourceSpans || value.batches;
+  if (Array.isArray(resources)) {
+    for (const rs of resources) {
+      for (const ss of rs.scopeSpans || rs.instrumentationLibrarySpans || []) {
+        for (const span of ss.spans || []) {
+          if (span.spanId) spanIndex.set(span.spanId, { raw: span });
+        }
+      }
+    }
+  } else if (value.spanId) {
+    spanIndex.set(value.spanId, { raw: value });
+  }
+}
+
+const MESSAGE_KEYS = {
+  user: ['gen_ai.input.messages', 'gen_ai.prompt', 'gen_ai.request.messages'],
+  response: ['gen_ai.output.messages', 'gen_ai.completion', 'gen_ai.response.messages'],
+};
+const INDEXED_PREFIX = { user: 'gen_ai.prompt.', response: 'gen_ai.completion.' };
+
+type Field = 'user' | 'response';
+
+function isModelCall(span: Span): boolean {
+  return (
+    !!span.tags[ADK_REQUEST_KEY] ||
+    !!span.tags[ADK_RESPONSE_KEY] ||
+    [...MESSAGE_KEYS.user, ...MESSAGE_KEYS.response].some(key => !!span.tags[key]) ||
+    span.tags['gen_ai.prompt.0.content'] !== undefined ||
+    span.tags['gen_ai.completion.0.content'] !== undefined
+  );
+}
+
+/** Messages on the span itself win over its model calls, as in the backend. */
+function carries(span: Span, field: Field): boolean {
+  return span.tags[MESSAGE_KEYS[field][0]] !== undefined;
+}
+
+/**
+ * Edit targets for every span that can anchor a turn, keyed by span id (the ``invocationId``
+ * the backend reports). A span's target is the first and last innermost model call in its
+ * subtree: like the backend, a wrapper call defers to the provider call inside it, so agent,
+ * workflow and bare root anchors all edit the content the backend reads.
+ */
+export function buildEditMappings(traces: Trace[]): SpanEditMapping[] {
   const mappings: SpanEditMapping[] = [];
 
   for (const trace of traces) {
-    const format = detectTraceFormat(trace);
+    const range = new Map<string, { first: Span; last: Span }>();
+    const order: Span[] = [];
+    const stack: Span[] = [...trace.rootSpans];
+    while (stack.length > 0) {
+      const span = stack.pop()!;
+      order.push(span);
+      stack.push(...span.children);
+    }
+    for (let i = order.length - 1; i >= 0; i--) {
+      const span = order[i];
+      let first: Span | undefined;
+      let last: Span | undefined;
+      for (const child of span.children) {
+        const r = range.get(child.spanId);
+        if (!r) continue;
+        if (!first || r.first.startTime < first.startTime) first = r.first;
+        if (!last || r.last.startTime > last.startTime) last = r.last;
+      }
+      if (!first && isModelCall(span)) first = last = span;
+      if (first && last) range.set(span.spanId, { first, last });
+    }
 
-    if (format === 'adk') {
-      mappings.push(...buildAdkMappings(trace));
-    } else {
-      mappings.push(...buildGenAIMappings(trace));
+    const byId = new Map(order.map(span => [span.spanId, span]));
+    for (const [spanId, { first, last }] of range) {
+      const anchor = byId.get(spanId)!;
+      mappings.push({
+        invocationId: spanId,
+        userInputSpanId: carries(anchor, 'user') ? spanId : first.spanId,
+        finalResponseSpanId: carries(anchor, 'response') ? spanId : last.spanId,
+      });
     }
   }
 
   return mappings;
-}
-
-function buildAdkMappings(trace: Trace): SpanEditMapping[] {
-  const mappings: SpanEditMapping[] = [];
-
-  const agentSpans = trace.allSpans.filter(
-    (span) =>
-      span.operationName.includes('invoke_agent') &&
-      span.tags['otel.scope.name'] === ADK_SCOPE
-  );
-
-  for (const agentSpan of agentSpans) {
-    const llmSpans = findChildrenByOperation(agentSpan, 'call_llm');
-    const toolSpans = findChildrenByOperation(agentSpan, 'execute_tool');
-
-    if (llmSpans.length === 0) continue;
-
-    mappings.push({
-      invocationId: agentSpan.spanId,
-      format: 'adk',
-      userInputSpanId: llmSpans[0].spanId,
-      finalResponseSpanId: llmSpans[llmSpans.length - 1].spanId,
-      toolSpanIds: toolSpans.map(s => s.spanId),
-      userInputAttrKey: 'gcp.vertex.agent.llm_request',
-      finalResponseAttrKey: 'gcp.vertex.agent.llm_response',
-    });
-  }
-
-  return mappings;
-}
-
-function buildGenAIMappings(trace: Trace): SpanEditMapping[] {
-  const mappings: SpanEditMapping[] = [];
-
-  const llmRootSpans = trace.rootSpans.filter(span =>
-    span.tags['gen_ai.request.model'] || span.tags['gen_ai.system']
-  );
-
-  const rootSpansToCheck = llmRootSpans.length > 0
-    ? llmRootSpans
-    : trace.rootSpans.slice(0, 1);
-
-  for (const rootSpan of rootSpansToCheck) {
-    const llmSpans = findDescendantLLMSpans(rootSpan);
-    if (llmSpans.length === 0) continue;
-
-    const firstLlm = llmSpans[0];
-    const lastLlm = llmSpans[llmSpans.length - 1];
-
-    const userInputAttrKey = resolveInputAttrKey(firstLlm);
-    const finalResponseAttrKey = resolveOutputAttrKey(lastLlm);
-
-    if (!userInputAttrKey || !finalResponseAttrKey) continue;
-
-    mappings.push({
-      invocationId: rootSpan.spanId,
-      format: 'genai',
-      userInputSpanId: firstLlm.spanId,
-      finalResponseSpanId: lastLlm.spanId,
-      toolSpanIds: [],
-      userInputAttrKey,
-      finalResponseAttrKey,
-    });
-  }
-
-  return mappings;
-}
-
-function resolveInputAttrKey(span: Span): string | null {
-  if (span.tags['gen_ai.input.messages']) return 'gen_ai.input.messages';
-  if (span.tags['gen_ai.prompt']) return 'gen_ai.prompt';
-  if (span.tags['gen_ai.request.messages']) return 'gen_ai.request.messages';
-  return null;
-}
-
-function resolveOutputAttrKey(span: Span): string | null {
-  if (span.tags['gen_ai.output.messages']) return 'gen_ai.output.messages';
-  if (span.tags['gen_ai.completion']) return 'gen_ai.completion';
-  if (span.tags['gen_ai.response.messages']) return 'gen_ai.response.messages';
-  return null;
 }
 
 export function applyEditsAndSerialize(
@@ -173,87 +173,98 @@ export function applyEditsAndSerialize(
     const responseText = inv.finalResponse?.parts?.[0]?.text;
 
     if (userText !== undefined) {
-      patchAttribute(parsedFile, mapping.userInputSpanId, mapping.userInputAttrKey, mapping.format, 'user', userText);
+      patchSpan(parsedFile, mapping.userInputSpanId, 'user', userText);
     }
     if (responseText !== undefined) {
-      patchAttribute(parsedFile, mapping.finalResponseSpanId, mapping.finalResponseAttrKey, mapping.format, 'response', responseText);
+      patchSpan(parsedFile, mapping.finalResponseSpanId, 'response', responseText);
     }
   }
 
   return serialize(parsedFile);
 }
 
-function patchAttribute(
-  parsedFile: ParsedTraceFile,
-  spanId: string,
-  attrKey: string,
-  format: 'adk' | 'genai',
-  field: 'user' | 'response',
-  newText: string
-): void {
+interface AttrStore {
+  get(key: string): unknown;
+  set(key: string, value: string): void;
+}
+
+function otlpStore(rawSpan: RawSpan): AttrStore {
+  // Span attributes first, then span event attributes (some frameworks put messages in events).
+  const lists = [rawSpan.attributes, ...(rawSpan.events || []).map(e => e.attributes)].filter(
+    (attrs): attrs is RawAttr[] => Array.isArray(attrs)
+  );
+  const find = (key: string) => {
+    for (const attrs of lists) {
+      const attr = attrs.find(a => a.key === key);
+      if (attr) return attr;
+    }
+    return undefined;
+  };
+  return {
+    get: key => find(key)?.value?.stringValue,
+    set: (key, value) => {
+      for (const attrs of lists) {
+        for (const attr of attrs) {
+          if (attr.key === key && attr.value?.stringValue !== undefined) attr.value = { stringValue: value };
+        }
+      }
+    },
+  };
+}
+
+function jaegerStore(rawSpan: RawSpan): AttrStore {
+  const tags: RawTag[] = Array.isArray(rawSpan.tags) ? rawSpan.tags : [];
+  return {
+    get: key => tags.find(t => t.key === key)?.value,
+    set: (key, value) => {
+      const tag = tags.find(t => t.key === key);
+      if (tag) tag.value = value;
+    },
+  };
+}
+
+/** Patch every representation of the message the span carries, so the file stays consistent
+ * whichever one a reader prefers. */
+function patchSpan(parsedFile: ParsedTraceFile, spanId: string, field: Field, newText: string): void {
   const locRef = parsedFile.spanIndex.get(spanId);
   if (!locRef) return;
+  const store = parsedFile.format === 'jaeger' ? jaegerStore(locRef.raw) : otlpStore(locRef.raw);
 
-  if (parsedFile.format === 'otlp-jsonl') {
-    patchOtlpAttribute(parsedFile.rawData[locRef.lineIndex!], attrKey, format, field, newText);
-  } else {
-    const span = parsedFile.rawData.data[locRef.traceIndex!].spans[locRef.spanIndex!];
-    patchJaegerAttribute(span, attrKey, format, field, newText);
+  for (const key of MESSAGE_KEYS[field]) {
+    const value = store.get(key);
+    if (typeof value !== 'string') continue;
+    const patched = patchJson(value, data => patchGenAIJsonValue(data, field, newText));
+    if (patched !== null) store.set(key, patched);
   }
+
+  const adkKey = field === 'user' ? ADK_REQUEST_KEY : ADK_RESPONSE_KEY;
+  const adkValue = store.get(adkKey);
+  if (typeof adkValue === 'string') {
+    const patched = patchJson(adkValue, data => patchAdkJsonValue(data, field, newText));
+    if (patched !== null) store.set(adkKey, patched);
+  }
+
+  patchIndexed(store, field, newText);
 }
 
-function patchOtlpAttribute(
-  rawSpan: any,
-  attrKey: string,
-  format: 'adk' | 'genai',
-  field: 'user' | 'response',
-  newText: string
-): void {
-  const attrs = rawSpan.attributes;
-  if (!Array.isArray(attrs)) return;
-
-  const attr = attrs.find((a: any) => a.key === attrKey);
-  if (!attr?.value?.stringValue) return;
-
-  const patched = patchJsonValue(attr.value.stringValue, format, field, newText);
-  if (patched !== null) {
-    attr.value.stringValue = patched;
-  }
-}
-
-function patchJaegerAttribute(
-  rawSpan: any,
-  attrKey: string,
-  format: 'adk' | 'genai',
-  field: 'user' | 'response',
-  newText: string
-): void {
-  const tags = rawSpan.tags;
-  if (!Array.isArray(tags)) return;
-
-  const tag = tags.find((t: any) => t.key === attrKey);
-  if (!tag) return;
-
-  const patched = patchJsonValue(tag.value, format, field, newText);
-  if (patched !== null) {
-    tag.value = patched;
-  }
-}
-
-function patchJsonValue(
-  jsonStr: string,
-  format: 'adk' | 'genai',
-  field: 'user' | 'response',
-  newText: string
-): string | null {
-  try {
-    const data = JSON.parse(jsonStr);
-
-    if (format === 'adk') {
-      return patchAdkJsonValue(data, field, newText);
-    } else {
-      return patchGenAIJsonValue(data, field, newText);
+/** OpenLLMetry style ``gen_ai.prompt.N.role`` / ``.content``: the last message with a matching role. */
+function patchIndexed(store: AttrStore, field: Field, newText: string): void {
+  const prefix = INDEXED_PREFIX[field];
+  const roles = field === 'user' ? USER_ROLES : ASSISTANT_ROLES;
+  let target: number | null = null;
+  for (let n = 0; store.get(`${prefix}${n}.role`) !== undefined || store.get(`${prefix}${n}.content`) !== undefined; n++) {
+    const role = store.get(`${prefix}${n}.role`);
+    const roleMatches = role === undefined || (typeof role === 'string' && roles.includes(role));
+    if (roleMatches && typeof store.get(`${prefix}${n}.content`) === 'string') {
+      target = n;
     }
+  }
+  if (target !== null) store.set(`${prefix}${target}.content`, newText);
+}
+
+function patchJson(jsonStr: string, patch: (data: any) => string): string | null {
+  try {
+    return patch(JSON.parse(jsonStr));
   } catch {
     return null;
   }
@@ -286,8 +297,18 @@ function patchAdkJsonValue(data: any, field: 'user' | 'response', newText: strin
   return JSON.stringify(data);
 }
 
+function hasText(msg: any): boolean {
+  if (typeof msg.content === 'string' && msg.content) return true;
+  if (Array.isArray(msg.content) && msg.content.some((item: any) => typeof item === 'object' && item.text)) return true;
+  return Array.isArray(msg.parts) && msg.parts.some((p: any) => typeof p === 'object' && p.type === 'text');
+}
+
 function patchGenAIJsonValue(data: any, field: 'user' | 'response', newText: string): string {
   if (!Array.isArray(data)) return JSON.stringify(data);
+  // A tool request has no text to replace; leave it rather than invent an answer.
+  if (field === 'response' && !data.some((msg: any) => ASSISTANT_ROLES.includes(msg.role) && hasText(msg))) {
+    return JSON.stringify(data);
+  }
 
   const targetRoles = field === 'user' ? USER_ROLES : ASSISTANT_ROLES;
 
@@ -323,6 +344,9 @@ function patchGenAIJsonValue(data: any, field: 'user' | 'response', newText: str
 function serialize(parsedFile: ParsedTraceFile): string {
   if (parsedFile.format === 'otlp-jsonl') {
     return parsedFile.rawData.map((line: any) => JSON.stringify(line)).join('\n');
+  }
+  if (parsedFile.format === 'otlp-json') {
+    return JSON.stringify(parsedFile.rawData);
   }
   return JSON.stringify(parsedFile.rawData, null, 2);
 }

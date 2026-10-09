@@ -102,27 +102,29 @@ Each evaluator entry in the `evaluators` list uses the following fields. The `ty
 
 ## Protocol
 
-Every evaluator — regardless of language — communicates via the same JSON protocol over stdin/stdout.
+Every evaluator, in any language, uses the same JSON protocol over stdin and stdout.
 
 ### Input (`EvalInput`)
 
 ```json
 {
-  "protocol_version": "1.0",
+  "protocol_version": "1.1",
   "metric_name": "response_quality",
   "threshold": 0.7,
   "config": { "min_length": 20 },
   "invocations": [
     {
-      "invocation_id": "inv-001",
+      "invocation_id": "a1b2c3d4e5f60718",
+      "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+      "span_id": "a1b2c3d4e5f60718",
       "user_content": "What is 2+2?",
       "final_response": "The answer is 4.",
       "intermediate_steps": {
         "tool_calls": [
-          { "name": "calculator", "args": { "expression": "2+2" } }
+          { "id": "call_1", "name": "calculator", "args": { "expression": "2+2" } }
         ],
         "tool_responses": [
-          { "name": "calculator", "output": "4" }
+          { "id": "call_1", "name": "calculator", "output": "{\"result\": 4}", "response": { "result": 4 } }
         ]
       }
     }
@@ -133,7 +135,7 @@ Every evaluator — regardless of language — communicates via the same JSON pr
 
 | Field | Type | Description |
 |---|---|---|
-| `protocol_version` | string | Wire-format version (`"MAJOR.MINOR"`). Current: `"1.0"` |
+| `protocol_version` | string | Wire format version (`"MAJOR.MINOR"`). Current: `"1.1"` |
 | `metric_name` | string | Name of this evaluator |
 | `threshold` | float | Pass/fail threshold |
 | `config` | object | User-provided config from the YAML |
@@ -144,7 +146,8 @@ Each invocation contains:
 
 | Field | Type | Description |
 |---|---|---|
-| `invocation_id` | string | Unique turn identifier |
+| `invocation_id` | string | Unique turn id: the span id of the turn's agent span |
+| `trace_id`, `span_id` | string or null | Where the turn is in the telemetry (1.1) |
 | `user_content` | string | What the user said |
 | `final_response` | string or null | The agent's final response |
 | `intermediate_steps` | object | Steps between user input and final response |
@@ -153,8 +156,10 @@ The `intermediate_steps` object contains:
 
 | Field | Type | Description |
 |---|---|---|
-| `tool_calls` | array | Tools the agent called |
-| `tool_responses` | array | Responses the agent received from tools |
+| `tool_calls` | array | Tools the agent called: `name`, `args`, and `id` when the producer recorded one (1.1) |
+| `tool_responses` | array | Tool results: `name`, `output` (the result as JSON text), `response` (the same result as a JSON value, 1.1) and `id` of the call it answers (1.1) |
+
+Tool results used to arrive in `output` as Python text in 1.0. Read `response` for structured access.
 
 ### Output (`EvalResult`)
 
@@ -176,18 +181,18 @@ The `intermediate_steps` object contains:
 
 ### Protocol Versioning
 
-The `protocol_version` field uses `"MAJOR.MINOR"` format (currently `"1.0"`). This allows the CLI and SDK to evolve independently while maintaining compatibility:
+The `protocol_version` field uses `"MAJOR.MINOR"` format (currently `"1.1"`). This lets the CLI and SDK evolve independently:
 
-- **Additive only** -- new fields may be added to `EvalInput` or `EvalResult`; existing fields are never removed or renamed within the same major version.
-- **Defaults required** -- every new field must have a default value. Older deserializers silently ignore unknown fields (Pydantic's default behavior), so an evaluator built against an older SDK will still work with a newer CLI.
-- **MINOR bumps** -- additive changes (new optional fields). No action required by evaluator authors.
-- **MAJOR bumps** -- breaking changes (removed fields, type changes). The SDK's `@evaluator` decorator will log a warning if it sees a major version it does not recognize.
+* **Additive only.** New fields may be added; existing fields are never removed or renamed within a major version.
+* **Defaults required.** Every new field has a default, and older SDKs ignore unknown fields, so an evaluator built against 1.0 keeps working with a 1.1 CLI.
+* **Minor bumps** add optional fields. Nothing to do for evaluator authors.
+* **Major bumps** are breaking. The SDK's `@evaluator` decorator warns when it sees a major version it does not know.
 
 The CLI and SDK are **independent packages**. Install them at whatever versions you need:
 
 ```bash
-pip install agentevals            # CLI -- may speak protocol 1.1
-pip install agentevals-evaluator-sdk   # SDK -- may speak protocol 1.0
+pip install agentevals                 # CLI, speaks protocol 1.1
+pip install agentevals-evaluator-sdk   # SDK, works with 1.0 and 1.1
 ```
 
 As long as the major version matches, they are compatible.
@@ -321,9 +326,9 @@ Custom evaluators use a layered architecture designed for extensibility.
            │
            ▼
 ┌──────────────────────────┐
-│  CustomEvaluatorRunner   │
-│  ADK Evaluator adapter   │
-│  Invocation ↔ EvalInput  │
+│  evaluate_custom_evaluator│
+│  turns ↔ EvalInput       │
+│  EvalResult → metric     │
 └──────────┬───────────────┘
            │
            ▼
@@ -346,7 +351,7 @@ Custom evaluators use a layered architecture designed for extensibility.
 - **`EvaluatorBackend`** is the execution abstraction. The `executor` field in config selects which factory to use (`"local"` → `SubprocessBackend`). New executors (e.g. `DockerBackend`) register via `register_executor()`.
 - **`SubprocessBackend`** runs a local file as a child process, piping JSON over stdin/stdout.
 - **`Runtime`** is an internal detail of `SubprocessBackend` that maps file extensions to interpreter commands.
-- **`CustomEvaluatorRunner`** adapts any `EvaluatorBackend` into ADK's `Evaluator` interface, handling the conversion between ADK's `Invocation` objects and the simpler `EvalInput`/`EvalResult` protocol.
+- **`evaluate_custom_evaluator`** turns the extracted conversation into `EvalInput`, runs the backend and maps `EvalResult` back to a metric result. It does not use ADK.
 
 ### Adding a new language runtime
 
@@ -375,7 +380,7 @@ _RUNTIMES: list[Runtime] = [
 ]
 ```
 
-No other files need to change — the extension validator and evaluator pick it up automatically.
+No other files need to change: the extension validator and evaluator pick it up automatically.
 
 ### Adding a new executor
 

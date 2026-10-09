@@ -1,13 +1,17 @@
-"""OTLP payload decoding and processing for traces/logs."""
+"""OTLP export decoding and ingestion, shared by the HTTP and gRPC receivers.
+
+Bodies decode straight into envelopes (``otel.decode``), strictly: invalid ids are rejected item
+by item and reported through ``partialSuccess`` together with what the live store refused.
+"""
 
 from __future__ import annotations
 
-import base64
 import logging
+from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from google.protobuf.json_format import MessageToDict
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest as LogsServiceRequestPB,
 )
@@ -21,23 +25,17 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceResponse as TraceServiceResponsePB,
 )
 
-from ..extraction import flatten_otlp_attributes
-from ..otlp_anyvalue import decode_any_value
-from ..streaming.session import MAX_LOGS_PER_SESSION, MAX_SPANS_PER_SESSION
-from ..trace_attrs import (
-    AGENTEVALS_EVAL_SET_ID,
-    AGENTEVALS_SESSION_NAME,
-    OTEL_GENAI_CONVERSATION_ID,
-    OTEL_GENAI_INPUT_MESSAGES,
-    OTEL_GENAI_OUTPUT_MESSAGES,
-    OTEL_SCHEMA_URL,
-    OTEL_SCOPE,
-    OTEL_SCOPE_VERSION,
+from ..otel.decode import (
+    DecodeResult,
+    decode_json_document,
+    decode_logs_proto,
+    decode_traces_proto,
+    proto_names_to_json,
 )
-from .models import WSSpanReceivedEvent
+from ..otel.store import IngestResult
 
 if TYPE_CHECKING:
-    from ..streaming.ws_server import StreamingTraceManager
+    from ..streaming.manager import LiveManager
 
 logger = logging.getLogger(__name__)
 
@@ -46,22 +44,28 @@ logger = logging.getLogger(__name__)
 class ExportResult:
     """Outcome of ingesting one Export<signal>ServiceRequest.
 
-    ``rejected`` is what OTLP requires the receiver to report back in the
-    response's ``partial_success`` field; ``accepted`` exists for logging and
-    tests. Reasons are accumulated so one English ``error_message`` can name
-    every cause of rejection.
+    ``rejected`` is what OTLP requires the receiver to report back in the response's
+    ``partial_success`` field. ``overloaded`` is set when any item was refused for transient
+    capacity (memory or session slots), which the receivers answer with a retryable 503 /
+    ``UNAVAILABLE`` instead, so the client resends rather than dropping those items.
     """
 
     accepted: int = 0
     rejected: int = 0
     rejected_reasons: dict[str, int] = field(default_factory=dict)
+    overloaded: bool = False
 
-    def accept(self) -> None:
-        self.accepted += 1
+    def accept(self, n: int = 1) -> None:
+        self.accepted += n
 
-    def reject(self, reason: str) -> None:
-        self.rejected += 1
-        self.rejected_reasons[reason] = self.rejected_reasons.get(reason, 0) + 1
+    def reject(self, reason: str, n: int = 1) -> None:
+        if n:
+            self.rejected += n
+            self.rejected_reasons[reason] = self.rejected_reasons.get(reason, 0) + n
+
+    def add_reasons(self, reasons: Mapping[str, int]) -> None:
+        for reason, n in reasons.items():
+            self.reject(reason, n)
 
     @property
     def error_message(self) -> str:
@@ -70,12 +74,7 @@ class ExportResult:
 
 
 def _log_rejections(signal: str, result: ExportResult) -> None:
-    """Warn once per export about dropped records.
-
-    Once per request, not per record: a long batch arriving at a capped session
-    would otherwise flood the log, and the exporter already surfaces the partial
-    success on its own side.
-    """
+    """Warn once per export about dropped records, never per record."""
     if not result.rejected:
         return
     logger.warning(
@@ -87,194 +86,61 @@ def _log_rejections(signal: str, result: ExportResult) -> None:
     )
 
 
-async def process_traces(body: dict, manager: StreamingTraceManager) -> ExportResult:
-    """Parse ExportTraceServiceRequest and feed spans to the pipeline."""
+def _merge(decoded_reasons: Counter, outcome: IngestResult) -> ExportResult:
     result = ExportResult()
+    result.add_reasons(decoded_reasons)
+    result.accept(outcome.accepted)
+    result.add_reasons(outcome.reasons)
+    result.overloaded = outcome.overloaded
+    if outcome.dropped:
+        logger.debug("OTLP export accepted but not stored: %s", dict(outcome.dropped))
+    return result
 
-    for resource_span in body.get("resourceSpans", []):
-        resource_attrs = resource_span.get("resource", {}).get("attributes", [])
-        metadata = _extract_agentevals_metadata(resource_attrs)
-        resource_schema_url = resource_span.get("schemaUrl", "")
 
-        if not metadata.get("conversation_id"):
-            metadata["conversation_id"] = _prescan_conversation_id(resource_span)
-
-        for scope_span in resource_span.get("scopeSpans", []):
-            scope = scope_span.get("scope", {})
-            scope_name = scope.get("name", "")
-            scope_version = scope.get("version", "")
-            schema_url = scope_span.get("schemaUrl", "") or resource_schema_url
-
-            for span_data in scope_span.get("spans", []):
-                span = _normalize_span(span_data, scope_name, scope_version, schema_url)
-                trace_id = span.get("traceId", "")
-
-                if not trace_id:
-                    result.reject("span(s) rejected: missing trace_id")
-                    continue
-
-                if not metadata.get("conversation_id"):
-                    conversation_id = _extract_conversation_id(span.get("attributes", []))
-                    if conversation_id:
-                        metadata["conversation_id"] = conversation_id
-
-                session = await manager.get_or_create_otlp_session(trace_id, metadata)
-
-                if not session.can_accept_span():
-                    result.reject(f"span(s) rejected: session has reached maximum span limit ({MAX_SPANS_PER_SESSION})")
-                    continue
-
-                session.spans.append(span)
-                result.accept()
-
-                extractor = manager.incremental_extractors.get(session.session_id)
-                if extractor:
-                    updates = extractor.process_span(span)
-                    for update in updates:
-                        update["sessionId"] = session.session_id
-                        await manager.broadcast_to_ui(update)
-
-                await manager.broadcast_to_ui(
-                    WSSpanReceivedEvent(
-                        session_id=session.session_id,
-                        span=span,
-                    ).model_dump(by_alias=True)
-                )
-
-                manager.reset_idle_timer(session.session_id)
-
-                if not span.get("parentSpanId"):
-                    session.has_root_span = True
-                    manager.schedule_session_completion(session.session_id)
-
+async def ingest_traces(decoded: DecodeResult, manager: LiveManager) -> ExportResult:
+    reasons = Counter({r: n for r, n in decoded.reasons.items() if r.startswith("span")})
+    if decoded.warnings:
+        logger.debug("OTLP trace export decode warnings: %s", dict(decoded.warnings))
+    result = _merge(reasons, await manager.ingest_spans(decoded))
     _log_rejections("trace", result)
     return result
 
 
-async def process_logs(body: dict, manager: StreamingTraceManager) -> ExportResult:
-    """Parse ExportLogsServiceRequest and feed logs to sessions.
-
-    Logs and spans arrive via separate OTLP exporters (BatchLogRecordProcessor
-    and BatchSpanProcessor) and may arrive in any order. When a log's traceId
-    isn't yet registered in a session's trace_ids set, we fall back to matching
-    by session_name from resource attributes.
-
-    Logs may arrive after span-triggered session completion (the
-    BatchLogRecordProcessor and BatchSpanProcessor flush independently).
-    Late-arriving logs are accepted and trigger re-extraction of invocations.
-    """
-    result = ExportResult()
-    sessions_needing_reextraction: set[str] = set()
-
-    for resource_log in body.get("resourceLogs", []):
-        resource_attrs = resource_log.get("resource", {}).get("attributes", [])
-        metadata = _extract_agentevals_metadata(resource_attrs)
-        session_name = metadata.get("session_name")
-
-        for scope_log in resource_log.get("scopeLogs", []):
-            for log_record in scope_log.get("logRecords", []):
-                log_event = _convert_otlp_log_record(log_record)
-                if not log_event:
-                    continue
-
-                trace_id = log_record.get("traceId", "")
-                if not trace_id:
-                    result.reject("log record(s) rejected: missing trace_id")
-                    continue
-
-                session = manager.find_session_by_trace_id(trace_id)
-
-                if not session and session_name:
-                    active_id = manager._active_session_for_name.get(session_name)
-                    candidate = manager.sessions.get(active_id) if active_id else None
-                    if candidate and not candidate.is_complete:
-                        candidate.trace_ids.add(trace_id)
-                        session = candidate
-
-                if not session:
-                    manager.buffer_orphan_log(trace_id, session_name, log_event)
-                    logger.debug(
-                        "Buffered orphan log trace_id=%s session_name=%s",
-                        trace_id[:12],
-                        session_name,
-                    )
-                    continue
-
-                if not session.can_accept_log():
-                    result.reject(
-                        f"log record(s) rejected: session has reached maximum log limit ({MAX_LOGS_PER_SESSION})"
-                    )
-                    continue
-
-                session.logs.append(log_event)
-                result.accept()
-
-                if session.is_complete:
-                    sessions_needing_reextraction.add(session.session_id)
-                else:
-                    manager.reset_idle_timer(session.session_id)
-
-                    extractor = manager.incremental_extractors.get(session.session_id)
-                    if extractor:
-                        updates = extractor.process_log(log_event)
-                        for update in updates:
-                            update["sessionId"] = session.session_id
-                            await manager.broadcast_to_ui(update)
-
-    for session_id in sessions_needing_reextraction:
-        manager.schedule_log_reextraction(session_id)
-
+async def ingest_logs(decoded: DecodeResult, manager: LiveManager) -> ExportResult:
+    reasons = Counter({r: n for r, n in decoded.reasons.items() if r.startswith("log")})
+    if decoded.warnings:
+        logger.debug("OTLP log export decode warnings: %s", dict(decoded.warnings))
+    result = _merge(reasons, await manager.ingest_logs(decoded))
     _log_rejections("log", result)
     return result
 
 
-def decode_protobuf_traces(raw: bytes) -> dict:
-    """Decode ExportTraceServiceRequest protobuf to OTLP JSON dict."""
-    msg = TraceServiceRequestPB()
-    msg.ParseFromString(raw)
-    data = MessageToDict(msg, preserving_proto_field_name=False)
-    fix_protobuf_id_fields(data)
-    return data
+def decode_traces_json(body: dict) -> DecodeResult:
+    body = proto_names_to_json(body)
+    return decode_json_document({"resourceSpans": body.get("resourceSpans", [])}, strict=True)
 
 
-def decode_protobuf_logs(raw: bytes) -> dict:
-    """Decode ExportLogsServiceRequest protobuf to OTLP JSON dict."""
-    msg = LogsServiceRequestPB()
-    msg.ParseFromString(raw)
-    data = MessageToDict(msg, preserving_proto_field_name=False)
-    fix_protobuf_id_fields(data)
-    return data
+def decode_logs_json(body: dict) -> DecodeResult:
+    body = proto_names_to_json(body)
+    return decode_json_document({"resourceLogs": body.get("resourceLogs", [])}, strict=True)
 
 
-def fix_protobuf_id_fields(data) -> None:
-    """Convert base64-encoded bytes fields to hex strings in-place.
+def decode_traces_protobuf(raw: bytes) -> DecodeResult:
+    """Raises ``google.protobuf.message.DecodeError`` on a malformed body."""
+    request = TraceServiceRequestPB()
+    request.ParseFromString(raw)
+    return decode_traces_proto(request)
 
-    MessageToDict base64-encodes protobuf bytes fields, but OTLP JSON
-    uses hex-encoded strings for traceId, spanId, and parentSpanId.
-    """
-    if isinstance(data, dict):
-        for key in ("traceId", "spanId", "parentSpanId"):
-            if key in data and isinstance(data[key], str):
-                try:
-                    raw = base64.b64decode(data[key])
-                    data[key] = raw.hex()
-                except Exception:
-                    pass
-        for value in data.values():
-            if isinstance(value, (dict, list)):
-                fix_protobuf_id_fields(value)
-    elif isinstance(data, list):
-        for item in data:
-            if isinstance(item, (dict, list)):
-                fix_protobuf_id_fields(item)
+
+def decode_logs_protobuf(raw: bytes) -> DecodeResult:
+    """Raises ``google.protobuf.message.DecodeError`` on a malformed body."""
+    request = LogsServiceRequestPB()
+    request.ParseFromString(raw)
+    return decode_logs_proto(request)
 
 
 def build_traces_response(result: ExportResult) -> TraceServiceResponsePB:
-    """Build the ExportTraceServiceResponse for an ingest result.
-
-    OTLP requires ``partial_success`` to be left unset on full success, so it is
-    populated only when spans were actually rejected.
-    """
+    """OTLP requires ``partial_success`` to be left unset on full success."""
     response = TraceServiceResponsePB()
     if result.rejected:
         response.partial_success.rejected_spans = result.rejected
@@ -283,144 +149,8 @@ def build_traces_response(result: ExportResult) -> TraceServiceResponsePB:
 
 
 def build_logs_response(result: ExportResult) -> LogsServiceResponsePB:
-    """Build the ExportLogsServiceResponse for an ingest result."""
     response = LogsServiceResponsePB()
     if result.rejected:
         response.partial_success.rejected_log_records = result.rejected
         response.partial_success.error_message = result.error_message
     return response
-
-
-_GENAI_EVENT_KEYS = {OTEL_GENAI_INPUT_MESSAGES, OTEL_GENAI_OUTPUT_MESSAGES}
-
-
-def _normalize_span(span_data: dict, scope_name: str, scope_version: str, schema_url: str = "") -> dict:
-    """Normalize an OTLP span for the downstream pipeline.
-
-    Performs two transformations:
-    1. Injects otel.scope.name/version (and otel.schema_url) from the
-       scopeSpans level into span attributes (the pipeline expects them
-       there).
-    2. Promotes gen_ai.input.messages and gen_ai.output.messages from span
-       events to span attributes. Some SDKs (e.g. Strands with
-       OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental) store
-       message content in span events, but the converter reads attributes.
-    """
-    span = dict(span_data)
-    attrs = list(span.get("attributes", []))
-
-    existing_keys = {a.get("key") for a in attrs}
-
-    if scope_name and OTEL_SCOPE not in existing_keys:
-        attrs.append({"key": OTEL_SCOPE, "value": {"stringValue": scope_name}})
-        existing_keys.add(OTEL_SCOPE)
-    if scope_version and OTEL_SCOPE_VERSION not in existing_keys:
-        attrs.append({"key": OTEL_SCOPE_VERSION, "value": {"stringValue": scope_version}})
-        existing_keys.add(OTEL_SCOPE_VERSION)
-    if schema_url and OTEL_SCHEMA_URL not in existing_keys:
-        attrs.append({"key": OTEL_SCHEMA_URL, "value": {"stringValue": schema_url}})
-        existing_keys.add(OTEL_SCHEMA_URL)
-
-    for event in span.get("events", []):
-        for attr in event.get("attributes", []):
-            key = attr.get("key", "")
-            if key in _GENAI_EVENT_KEYS and key not in existing_keys:
-                attrs.append(attr)
-                existing_keys.add(key)
-
-    span["attributes"] = attrs
-    return span
-
-
-def _extract_agentevals_metadata(resource_attrs: list[dict]) -> dict:
-    """Extract agentevals-specific metadata from OTLP resource attributes.
-
-    ``eval_set_id`` and ``session_name`` are used as dict keys downstream
-    (``_active_session_for_name``) and typed ``str | None`` on the session
-    models. Neither is in ``SPEC_CONTAINER_ATTRS``, so the shared decoder never
-    hands them a list or dict in the first place.
-    """
-    flat = flatten_otlp_attributes(resource_attrs)
-    return {
-        "eval_set_id": flat.get(AGENTEVALS_EVAL_SET_ID),
-        "session_name": flat.get(AGENTEVALS_SESSION_NAME),
-        "service_name": flat.get("service.name"),
-        "resource_attrs": flat,
-    }
-
-
-def _prescan_conversation_id(resource_span: dict) -> str | None:
-    """Pre-scan all spans in a resourceSpan batch for gen_ai.conversation.id.
-
-    Within a single OTLP batch, some scopes (e.g. A2A server instrumentation)
-    may lack conversation_id while others (agent instrumentation) have it.
-    Scanning upfront ensures ALL spans in the batch route to the same session.
-    """
-    for scope_span in resource_span.get("scopeSpans", []):
-        for span_data in scope_span.get("spans", []):
-            conv_id = _extract_conversation_id(span_data.get("attributes", []))
-            if conv_id:
-                return conv_id
-    return None
-
-
-def _extract_conversation_id(attrs_list: list[dict]) -> str | None:
-    """Extract gen_ai.conversation.id from OTLP span attributes."""
-    for attr in attrs_list:
-        if attr.get("key") == OTEL_GENAI_CONVERSATION_ID:
-            return attr.get("value", {}).get("stringValue")
-    return None
-
-
-def _convert_otlp_log_record(log_record: dict) -> dict | None:
-    """Convert OTLP log record to internal log event format.
-
-    Internal format (used by IncrementalInvocationExtractor.process_log()):
-        {"event_name": "gen_ai.user.message", "timestamp": ..., "body": {...}, "attributes": {...}}
-
-    Handles two event-name conventions:
-    - Newer OTel SDKs: top-level ``eventName`` field (LogRecord.event_name proto)
-    - Older convention: ``event.name`` stored as a regular attribute
-    """
-    attrs = flatten_otlp_attributes(log_record.get("attributes", []))
-    event_name = log_record.get("eventName") or attrs.get("event.name", "")
-
-    if not event_name or not event_name.startswith("gen_ai."):
-        return None
-
-    body_raw = log_record.get("body", {})
-    body = _parse_otlp_body(body_raw)
-
-    timestamp = log_record.get("timeUnixNano") or log_record.get("observedTimeUnixNano")
-
-    result = {
-        "event_name": event_name,
-        "timestamp": timestamp,
-        "body": body,
-        "attributes": attrs,
-    }
-
-    span_id = log_record.get("spanId", "")
-    if span_id:
-        result["span_id"] = span_id
-
-    return result
-
-
-def _parse_otlp_body(body_raw: dict) -> dict | str:
-    """Parse OTLP log record body value.
-
-    Top-level stringValue bodies are JSON-decoded (Strands-style logs store
-    message content as JSON strings). All other AnyValue types are parsed
-    recursively via ``decode_any_value`` (handles the nested kvlistValue /
-    arrayValue structures used by the OpenAI instrumentor).
-    """
-    if "stringValue" in body_raw:
-        import json
-
-        raw = body_raw["stringValue"]
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            return raw
-    return decode_any_value(body_raw)

@@ -1,0 +1,39 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v2proj_no_content/S4b",
+ "source": "adk-python 2.10 recording, mode v2proj_no_content, scenario S4b",
+ "content_captured": false,
+ "turns": [
+  {
+   "user_text": null,
+   "final_text": null,
+   "intermediate_texts": [],
+   "agents": [
+    "coordinator",
+    "research_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "research_agent",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 82,
+    "output": 26
+   }
+  }
+ ],
+ "tokens": {
+  "input": 82,
+  "output": 26
+ },
+ "notes": [
+  "AgentTool: coordinator calls research_agent as a tool",
+  "mode captures no message content; text, tool args and results must be absent",
+  "tokens and agents cover every agent in the turn subtree (delegates included)"
+ ]
+}

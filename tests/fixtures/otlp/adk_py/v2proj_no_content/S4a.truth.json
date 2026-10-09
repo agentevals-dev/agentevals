@@ -1,0 +1,46 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v2proj_no_content/S4a",
+ "source": "adk-python 2.10 recording, mode v2proj_no_content, scenario S4a",
+ "content_captured": false,
+ "turns": [
+  {
+   "user_text": null,
+   "final_text": null,
+   "intermediate_texts": [],
+   "agents": [
+    "billing_agent",
+    "coordinator"
+   ],
+   "tool_calls": [
+    {
+     "name": "transfer_to_agent",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "issue_refund",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 115,
+    "output": 22
+   }
+  }
+ ],
+ "tokens": {
+  "input": 115,
+  "output": 22
+ },
+ "notes": [
+  "sub-agent delegation via transfer_to_agent",
+  "mode captures no message content; text, tool args and results must be absent",
+  "tokens and agents cover every agent in the turn subtree (delegates included)"
+ ]
+}

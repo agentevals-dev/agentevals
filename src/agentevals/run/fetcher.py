@@ -8,16 +8,13 @@ does not validate them.
 
 from __future__ import annotations
 
-import json
 import logging
-import tempfile
-from pathlib import Path
 from typing import Protocol
 
 import httpx
 
-from ..loader import load_traces
-from ..loader.base import Trace
+from ..loader import load_traces_from_obj
+from ..otel.model import Trace
 from ..storage.models import TraceTarget
 
 logger = logging.getLogger(__name__)
@@ -28,22 +25,12 @@ class TraceFetcher(Protocol):
 
 
 class InlineTraceFetcher:
-    """Materializes inline JSON to a temp file and parses it via the existing loader.
-
-    The temp file dance reuses :func:`agentevals.loader.load_traces` (which
-    auto-detects format) without a special-case in the loader for dict input.
-    """
+    """Decodes the JSON document embedded in the run spec."""
 
     async def fetch(self, target: TraceTarget, context: dict) -> list[Trace]:
         if not target.inline:
             raise ValueError("InlineTraceFetcher requires target.inline to be set")
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
-            json.dump(target.inline, f)
-            path = Path(f.name)
-        try:
-            return load_traces(str(path), format=target.trace_format)
-        finally:
-            path.unlink(missing_ok=True)  # noqa: ASYNC240
+        return load_traces_from_obj(target.inline, format=target.trace_format)
 
 
 class HttpTraceFetcher:
@@ -61,13 +48,7 @@ class HttpTraceFetcher:
             resp = await client.get(url, headers=headers)
             resp.raise_for_status()
             payload = resp.json()
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
-            json.dump(payload, f)
-            path = Path(f.name)
-        try:
-            return load_traces(str(path), format=target.trace_format)
-        finally:
-            path.unlink(missing_ok=True)  # noqa: ASYNC240
+        return load_traces_from_obj(payload, format=target.trace_format)
 
 
 def resolve_fetcher(target: TraceTarget) -> TraceFetcher:

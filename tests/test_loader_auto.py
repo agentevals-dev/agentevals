@@ -94,10 +94,10 @@ def _jaeger_doc() -> dict:
 
 
 class TestDetectFormat:
-    def test_jsonl_extension_implies_otlp(self):
+    def test_jsonl_extension_is_sniffed_not_trusted(self):
         path = _write_tmp("not even json", suffix=".jsonl")
         try:
-            assert detect_format(path) == "otlp-json"
+            assert detect_format(path) is None
         finally:
             os.unlink(path)
 
@@ -105,6 +105,23 @@ class TestDetectFormat:
         path = _write_tmp(json.dumps(_otlp_doc()))
         try:
             assert detect_format(path) == "otlp-json"
+        finally:
+            os.unlink(path)
+
+    def test_otlp_with_protobuf_field_names(self):
+        doc = {
+            "resource_spans": [
+                {
+                    "scope_spans": [
+                        {"spans": [{"trace_id": "t1", "span_id": "s1", "name": "op", "end_time_unix_nano": "1000"}]}
+                    ]
+                }
+            ]
+        }
+        path = _write_tmp(json.dumps(doc))
+        try:
+            assert detect_format(path) == "otlp-json"
+            assert [t.trace_id for t in load_traces(path)] == ["t1"]
         finally:
             os.unlink(path)
 
@@ -238,4 +255,4 @@ class TestLoadTraces:
         traces = load_traces(TEMPO_FIXTURE)
         assert len(traces) == 1
         assert traces[0].trace_id == "dd547580319ab0312cee07f1def50dad"
-        assert len(traces[0].all_spans) == 86
+        assert len(traces[0].spans) == 86

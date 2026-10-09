@@ -12,15 +12,13 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import json
 import logging
 import shutil
 import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-
-from google.adk.evaluation.eval_case import Invocation, get_all_tool_calls
-from google.adk.evaluation.evaluator import EvalStatus, EvaluationResult, Evaluator, PerInvocationResult
 
 from agentevals._protocol import (
     EvalInput,
@@ -30,6 +28,9 @@ from agentevals._protocol import (
     ToolCallData,
     ToolResponseData,
 )
+from agentevals.genai.matching import ExpectedConversation, ExpectedTurn, align
+from agentevals.genai.messages import text_of
+from agentevals.genai.model import Conversation, Turn
 
 logger = logging.getLogger(__name__)
 
@@ -252,210 +253,122 @@ def register_executor(name: str, factory: Callable[..., EvaluatorBackend]) -> No
 
 
 # ---------------------------------------------------------------------------
-# ADK Invocation ↔ InvocationData conversion
+# Canonical turns -> protocol InvocationData
 # ---------------------------------------------------------------------------
 
 
-def _content_to_text(content) -> str:
-    """Extract plain text from an ADK Content object."""
-    if content is None:
+def _json_text(value: Any) -> str:
+    if value is None:
         return ""
-    if isinstance(content, str):
-        return content
-    if hasattr(content, "parts") and content.parts:
-        texts = []
-        for part in content.parts:
-            if hasattr(part, "text") and part.text:
-                texts.append(part.text)
-        return " ".join(texts)
-    return ""
-
-
-def _extract_tool_calls_from_invocation(inv: Invocation) -> list[ToolCallData]:
-    """Extract tool calls from an Invocation's intermediate_data."""
-    calls: list[ToolCallData] = []
-    if not inv.intermediate_data:
-        return calls
-
+    if isinstance(value, str):
+        return value
     try:
-        tool_uses = get_all_tool_calls(inv.intermediate_data)
-        for tc in tool_uses:
-            calls.append(ToolCallData(name=tc.name or "", args=tc.args or {}))
-    except Exception:
-        pass
-
-    return calls
+        return json.dumps(value, sort_keys=True, default=str)
+    except (TypeError, ValueError, RecursionError):
+        return str(value)
 
 
-def _extract_tool_responses_from_invocation(inv: Invocation) -> list[ToolResponseData]:
-    """Extract tool responses from intermediate_data."""
-    responses: list[ToolResponseData] = []
-    if not inv.intermediate_data:
-        return responses
-
-    if hasattr(inv.intermediate_data, "tool_responses"):
-        for tr in inv.intermediate_data.tool_responses or []:
-            name = ""
-            output = ""
-            status = None
-            if hasattr(tr, "name"):
-                name = tr.name or ""
-            if hasattr(tr, "response"):
-                output = str(tr.response) if tr.response else ""
-            elif hasattr(tr, "output"):
-                output = str(tr.output) if tr.output else ""
-            if hasattr(tr, "status") and tr.status:
-                status = str(tr.status)
-            responses.append(ToolResponseData(name=name, output=output, status=status))
-
-    return responses
+def _args_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {} if value is None else {"value": value}
 
 
-def invocation_to_data(
-    inv: Invocation,
-    performance_metrics: dict[str, Any] | None = None,
-) -> InvocationData:
-    """Convert an ADK Invocation to a simplified InvocationData for the protocol."""
+def turn_to_data(turn: Turn, performance_metrics: dict[str, Any] | None = None) -> InvocationData:
+    calls = [ToolCallData(name=t.name, args=_args_dict(t.arguments), id=t.call_id) for t in turn.tool_calls]
+    responses = [
+        ToolResponseData(
+            name=t.name,
+            output=_json_text(t.result),
+            status="error" if t.is_error else None,
+            id=t.call_id,
+            response=t.result,
+        )
+        for t in turn.tool_calls
+        if t.result is not None or t.is_error
+    ]
     return InvocationData(
-        invocation_id=inv.invocation_id or "",
-        user_content=_content_to_text(inv.user_content),
-        final_response=_content_to_text(inv.final_response) or None,
-        intermediate_steps=IntermediateStepData(
-            tool_calls=_extract_tool_calls_from_invocation(inv),
-            tool_responses=_extract_tool_responses_from_invocation(inv),
-        ),
+        invocation_id=turn.ref.span_id,
+        user_content=text_of(turn.user_input) or "",
+        final_response=text_of(turn.final_output),
+        intermediate_steps=IntermediateStepData(tool_calls=calls, tool_responses=responses),
         performance_metrics=performance_metrics,
+        trace_id=turn.ref.trace_id,
+        span_id=turn.ref.span_id,
     )
 
 
-def invocations_to_data(
-    invocations: list[Invocation] | None,
-    performance_metrics: dict[str, Any] | None = None,
-) -> list[InvocationData] | None:
-    """Convert a list of ADK Invocations, or return None."""
-    if invocations is None:
-        return None
-    return [invocation_to_data(inv, performance_metrics=performance_metrics) for inv in invocations]
-
-
-# ---------------------------------------------------------------------------
-# EvalResult → EvaluationResult conversion
-# ---------------------------------------------------------------------------
-
-
-def _eval_result_to_evaluation_result(
-    result: EvalResult,
-    threshold: float,
-    actual_invocations: list[Invocation],
-) -> EvaluationResult:
-    """Convert our protocol EvalResult into an ADK EvaluationResult."""
-    if result.status:
-        status_map = {
-            "PASSED": EvalStatus.PASSED,
-            "FAILED": EvalStatus.FAILED,
-            "NOT_EVALUATED": EvalStatus.NOT_EVALUATED,
-        }
-        overall_status = status_map.get(result.status.upper(), EvalStatus.NOT_EVALUATED)
-    else:
-        overall_status = EvalStatus.PASSED if result.score >= threshold else EvalStatus.FAILED
-
-    per_inv_results: list[PerInvocationResult] = []
-    for i, inv in enumerate(actual_invocations):
-        score = result.per_invocation_scores[i] if i < len(result.per_invocation_scores) else None
-        per_inv_results.append(
-            PerInvocationResult(
-                actual_invocation=inv,
-                score=score,
-                eval_status=overall_status,
-            )
+def expected_turn_to_data(turn: ExpectedTurn) -> InvocationData:
+    calls = [
+        ToolCallData(name=c.get("name") or "", args=_args_dict(c.get("arguments")), id=c.get("id"))
+        for c in turn.tool_calls
+    ]
+    responses = [
+        ToolResponseData(
+            name=r.get("name") or "", output=_json_text(r.get("response")), id=r.get("id"), response=r.get("response")
         )
-
-    return EvaluationResult(
-        overall_score=result.score,
-        overall_eval_status=overall_status,
-        per_invocation_results=per_inv_results,
+        for r in turn.tool_responses
+    ]
+    return InvocationData(
+        invocation_id=turn.invocation_id or "",
+        user_content=turn.user_text or "",
+        final_response=turn.final_text,
+        intermediate_steps=IntermediateStepData(tool_calls=calls, tool_responses=responses),
     )
 
 
-# ---------------------------------------------------------------------------
-# CustomEvaluatorRunner — ADK Evaluator adapter (backend-agnostic)
-# ---------------------------------------------------------------------------
-
-
-class CustomEvaluatorRunner(Evaluator):
-    """Wraps any :class:`EvaluatorBackend` as an ADK :class:`Evaluator`.
-
-    Handles the conversion between ADK ``Invocation`` objects and the
-    language-agnostic ``EvalInput``/``EvalResult`` protocol.
-    """
-
-    def __init__(
-        self,
-        backend: EvaluatorBackend,
-        metric_name: str,
-        threshold: float = 0.5,
-        config: dict[str, Any] | None = None,
-        performance_metrics: dict[str, Any] | None = None,
-    ):
-        self._backend = backend
-        self._metric_name = metric_name
-        self._threshold = threshold
-        self._config = config or {}
-        self._performance_metrics = performance_metrics
-
-    async def evaluate_invocations(
-        self,
-        actual_invocations: list[Invocation],
-        expected_invocations: list[Invocation] | None = None,
-        conversation_scenario=None,
-    ) -> EvaluationResult:
-
-        eval_input = EvalInput(
-            metric_name=self._metric_name,
-            threshold=self._threshold,
-            config=self._config,
-            invocations=invocations_to_data(actual_invocations, performance_metrics=self._performance_metrics) or [],
-            expected_invocations=invocations_to_data(expected_invocations),
-        )
-
-        result = await self._backend.run(eval_input, self._metric_name)
-        return _eval_result_to_evaluation_result(result, self._threshold, actual_invocations)
+def _status_of(result: EvalResult, threshold: float) -> str:
+    if result.status is not None:
+        return result.status.value
+    return "PASSED" if result.score >= threshold else "FAILED"
 
 
 # ---------------------------------------------------------------------------
-# Public helper — build and run a custom evaluator from a config definition
+# Dispatcher
 # ---------------------------------------------------------------------------
 
 
 async def evaluate_custom_evaluator(
     evaluator_def,
-    actual_invocations: list[Invocation],
-    expected_invocations: list[Invocation] | None,
+    actual: Conversation,
+    expected: ExpectedConversation | None,
     performance_metrics: dict[str, Any] | None = None,
+    expected_reason: str | None = None,
 ):
-    """Evaluate a single custom evaluator and return a ``MetricResult``.
+    """Evaluate one evaluator over a conversation and return a ``MetricResult``.
 
-    This is the entry point called by the runner.  It constructs the
-    appropriate backend from the config definition, wraps it in a
-    ``CustomEvaluatorRunner``, and runs the evaluation.
+    ``expected`` is the golden conversation selected for ``actual``, or ``None`` with
+    ``expected_reason`` explaining why there is none.
     """
-    import inspect as _inspect
-
-    from .builtin_metrics import evaluate_builtin_metric
     from .config import BuiltinMetricDef, CodeEvaluatorDef, RemoteEvaluatorDef
     from .runner import MetricResult
 
     if isinstance(evaluator_def, BuiltinMetricDef):
-        return await evaluate_builtin_metric(
+        from .adk_bridge import expected_invocations, to_adk_invocations
+        from .builtin_metrics import evaluate_builtin_metric
+
+        actual_invocations = to_adk_invocations(actual.turns)
+        golden = expected_invocations(expected)
+        alignment: dict[str, int] = {}
+        if golden is not None and len(golden) != len(actual_invocations):
+            aligned = align(actual.turns, expected.turns)
+            n = len(aligned.pairs)
+            actual_invocations, golden = actual_invocations[:n], golden[:n]
+            alignment = {"missing_turns": aligned.missing_turns, "unexpected_turns": aligned.unexpected_turns}
+        result = await evaluate_builtin_metric(
             metric_name=evaluator_def.name,
             actual_invocations=actual_invocations,
-            expected_invocations=expected_invocations,
+            expected_invocations=golden,
             judge_model=evaluator_def.judge_model,
             threshold=evaluator_def.threshold,
             match_type=evaluator_def.trajectory_match_type,
             credential_ref=evaluator_def.credential_ref,
             judge_base_url=evaluator_def.judge_base_url,
+            expected_reason=expected_reason,
         )
+        if alignment:
+            result.details = {**(result.details or {}), **alignment}
+        return result
 
     is_remote = isinstance(evaluator_def, RemoteEvaluatorDef)
     if is_remote:
@@ -463,66 +376,53 @@ async def evaluate_custom_evaluator(
 
         evaluator_def = await get_default_resolver().resolve(evaluator_def)
 
-    if isinstance(evaluator_def, CodeEvaluatorDef):
-        evaluator_path = Path(evaluator_def.path)
-
-        runtime: Runtime | None = None
-        if evaluator_path.suffix == ".py":
-            from .evaluator.venv import ensure_venv_async
-
-            try:
-                venv_python = await ensure_venv_async(evaluator_path, strict_requirements=is_remote)
-            except Exception as exc:
-                logger.error("Failed to set up venv for '%s': %s", evaluator_def.name, exc)
-                return MetricResult(
-                    metric_name=evaluator_def.name,
-                    error=f"Dependency installation failed: {exc}",
-                )
-            if venv_python:
-                runtime = PythonRuntime(python_path=venv_python)
-
-        if runtime is not None:
-            backend = SubprocessBackend(evaluator_path, evaluator_def.timeout, runtime=runtime)
-        else:
-            backend = create_executor(evaluator_def.executor, evaluator_path, evaluator_def.timeout)
-    else:
+    if not isinstance(evaluator_def, CodeEvaluatorDef):
         raise ValueError(f"Unsupported custom evaluator type: {type(evaluator_def).__name__}")
 
-    evaluator_instance = CustomEvaluatorRunner(
-        backend=backend,
+    evaluator_path = Path(evaluator_def.path)
+    runtime: Runtime | None = None
+    if evaluator_path.suffix == ".py":
+        from .evaluator.venv import ensure_venv_async
+
+        try:
+            venv_python = await ensure_venv_async(evaluator_path, strict_requirements=is_remote)
+        except Exception as exc:
+            logger.error("Failed to set up venv for '%s': %s", evaluator_def.name, exc)
+            return MetricResult(
+                metric_name=evaluator_def.name,
+                error=f"Dependency installation failed: {exc}",
+                error_type=type(exc).__name__,
+            )
+        if venv_python:
+            runtime = PythonRuntime(python_path=venv_python)
+
+    if runtime is not None:
+        backend: EvaluatorBackend = SubprocessBackend(evaluator_path, evaluator_def.timeout, runtime=runtime)
+    else:
+        backend = create_executor(evaluator_def.executor, evaluator_path, evaluator_def.timeout)
+
+    eval_input = EvalInput(
         metric_name=evaluator_def.name,
         threshold=evaluator_def.threshold,
         config=evaluator_def.config,
-        performance_metrics=performance_metrics,
+        invocations=[turn_to_data(t, performance_metrics) for t in actual.turns],
+        expected_invocations=[expected_turn_to_data(t) for t in expected.turns] if expected else None,
     )
-
     try:
-        if _inspect.iscoroutinefunction(evaluator_instance.evaluate_invocations):
-            eval_result: EvaluationResult = await evaluator_instance.evaluate_invocations(
-                actual_invocations=actual_invocations,
-                expected_invocations=expected_invocations,
-            )
-        else:
-            import asyncio
-
-            eval_result: EvaluationResult = await asyncio.to_thread(
-                evaluator_instance.evaluate_invocations,
-                actual_invocations=actual_invocations,
-                expected_invocations=expected_invocations,
-            )
-
-        per_inv_scores = [r.score for r in eval_result.per_invocation_results]
-
-        return MetricResult(
-            metric_name=evaluator_def.name,
-            score=eval_result.overall_score,
-            eval_status=eval_result.overall_eval_status.name,
-            per_invocation_scores=per_inv_scores,
-        )
-
+        result = await backend.run(eval_input, evaluator_def.name)
     except Exception as exc:
         logger.exception("Failed to evaluate custom evaluator '%s'", evaluator_def.name)
-        return MetricResult(
-            metric_name=evaluator_def.name,
-            error=str(exc),
-        )
+        return MetricResult(metric_name=evaluator_def.name, error=str(exc), error_type=type(exc).__name__)
+
+    threshold = evaluator_def.threshold
+    return MetricResult(
+        metric_name=evaluator_def.name,
+        score=result.score,
+        eval_status=_status_of(result, threshold),
+        per_invocation_scores=list(result.per_invocation_scores),
+        per_invocation_statuses=[
+            "NOT_EVALUATED" if s is None else "PASSED" if s >= threshold else "FAILED"
+            for s in result.per_invocation_scores
+        ],
+        details=result.details,
+    )

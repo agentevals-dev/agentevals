@@ -170,16 +170,19 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export function convertSnakeToCamel(obj: any): any {
+// Values under these keys are user data (tool arguments, tool results, evaluator details).
+// Their keys are kept exactly as the producer wrote them.
+const PAYLOAD_KEYS = new Set(['args', 'arguments', 'response', 'result', 'output', 'details']);
+
+function convertKeys(obj: unknown, rename: (key: string) => string): unknown {
   if (Array.isArray(obj)) {
-    return obj.map(convertSnakeToCamel);
+    return obj.map((item) => convertKeys(item, rename));
   }
 
   if (obj !== null && typeof obj === 'object') {
-    const converted: any = {};
+    const converted: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
-      const camelKey = key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
-      converted[camelKey] = convertSnakeToCamel(value);
+      converted[rename(key)] = PAYLOAD_KEYS.has(key) ? value : convertKeys(value, rename);
     }
     return converted;
   }
@@ -187,21 +190,12 @@ export function convertSnakeToCamel(obj: any): any {
   return obj;
 }
 
+export function convertSnakeToCamel(obj: any): any {
+  return convertKeys(obj, (key) => key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()));
+}
+
 export function convertCamelToSnake(obj: any): any {
-  if (Array.isArray(obj)) {
-    return obj.map(convertCamelToSnake);
-  }
-
-  if (obj !== null && typeof obj === 'object') {
-    const converted: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-      converted[snakeKey] = convertCamelToSnake(value);
-    }
-    return converted;
-  }
-
-  return obj;
+  return convertKeys(obj, (key) => key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`));
 }
 
 /**

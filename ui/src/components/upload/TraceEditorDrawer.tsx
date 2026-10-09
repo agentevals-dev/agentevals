@@ -45,7 +45,7 @@ export const TraceEditorDrawer: React.FC<TraceEditorDrawerProps> = ({ file, file
         setParsedFile(parsed);
 
         const traces = await loadTraces(content);
-        const mappings = buildEditMappings(traces, parsed);
+        const mappings = buildEditMappings(traces);
         setEditMappings(mappings);
       }),
       convertTraces([file]).then((response) => {

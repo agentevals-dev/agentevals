@@ -1,0 +1,27 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/upstream_new_parts",
+ "source": "hand authored from gen-ai-input/output-messages.json at 4f85037",
+ "turns": [
+  {
+   "user_text": "What is OpenTelemetry GenAI?",
+   "final_text": "OpenTelemetry has GenAI conventions.",
+   "intermediate_texts": [],
+   "agents": [],
+   "tool_calls": [],
+   "tokens": {
+    "input": 20,
+    "output": 30
+   }
+  }
+ ],
+ "notes": [
+  "server_tool_call parts run at the provider; they are kept in messages but are not client tool trajectory (decision D-02 in deviations.md)",
+  "reasoning and compaction parts are not user or final text"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 20,
+  "output": 30
+ }
+}

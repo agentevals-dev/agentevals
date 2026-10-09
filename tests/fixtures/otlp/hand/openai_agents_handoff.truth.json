@@ -1,0 +1,50 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/openai_agents_handoff",
+ "source": "hand authored from reports/E_landscape.md (genai-openai-agents 1.2b0 handoff = invoke_workflow > 2x invoke_agent)",
+ "turns": [
+  {
+   "user_text": "I need a refund for order 42.",
+   "final_text": "Your refund for order 42 has been issued.",
+   "intermediate_texts": [],
+   "agents": [
+    "billing",
+    "triage"
+   ],
+   "tool_calls": [
+    {
+     "name": "transfer_to_billing",
+     "args": {},
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "issue_refund",
+     "args": {
+      "order_id": "42"
+     },
+     "result": {
+      "status": "refunded",
+      "order_id": "42"
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 115,
+    "output": 22
+   }
+  }
+ ],
+ "notes": [
+  "one turn anchored on the workflow",
+  "the handoff has no tool span, so transfer_to_billing comes from its tool_call part; ADK's transfer_to_agent is a tool call too"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 115,
+  "output": 22
+ }
+}

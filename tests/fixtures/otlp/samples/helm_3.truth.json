@@ -1,0 +1,47 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "samples/helm_3",
+ "source": "samples/helm_3.json (copied verbatim)",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "I need all the Helm releases right now!!",
+   "final_text": "Got it — I listed all releases across all namespaces. Here are the Helm releases currently in the cluster:\n\n- jaeger\n  - namespace: jaeger\n  - revision: 1\n  - updated: 2026-02-16 11:14:23\n  - status: deployed\n  - chart: jaeger-4.4.7\n  - app_version: 2.14.1\n\n- kagent\n  - namespace: kagent\n  - revision: 2\n  - updated: 2026-02-16 11:24:39\n  - status: deployed\n  - chart: kagent-0.7.14\n  - app_version: (none)\n\n- kagent-crds\n  - namespace: kagent\n  - revision: 1\n  - updated: 2026-02-16 11:14:54\n  - status: deployed\n  - chart: kagent-crds-0.7.14\n  - app_version: (none)\n\nNext steps I can take for you (choose any):\n- Show release details (manifests, values, hooks, notes) for a specific release.\n- Fetch release history.\n- Check Kubernetes resources (pods, deployments, services) in the release namespaces to verify runtime status.\n- Update repo cache or inspect a chart version.\n\nRecommended commands I can run for more info (explain what each will do):\n- Get full release manifest: GetRelease(<release>, <namespace>, resource=\"manifest\") — shows Kubernetes YAML that Helm applied.\n- Get current values: GetRelease(<release>, <namespace>, resource=\"values\") — lets you back up or inspect overrides before changes.\n- Get hooks: GetRelease(..., resource=\"hooks\") — find pre/post hooks that could affect upgrades/uninstalls.\n- List pods in a namespace: GetResources(resource_type=\"pod\", namespace=\"<namespace>\") — verify the release pods are running.\n- RepoUpdate(): refresh local chart index before any upgrades.\n\nSafety reminders:\n- I’ll fetch and show values/manifests first before suggesting any upgrades/uninstalls.\n- Upgrades should use --dry-run and you should keep a copy of current values for rollback.\n- Always be explicit about namespaces.\n\nTell me which release(s) you want more details for (manifest, values, or resource check), or say “Fetch all details” and I’ll retrieve manifests and current values for each release.",
+   "intermediate_texts": [],
+   "agents": [
+    "helm_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "helm_list_releases",
+     "args": {
+      "all_namespaces": "true",
+      "output": "json"
+     },
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "[{\"name\":\"jaeger\",\"namespace\":\"jaeger\",\"revision\":\"1\",\"updated\":\"2026-02-16 11:14:23.175657571 +0100 +0100\",\"status\":\"deployed\",\"chart\":\"jaeger-4.4.7\",\"app_version\":\"2.14.1\"},{\"name\":\"kagent\",\"namespace\":\"kagent\",\"revision\":\"2\",\"updated\":\"2026-02-16 11:24:39.926237192 +0100 +0100\",\"status\":\"deployed\",\"chart\":\"kagent-0.7.14\",\"app_version\":\"\"},{\"name\":\"kagent-crds\",\"namespace\":\"kagent\",\"revision\":\"1\",\"updated\":\"2026-02-16 11:14:54.214121705 +0100 +0100\",\"status\":\"deployed\",\"chart\":\"kagent-crds-0.7.14\",\"app_version\":\"\"}]\n"
+       }
+      ],
+      "isError": false
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 4047,
+    "output": 803
+   }
+  }
+ ],
+ "tokens": {
+  "input": 4047,
+  "output": 803
+ },
+ "notes": [
+  "kagent with gpt-5-mini; tool args are strings in the model output"
+ ]
+}

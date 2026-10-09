@@ -1,0 +1,43 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/adk_go_main",
+ "source": "hand authored from reports/C_adk_kagent_telemetry.md section 2.1 (adk-go main 967bfab, SPAN_ONLY)",
+ "turns": [
+  {
+   "user_text": "What is the weather in Paris?",
+   "final_text": "It is sunny and 21C in Paris.",
+   "intermediate_texts": [],
+   "agents": [
+    "weather_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get_weather",
+     "args": {
+      "city": "Paris"
+     },
+     "result": {
+      "city": "Paris",
+      "forecast": "sunny",
+      "temp_c": 21
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 90,
+    "output": 18
+   }
+  }
+ ],
+ "notes": [
+  "merged tool span must be ignored while its child is kept",
+  "no call_llm wrapper"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 90,
+  "output": 18
+ }
+}

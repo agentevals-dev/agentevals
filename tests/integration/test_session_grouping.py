@@ -1,7 +1,7 @@
 """Session grouping edge case tests.
 
 Deterministic tests using crafted OTLP payloads via ASGI transport.
-Each test gets a fresh StreamingTraceManager with fast timers (0.1s/0.5s).
+Each test gets a fresh LiveManager with fast timers (0.1s/0.5s).
 """
 
 from __future__ import annotations
@@ -10,14 +10,18 @@ import asyncio
 
 import pytest
 
+from agentevals.otel.store import Limits
+
 from .conftest import (
     get_sessions,
+    has_local_root,
     make_genai_log,
     make_genai_span,
     make_log_request,
     make_trace_request,
     send_logs,
     send_traces,
+    tid,
     wait_for_session_complete,
 )
 
@@ -36,9 +40,8 @@ class TestBasicSessionCreation:
 
         session = trace_manager.sessions["basic"]
         assert session.is_complete
-        assert session.source == "otlp"
-        assert len(session.spans) == 1
-        assert "t1" in session.trace_ids
+        assert session.span_count == 1
+        assert tid("t1") in session.trace_ids
 
     async def test_session_name_from_resource_attrs(self, trace_manager, otlp_client):
         body = make_trace_request(
@@ -52,16 +55,17 @@ class TestBasicSessionCreation:
         assert "custom-name" in trace_manager.sessions
 
     async def test_fallback_session_name(self, trace_manager, otlp_client):
-        """Without agentevals.session_name, falls back to otlp-{trace_id[:12]}."""
+        """Without a key, a GenAI trace becomes the provisional session otlp-{trace_id[:12]}."""
         body = make_trace_request(
             trace_id="abcdef123456789",
             session_name=None,
             spans=[make_genai_span(trace_id="abcdef123456789", parent_span_id=None)],
         )
         await send_traces(otlp_client, body)
-        await wait_for_session_complete(trace_manager, "otlp-abcdef123456")
+        expected = f"otlp-{tid('abcdef123456789')[:12]}"
+        await wait_for_session_complete(trace_manager, expected)
 
-        assert "otlp-abcdef123456" in trace_manager.sessions
+        assert expected in trace_manager.sessions
 
     async def test_eval_set_id_propagated(self, trace_manager, otlp_client):
         body = make_trace_request(
@@ -97,8 +101,8 @@ class TestMultiTraceGrouping:
         await wait_for_session_complete(trace_manager, "multi")
 
         session = trace_manager.sessions["multi"]
-        assert len(session.spans) == 4
-        assert session.trace_ids == {"trace-0", "trace-1", "trace-2", "trace-root"}
+        assert session.span_count == 4
+        assert set(session.trace_ids) == {tid("trace-0"), tid("trace-1"), tid("trace-2"), tid("trace-root")}
 
     async def test_different_names_different_sessions(self, trace_manager, otlp_client):
         for name in ["session-a", "session-b"]:
@@ -134,8 +138,8 @@ class TestSessionCompletion:
 
         session = trace_manager.sessions["root-test"]
         assert session.is_complete
-        assert session.has_root_span
-        assert len(session.spans) == 2
+        assert has_local_root(trace_manager, "root-test")
+        assert session.span_count == 2
 
     async def test_no_root_span_idle_timeout(self, trace_manager, otlp_client):
         """Without root span, session completes via idle timeout (0.5s in tests)."""
@@ -148,7 +152,7 @@ class TestSessionCompletion:
 
         session = trace_manager.sessions["idle-test"]
         assert not session.is_complete
-        assert not session.has_root_span
+        assert not has_local_root(trace_manager, "idle-test")
 
         await wait_for_session_complete(trace_manager, "idle-test", timeout=2.0)
         assert session.is_complete
@@ -187,14 +191,14 @@ class TestSessionNameCollisions:
         assert "repeated" in trace_manager.sessions
         assert "repeated-2" in trace_manager.sessions
         assert "repeated-3" in trace_manager.sessions
-        assert trace_manager.sessions["repeated"].trace_ids == {"run1"}
-        assert trace_manager.sessions["repeated-2"].trace_ids == {"run2"}
-        assert trace_manager.sessions["repeated-3"].trace_ids == {"run3"}
+        assert set(trace_manager.sessions["repeated"].trace_ids) == {tid("run1")}
+        assert set(trace_manager.sessions["repeated-2"].trace_ids) == {tid("run2")}
+        assert set(trace_manager.sessions["repeated-3"].trace_ids) == {tid("run3")}
 
 
 class TestOrphanLogs:
     async def test_orphan_logs_before_spans(self, trace_manager, otlp_client):
-        """Logs arriving before spans are buffered and replayed into session."""
+        """Keyed logs arriving before spans open their session as log only members; the spans join it."""
         log_body = make_log_request(
             trace_id="orphan-trace",
             session_name="orphan-test",
@@ -204,7 +208,7 @@ class TestOrphanLogs:
         )
         await send_logs(otlp_client, log_body)
 
-        assert len(trace_manager._orphan_logs) == 1
+        assert trace_manager.sessions["orphan-test"].log_count == 1
 
         trace_body = make_trace_request(
             trace_id="orphan-trace",
@@ -215,8 +219,9 @@ class TestOrphanLogs:
         await wait_for_session_complete(trace_manager, "orphan-test")
 
         session = trace_manager.sessions["orphan-test"]
-        assert len(session.logs) >= 1
-        assert len(trace_manager._orphan_logs) == 0
+        assert session.log_count >= 1
+        assert session.span_count == 1
+        assert list(trace_manager.sessions) == ["orphan-test"]
 
     async def test_orphan_logs_matched_by_session_name(self, trace_manager, otlp_client):
         """Orphan log with matching session_name but different trace_id → replayed."""
@@ -239,9 +244,9 @@ class TestOrphanLogs:
         await wait_for_session_complete(trace_manager, "name-match")
 
         session = trace_manager.sessions["name-match"]
-        assert "log-trace" in session.trace_ids
-        assert "span-trace" in session.trace_ids
-        assert len(session.logs) >= 1
+        assert tid("log-trace") in session.trace_ids
+        assert tid("span-trace") in session.trace_ids
+        assert session.log_count >= 1
 
 
 class TestLateLogs:
@@ -257,7 +262,7 @@ class TestLateLogs:
 
         session = trace_manager.sessions["late-test"]
         assert session.is_complete
-        assert len(session.logs) == 0
+        assert session.log_count == 0
 
         log_body = make_log_request(
             trace_id="late-trace",
@@ -271,7 +276,7 @@ class TestLateLogs:
         # Wait for re-extraction debounce (0.1s in tests)
         await asyncio.sleep(0.3)
 
-        assert len(session.logs) == 1
+        assert session.log_count == 1
 
 
 class TestAPIVisibility:
@@ -291,10 +296,8 @@ class TestAPIVisibility:
 
 class TestSpanLimits:
     async def test_span_limit_enforcement(self, trace_manager, otlp_client):
-        """Session rejects spans beyond MAX_SPANS_PER_SESSION."""
-        from agentevals.streaming.session import MAX_SPANS_PER_SESSION
-
-        # Pre-fill the session with spans up to the limit
+        """A session at its span cap rejects further spans through partial success."""
+        trace_manager.store.limits = Limits(spans_per_session=1)
         body = make_trace_request(
             trace_id="limit-trace",
             session_name="limit-test",
@@ -303,8 +306,6 @@ class TestSpanLimits:
         await send_traces(otlp_client, body)
 
         session = trace_manager.sessions["limit-test"]
-        session.spans.extend([{}] * (MAX_SPANS_PER_SESSION - 1))
-        assert not session.can_accept_span()
 
         # This span should be rejected
         body2 = make_trace_request(
@@ -314,11 +315,11 @@ class TestSpanLimits:
         )
         resp = await send_traces(otlp_client, body2)
 
-        assert len(session.spans) == MAX_SPANS_PER_SESSION
+        assert session.span_count == 1
         # The rejection must be visible to the caller, not silently swallowed.
         partial = resp.json()["partialSuccess"]
         assert int(partial["rejectedSpans"]) == 1
-        assert "maximum span limit" in partial["errorMessage"]
+        assert "session span limit" in partial["errorMessage"]
 
 
 class TestSplitBatchReopen:
@@ -354,7 +355,7 @@ class TestSplitBatchReopen:
 
         session = trace_manager.sessions[session_name]
         assert session.is_complete
-        assert "sr-t2" in session.trace_ids
+        assert tid("sr-t2") in session.trace_ids
 
         # Batch 2: turn 2 root span arrives after completion
         await send_traces(
@@ -370,11 +371,11 @@ class TestSplitBatchReopen:
 
         assert not session.is_complete
         assert len(trace_manager.sessions) == 1
-        assert session.trace_ids == {"sr-t1", "sr-t2"}
+        assert set(session.trace_ids) == {tid("sr-t1"), tid("sr-t2")}
 
         await wait_for_session_complete(trace_manager, session_name)
         assert session.is_complete
-        assert len(session.spans) == 3
+        assert session.span_count == 3
 
     async def test_strands_three_turn_bug_repro(self, trace_manager, otlp_client):
         """Reproduces the exact bug from the Strands SDK report: the
@@ -409,7 +410,7 @@ class TestSplitBatchReopen:
 
         session = trace_manager.sessions[session_name]
         assert session.is_complete
-        assert "t3" in session.trace_ids
+        assert tid("t3") in session.trace_ids
 
         # Batch 2: turn 3 root span + remaining spans (after completion)
         await send_traces(
@@ -430,8 +431,8 @@ class TestSplitBatchReopen:
         await wait_for_session_complete(trace_manager, session_name)
 
         assert len(trace_manager.sessions) == 1
-        assert session.trace_ids == {"t1", "t2", "t3"}
-        assert len(session.spans) == 9
+        assert set(session.trace_ids) == {tid("t1"), tid("t2"), tid("t3")}
+        assert session.span_count == 9
 
     async def test_new_trace_after_completion_creates_new_session(self, trace_manager, otlp_client):
         """A completely new trace_id after session completion creates a
@@ -460,8 +461,8 @@ class TestSplitBatchReopen:
         await wait_for_session_complete(trace_manager, f"{session_name}-2")
 
         assert len(trace_manager.sessions) == 2
-        assert trace_manager.sessions[session_name].trace_ids == {"run-1"}
-        assert trace_manager.sessions[f"{session_name}-2"].trace_ids == {"run-2"}
+        assert set(trace_manager.sessions[session_name].trace_ids) == {tid("run-1")}
+        assert set(trace_manager.sessions[f"{session_name}-2"].trace_ids) == {tid("run-2")}
 
     async def test_reopen_preserves_existing_spans_and_logs(self, trace_manager, otlp_client):
         """Reopening a session preserves all previously collected spans and logs."""
@@ -493,8 +494,8 @@ class TestSplitBatchReopen:
         await wait_for_session_complete(trace_manager, session_name)
 
         session = trace_manager.sessions[session_name]
-        spans_before = len(session.spans)
-        logs_before = len(session.logs)
+        spans_before = session.span_count
+        logs_before = session.log_count
         assert spans_before >= 2
         assert logs_before >= 1
 
@@ -509,5 +510,5 @@ class TestSplitBatchReopen:
         )
         await wait_for_session_complete(trace_manager, session_name)
 
-        assert len(session.spans) == spans_before + 1
-        assert len(session.logs) == logs_before
+        assert session.span_count == spans_before + 1
+        assert session.log_count == logs_before

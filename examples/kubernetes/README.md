@@ -1,256 +1,151 @@
-# Kubernetes: Evaluating kagent with agentevals
+# Evaluating kagent agents on Kubernetes
 
-Run agentevals alongside [kagent](https://github.com/kagent-dev/kagent) on Kubernetes to evaluate AI agent conversations in real time. This example deploys three components:
-
-1. **agentevals** receives OTLP traces over HTTP and serves the evaluation UI
-2. **OTel Collector** Optional, useful when you want centralized telemetry
-controls.
-3. **kagent** provides Kubernetes-native AI agents with built-in OTel instrumentation (gRPC export only)
+Let's run two [kagent](https://github.com/kagent-dev/kagent) agents with the same prompt and tools, one on the Go ADK runtime and one on the Claude Code harness, and score them with agentevals. Telemetry goes through a Collector, which also prints the scores agentevals sends back.
 
 ```
-kagent (gRPC :4317) --> OTel Collector( optional ) --> agentevals (gRPC :4317 / HTTP :4318)
-                                                           |
-                                                      UI on :8001
+kagent agents --> OTel Collector --> agentevals (UI on :8001)
+                        ^                 |
+                        +---- scores -----+
 ```
 
-## Prerequisites
+Tested with kagent main at `46fdd3d7` (chart `v1.0.0-alpha3-82`, `v1alpha3` agents on Substrate), Claude Code 2.1.285, Collector contrib 0.162.0, and `claude-haiku-4-5` for both agents.
 
-- A running Kubernetes cluster (kind, minikube, EKS, GKE, etc.)
-- `helm` v3 installed
-- `kubectl` configured for your cluster
-- An OpenAI API key (`OPENAI_API_KEY`)
+## Set it up
 
-## Deploy
+You need a cluster with kagent 1.0 already running.
 
-### 1. agentevals
+Install agentevals and the Collector:
 
 ```bash
-helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals
+kubectl create namespace agentevals
+kubectl apply -f otel-collector.yaml
+helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals \
+  -n agentevals -f agentevals-values.yaml --wait
 ```
 
-This creates a single pod exposing:
-
-| Port | Purpose |
-|------|---------|
-| 8001 | Web UI and API |
-| 4317 | OTLP gRPC receiver (traces and logs) |
-| 4318 | OTLP HTTP receiver (traces and logs) |
-| 8080 | MCP (Streamable HTTP) |
-
-### 2. OTel Collector (optional)
-
-Native gRPC ingestion in agentevals is sufficient for most setups, but an
-intermediate collector is still useful when you want centralized telemetry
-controls:
-
-- traffic shaping (batching, retries, backpressure)
-- filtering or redaction before data reaches agentevals
-- routing/fan-out to additional backends
-- protocol translation for mixed clients
+Point kagent at the Collector:
 
 ```bash
-helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-helm repo update
-
-helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
-  --namespace kagent --create-namespace \
-  --set mode=deployment \
-  --set replicaCount=1 \
-  --set image.repository=otel/opentelemetry-collector \
-  --set ports.otlp.enabled=true \
-  --set ports.otlp-http.enabled=false \
-  --set config.exporters.otlp.endpoint="agentevals.default.svc.cluster.local:4317" \
-  --set config.exporters.otlp.compression="gzip" \
-  --set config.service.pipelines.traces.receivers[0]=otlp \
-  --set config.service.pipelines.traces.exporters[0]=otlp \
-  --set config.service.pipelines.logs.receivers[0]=otlp \
-  --set config.service.pipelines.logs.exporters[0]=otlp
+helm upgrade kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent -n kagent --reuse-values \
+  --set otel.exporter.otlp.endpoint=http://otel-collector.agentevals.svc.cluster.local:4317 \
+  --set otel.traces.enabled=true --set otel.logs.enabled=true \
+  --set otel.capture.messageContent=true --wait
 ```
 
-> **Note:** If you deployed agentevals in a namespace other than `default`, update the `endpoint` value accordingly: `http://agentevals.<namespace>.svc.cluster.local:4317`.
+Heads up: `messageContent` puts prompts and responses on spans. agentevals needs them, but they can be sensitive.
 
-### 3. kagent
-
-Install the CRDs first, then the kagent operator with OTel tracing enabled:
+Create the agents, using the images of your kagent release:
 
 ```bash
-helm install kagent-crds oci://ghcr.io/kagent-dev/kagent/helm/kagent-crds \
-  --namespace kagent \
-  --create-namespace
-
-helm upgrade --install kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent \
-  --namespace kagent \
-  --set providers.default=openAI \
-  --set providers.openAI.apiKey=$OPENAI_API_KEY \
-  --set agents.kgateway-agent.enabled=false \
-  --set agents.istio-agent.enabled=false \
-  --set agents.promql-agent.enabled=false \
-  --set agents.observability-agent.enabled=false \
-  --set agents.argo-rollouts-agent.enabled=false \
-  --set agents.cilium-policy-agent.enabled=false \
-  --set agents.cilium-manager-agent.enabled=false \
-  --set agents.cilium-debug-agent.enabled=false \
-  --set otel.tracing.enabled=true \
-  --set otel.tracing.exporter.otlp.endpoint="otel-collector-opentelemetry-collector.kagent.svc.cluster.local:4317" \
-  --set otel.tracing.exporter.otlp.insecure=true
+export KAGENT_ADK_GO_IMAGE=<golang-adk image> KAGENT_CLAUDE_IMAGE=<claude-harness image>
+envsubst < agents.yaml | kubectl apply -f -
 ```
 
-This installs kagent with only the default Helm agent (`helm-agent`) and the K8s troubleshooter enabled, and points its OTel exporter at the Collector.
-
-> **Note:** If you are not running an OTel Collector, point `otel.tracing.exporter.otlp.endpoint` directly to the agentevals OTLP gRPC endpoint instead: `agentevals.default.svc.cluster.local:4317`.
-
-### Verify the deployment
+kagent bakes the telemetry settings into each agent revision, so wait until `DESIRED` and `LATEST` match before chatting:
 
 ```bash
-kubectl get pods -A -l 'app.kubernetes.io/name in (agentevals, kagent, opentelemetry-collector)'
+kubectl get agents -n kagent -o custom-columns=NAME:.metadata.name,DESIRED:.status.desiredRevision,LATEST:.status.latestSuccessfulRevision
 ```
 
-All pods should be `Running` before continuing.
-
-## Walkthrough: Comparing models with kagent and agentevals
-
-This walkthrough shows how to evaluate two kagent agents side by side: the default Helm agent running `gpt-4.1-mini` and a new agent running `gpt-5`. You will chat with both agents, watch their traces stream into agentevals, select the better session as the evaluation baseline, and score both on tool trajectory and response match.
-
-### Step 1. Access the UIs
-
-Port-forward both services to your local machine:
+## Chat with both agents
 
 ```bash
-# Terminal 1: agentevals UI
-kubectl port-forward svc/agentevals 8001:8001
-
-# Terminal 2: kagent UI
-kubectl port-forward -n kagent svc/kagent 8083:8083
+kubectl port-forward -n kagent svc/kagent-ui 8080:8080
+kubectl port-forward -n agentevals svc/agentevals 8001:8001
 ```
 
-Open **http://localhost:8083** for the kagent UI and **http://localhost:8001** for the agentevals UI.
+Open the kagent UI at http://localhost:8080. For `adk-go-test`, and then `claude-test`, start a new chat and send:
 
-### Step 2. Create a GPT-5 agent
+1. *Use your tools to list the namespaces in this cluster, then tell me how many pods are running in the kagent namespace. Answer in two short sentences.*
+2. *Now use your tools to list the services in the agentevals namespace. One sentence.*
 
-kagent ships with a default `helm-agent` configured to use `gpt-4.1-mini`. Create a second agent that uses `gpt-5` so you can compare the two.
+Use a new chat after the agents got their new revision. Older chats stay on the old one and send nothing.
 
-**Option A: via the kagent UI**
+Now open agentevals at http://localhost:8001 and click **Local Development** in the sidebar. Each chat shows up as one session with two turns, and is marked complete a few seconds after the last answer. If the page stops loading after agentevals restarts, restart its port forward.
 
-1. Open http://localhost:8083
-2. Navigate to the Agents page
-3. Click **Create Agent**
-4. Copy the configuration from the existing `helm-agent` (same system prompt, same tools)
-5. Change the model to `gpt-5`
-6. Name it `helm-agent-gpt5`
-7. Save
+## Score them
 
-**Option B: via a CRD**
+The idea: pick one session you're happy with as the golden run, and agentevals scores every other session turn by turn against it.
 
-Apply the following manifest (adjust the system prompt if needed):
+1. On the `adk-go-test` session card, click **Set as EvalSet**. Its turns become the expected tool calls and answers.
+2. Click **Continue to Evaluation**.
+3. Pick the metrics and hit **Run Evaluation**:
+   * `tool_trajectory_avg_score` checks that each turn called the same tools with the same arguments. Set the match type to `ANY_ORDER` if the order doesn't matter.
+   * `response_match_score` compares each answer with the golden one (ROUGE 1 text overlap).
+
+Clicking a session in the results shows each turn's expected and actual tool calls side by side.
+
+What we got from one run:
+
+| Session | Trajectory | Response match |
+|---|---|---|
+| Another `adk-go-test` chat | 1.0 | 0.93 |
+| `claude-test` | 0.0 | 0.64 |
+
+The second Go ADK chat made the same calls, so its trajectory matches and the answers are close. Claude Code fails the trajectory because its tool calls come without arguments (see below) and it uses extra tools like `ToolSearch` and `Bash`. To track Claude Code, use a Claude Code session as its golden run.
+
+## Get the results as OTel events
+
+agentevals can send every score as a `gen_ai.evaluation.result` log event, so it ends up next to the agent's traces in your observability backend. That's already on here, through `agentevals-values.yaml`:
 
 ```yaml
-apiVersion: kagent.dev/v1alpha1
-kind: Agent
-metadata:
-  name: helm-agent-gpt5
-  namespace: kagent
-spec:
-  description: "Helm agent (GPT-5) for model comparison"
-  modelConfig:
-    model: gpt-5
-    apiKeySecretRef:
-      name: kagent-openai
-      key: OPENAI_API_KEY
-  systemPrompt: |
-    You are a Kubernetes Helm expert. You help users manage Helm charts,
-    releases, and repositories. Use your tools to inspect and manage
-    Helm resources in the cluster.
-  tools:
-    - name: helm-list
-    - name: helm-status
-    - name: helm-get-values
-    - name: helm-history
+env:
+  - name: AGENTEVALS_EVALUATION_EVENTS
+    value: "true"
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: http://otel-collector.agentevals.svc.cluster.local:4318
+  - name: OTEL_SERVICE_NAME
+    value: agentevals
 ```
 
+The Collector prints them with its `debug` exporter. After a run, check:
+
 ```bash
-kubectl apply -f helm-agent-gpt5.yaml
+kubectl logs -n agentevals deploy/otel-collector | grep -A12 "EventName: gen_ai.evaluation.result"
 ```
 
-### Step 3. Open agentevals Live view
+You get one event per turn and metric, like this one:
 
-1. Go to http://localhost:8001
-2. Click **Live** in the sidebar to open the live streaming view
-3. Leave this tab open. Sessions will appear as traces arrive.
+```
+EventName: gen_ai.evaluation.result
+Attributes:
+     -> gen_ai.evaluation.name: Str(tool_trajectory_avg_score)
+     -> gen_ai.evaluation.score.value: Double(1)
+     -> gen_ai.evaluation.score.label: Str(pass)
+     -> gen_ai.agent.name: Str(adk_go_test)
+     -> gen_ai.conversation.id: Str(01a11b1c-41b6-794d-b0be-65a187d1fbcc)
+     -> agentevals.evaluator.type: Str(deterministic)
+     -> agentevals.eval_set.id: Str(manual-1)
+Trace ID: bf5aed954bb31b9234b2a29b14224354
+Span ID: 0b95fefded63d107
+```
 
-### Step 4. Chat with both agents
+The trace and span id point at the turn's `invoke_agent` span, so your backend shows the score on the exact turn it belongs to. `gen_ai.conversation.id` is the kagent chat id, which is also the session id in agentevals.
 
-Switch to the kagent UI (http://localhost:8083) and have the same conversation with each agent. For example:
+Events carry no prompts or answers. Set `AGENTEVALS_EVALUATION_EVENTS_EXPLANATION=true` to add the evaluator's explanation, which can contain content. To forward events to a real backend and turn scores into a histogram metric, see [OpenTelemetry pipelines](../../docs/opentelemetry-pipeline.md). Outside Kubernetes, `agentevals run ... --emit-otel` and `agentevals serve --emit-otel` do the same.
 
-**With `helm-agent` (gpt-4.1-mini):**
+## Claude Code workaround
 
-1. Select `helm-agent` from the agent list
-2. Start a new conversation
-3. Ask: *"List all Helm releases across all namespaces and tell me which ones have pending upgrades"*
-4. Follow up: *"Show me the values for the agentevals release"*
+Claude Code exports its own `claude_code.*` spans instead of GenAI ones. kagent wraps each turn in a GenAI `invoke_agent` span, so out of the box you only get the message and the answer.
 
-**With `helm-agent-gpt5` (gpt-5):**
+The `transform/claude_code` processor in `otel-collector.yaml` fills the gap for Claude Code 2.1.285:
 
-1. Select `helm-agent-gpt5` from the agent list
-2. Start a new conversation
-3. Ask the same questions in the same order
+* `claude_code.tool` becomes `execute_tool`, with `gen_ai.tool.name` taken from `tool_name` (minus the `mcp__<server>__` prefix)
+* `claude_code.llm_request` becomes `chat`, with the model and token usage, cache reads and writes included
 
-### Step 5. Watch traces in agentevals
+Recheck it when you upgrade the harness, since those names can change. Drop it once the harness emits GenAI spans itself, or calls get counted twice.
 
-Switch back to the agentevals Live view at http://localhost:8001. You will see two sessions appear, one for each conversation. Each session shows:
+Still missing with this version:
 
-- **Status** transitioning from ACTIVE to COMPLETED as the conversation ends
-- **Span count** incrementing in real time as the agent makes LLM calls and tool invocations
-- **Model name** visible in the session metadata
+* tool arguments, since Claude Code doesn't put them on spans
+* a clean answer: the response is everything the harness streamed in the turn, subagent chatter included
+* background calls, which aren't part of the turn's trace
 
-### Step 6. Select the GPT-5 session as the eval set
-
-Once both sessions are complete:
-
-1. Click on the `helm-agent-gpt5` session card to open its trace details
-2. Review the conversation: check that it called the right tools and produced correct responses
-3. Click **Use as Eval Set** to mark this session as the evaluation baseline
-4. Give it a name like `helm-agent-comparison`
-
-This captures the GPT-5 session's tool trajectory and final responses as the golden reference.
-
-<img width="1910" height="1498" alt="image" src="https://github.com/user-attachments/assets/2cabb4a8-c680-4742-a5be-403bac0487a3" />
-
-### Step 7. Evaluate both sessions
-
-1. Go back to the sessions list
-2. Select both sessions (the `gpt-4.1-mini` session and the `gpt-5` session)
-3. Click **Evaluate**
-4. Select the `helm-agent-comparison` eval set
-5. Choose the evaluators:
-   - **tool_trajectory_avg_score**: Did the agent call the correct tools in the correct order?
-   - **response_match_score**: Did the agent produce responses consistent with the golden reference?
-6. Run the evaluation
-
-### What to look for
-
-| Metric | What it tells you |
-|--------|------------------|
-| `tool_trajectory_avg_score` | Whether the agent followed the expected sequence of Helm tool calls (`helm-list`, then `helm-get-values`). A score of 1.0 means it matched exactly. |
-| `response_match_score` | How closely the agent's final answers matched the GPT-5 baseline. Useful for catching regressions when switching to a cheaper model. |
-
-Compare the two sessions in the results table:
-
-- **Token usage**: The session metadata includes total token counts. If `gpt-5` consumed fewer tokens while achieving the same trajectory score, it may be the better choice for this use case.
-- **Tool trajectory**: If one agent called extra tools or skipped expected ones, the trajectory score reflects that.
-- **Response quality**: A lower response match score on the `gpt-4.1-mini` session highlights where the cheaper model diverged from the GPT-5 baseline.
-
-<img width="1914" height="1154" alt="image" src="https://github.com/user-attachments/assets/5939a8d4-3775-4cf1-9cf2-d3b6b4afd582" />
-
-You can also click an individual conversation and see a breakdown of each evaluator.
-
-<img width="1916" height="1348" alt="image" src="https://github.com/user-attachments/assets/984b3d29-8018-4fcb-9036-bb7c6e97d9ff" />
-
-## Cleanup
+## Clean up
 
 ```bash
-helm uninstall kagent -n kagent
-helm uninstall kagent-crds -n kagent
-helm uninstall otel-collector -n kagent
-helm uninstall agentevals
-kubectl delete namespace kagent
+envsubst < agents.yaml | kubectl delete -f -
+helm uninstall agentevals -n agentevals
+kubectl delete -f otel-collector.yaml
+kubectl delete namespace agentevals
 ```

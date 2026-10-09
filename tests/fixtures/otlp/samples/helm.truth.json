@@ -1,0 +1,44 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "samples/helm",
+ "source": "samples/helm.json (copied verbatim)",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "list all Helm releases",
+   "final_text": "There are two Helm releases installed in the cluster:\n\n1. Release name: kagent\n   - Namespace: kagent\n   - Revision: 2\n   - Status: deployed\n   - Chart: kagent-0.7.14\n\n2. Release name: kagent-crds\n   - Namespace: kagent\n   - Revision: 1\n   - Status: deployed\n   - Chart: kagent-crds-0.7.14\n\nLet me know if you would like more detailed information or want to perform any actions on these releases.",
+   "intermediate_texts": [],
+   "agents": [
+    "helm_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "helm_list_releases",
+     "args": {},
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "NAME       \tNAMESPACE\tREVISION\tUPDATED                                  \tSTATUS  \tCHART             \tAPP VERSION\nkagent     \tkagent   \t2       \t2026-02-16 11:24:39.926237192 +0100 +0100\tdeployed\tkagent-0.7.14     \t           \nkagent-crds\tkagent   \t1       \t2026-02-16 11:14:54.214121705 +0100 +0100\tdeployed\tkagent-crds-0.7.14\t           \n"
+       }
+      ],
+      "isError": false
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 3776,
+    "output": 130
+   }
+  }
+ ],
+ "tokens": {
+  "input": 3776,
+  "output": 130
+ },
+ "notes": [
+  "kagent ADK python over OpenLLMetry openai: call_llm wraps openai.chat with equal usage (count once); content only as indexed gen_ai.prompt.N / gen_ai.completion.N"
+ ]
+}

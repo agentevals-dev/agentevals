@@ -1,0 +1,30 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/details_event_log_debug",
+ "source": "hand authored from client-inference.md at 4f85037 (details event SHOULD be DEBUG)",
+ "turns": [
+  {
+   "user_text": "Say hello.",
+   "final_text": "Hello!",
+   "intermediate_texts": [],
+   "agents": [
+    "helper"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 15,
+    "output": 7
+   }
+  }
+ ],
+ "notes": [
+  "DEBUG severity must not be dropped",
+  "reasoning parts are not final text",
+  "event name carried in the otel.event.name attribute"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 15,
+  "output": 7
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "hand/deprecated_aliases",
+ "source": "hand authored; deprecated aliases gen_ai.system, prompt/completion tokens, cache_creation, scalar finish_reason",
+ "turns": [
+  {
+   "user_text": "Name three primes.",
+   "final_text": "2, 3 and 5.",
+   "intermediate_texts": [],
+   "agents": [],
+   "tool_calls": [],
+   "tokens": {
+    "input": 70,
+    "output": 14
+   }
+  }
+ ],
+ "notes": [
+  "provider anthropic and cache_write 50 come only through the alias table"
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 70,
+  "output": 14
+ }
+}

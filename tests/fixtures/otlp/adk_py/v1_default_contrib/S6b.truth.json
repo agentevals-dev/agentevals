@@ -1,0 +1,41 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v1_default_contrib/S6b",
+ "source": "adk-python 2.10 recording, mode v1_default_contrib, scenario S6b",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "What is the price of XYZ?",
+   "final_text": "Sorry, I could not find a stock with ticker XYZ.",
+   "intermediate_texts": [],
+   "agents": [
+    "stock_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get_stock_price",
+     "args": {
+      "ticker": "XYZ"
+     },
+     "result": {
+      "error": "ValueError: ticker not found: XYZ"
+     },
+     "is_error": true,
+     "error_type": "TOOL_ERROR"
+    }
+   ],
+   "tokens": {
+    "input": 58,
+    "output": 18
+   }
+  }
+ ],
+ "tokens": {
+  "input": 58,
+  "output": 18
+ },
+ "notes": [
+  "tool raises, on_tool_error_callback turns it into an error response",
+  "evidence lost model call agent names in this mode; agents taken from the same scenario in v2_default"
+ ]
+}

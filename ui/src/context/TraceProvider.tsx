@@ -55,7 +55,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
         setState((prev) => ({ ...prev, traceFiles: files, isLoadingMetadata: true }));
 
         try {
-          const response = await convertTraces(files);
+          const response = await convertTraces(files, 'auto');
           const metadataMap = new Map();
           for (const entry of response.traces) {
             metadataMap.set(entry.traceId, {
@@ -151,6 +151,11 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
                 if (!partialResult) return prev;
 
                 const newRows = new Map(prev.tableRows);
+                // Evaluation groups traces into conversations; drop rows of the other members so a
+                // group shows once, under its earliest trace.
+                for (const memberId of partialResult.traceIds ?? []) {
+                  if (memberId !== traceId) newRows.delete(memberId);
+                }
                 const existingRow = newRows.get(traceId);
                 const metadata = prev.traceMetadata.get(traceId);
 

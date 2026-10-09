@@ -1,0 +1,28 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "samples/k8s",
+ "source": "samples/k8s.json (copied verbatim)",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "list all Helm releases",
+   "final_text": "To list all Helm releases, I would typically use Helm CLI commands like `helm list --all-namespaces`. However, I currently only have access to Kubernetes cluster via the available functions and do not have direct Helm CLI access.\n\nI can help by listing Kubernetes resources related to Helm releases. Helm stores release information as secrets or configmaps in namespaces, commonly in the \"kube-system\" or the namespace of the release with labels such as `owner=helm`.\n\nWould you like me to:\n1. List all Helm release secrets across all namespaces?\n2. List configmaps labeled as Helm release metadata?\n3. Or provide another approach?\n\nPlease confirm or specify how you'd like to proceed.",
+   "intermediate_texts": [],
+   "agents": [
+    "k8s_agent"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 2203,
+    "output": 139
+   }
+  }
+ ],
+ "tokens": {
+  "input": 2203,
+  "output": 139
+ },
+ "notes": [
+  "kagent k8s agent; no tool call"
+ ]
+}

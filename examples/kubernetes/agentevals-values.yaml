@@ -1,0 +1,8 @@
+# Send evaluation results to the Collector as gen_ai.evaluation.result log events.
+env:
+  - name: AGENTEVALS_EVALUATION_EVENTS
+    value: "true"
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: http://otel-collector.agentevals.svc.cluster.local:4318
+  - name: OTEL_SERVICE_NAME
+    value: agentevals

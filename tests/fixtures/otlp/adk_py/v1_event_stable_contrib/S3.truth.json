@@ -1,0 +1,69 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v1_event_stable_contrib/S3",
+ "source": "adk-python 2.10 recording, mode v1_event_stable_contrib, scenario S3",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "Hi, my name is Ada.",
+   "final_text": "Nice to meet you, Ada! How can I help?",
+   "intermediate_texts": [],
+   "agents": [
+    "weather_agent"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 10,
+    "output": 8
+   }
+  },
+  {
+   "user_text": "What is the weather in Rome?",
+   "final_text": "It is cloudy and 17C in Rome.",
+   "intermediate_texts": [],
+   "agents": [
+    "weather_agent"
+   ],
+   "tool_calls": [
+    {
+     "name": "get_weather",
+     "args": {
+      "city": "Rome"
+     },
+     "result": {
+      "city": "Rome",
+      "forecast": "cloudy",
+      "temp_c": 17
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 80,
+    "output": 14
+   }
+  },
+  {
+   "user_text": "Thanks, bye!",
+   "final_text": "Goodbye, Ada!",
+   "intermediate_texts": [],
+   "agents": [
+    "weather_agent"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 70,
+    "output": 4
+   }
+  }
+ ],
+ "tokens": {
+  "input": 160,
+  "output": 26
+ },
+ "notes": [
+  "multi turn session (3 turns, one with a tool)",
+  "evidence lost model call agent names in this mode; agents taken from the same scenario in v2_default"
+ ]
+}

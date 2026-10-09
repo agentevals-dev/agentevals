@@ -1,0 +1,632 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_default"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "spans": [
+      {
+       "traceId": "ef78e41d9b937ba1cddedb3be236370a",
+       "spanId": "d4d149813ec462be",
+       "parentSpanId": "14048389f2a003c5",
+       "name": "generate_content gemini-2.5-flash",
+       "kind": 1,
+       "startTimeUnixNano": "1790607510433077806",
+       "endTimeUnixNano": "1790607510433191132",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "generate_content"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6a-v2_default"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "c08dca34-a4e5-4df2-9d13-05e12d1b5b37"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-30d145c7-2109-4c2a-949f-d1dac7bb9ea2"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "18"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "ef78e41d9b937ba1cddedb3be236370a",
+       "spanId": "a0a9c1778a853e77",
+       "parentSpanId": "3250d859a1f9de4f",
+       "name": "execute_tool get_stock_price",
+       "kind": 1,
+       "startTimeUnixNano": "1790607510433395835",
+       "endTimeUnixNano": "1790607510434649999",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "Returns the stock price for a ticker."
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_stock_price"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "FunctionTool"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "error.type",
+         "value": {
+          "stringValue": "ValueError"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_call_args",
+         "value": {
+          "stringValue": "{\"ticker\": \"XYZ\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "<not specified>"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.tool_response",
+         "value": {
+          "stringValue": "{\"result\": \"<not specified>\"}"
+         }
+        }
+       ],
+       "events": [
+        {
+         "timeUnixNano": "1790607510434090533",
+         "name": "exception",
+         "attributes": [
+          {
+           "key": "exception.type",
+           "value": {
+            "stringValue": "ValueError"
+           }
+          },
+          {
+           "key": "exception.message",
+           "value": {
+            "stringValue": "ticker not found: XYZ"
+           }
+          },
+          {
+           "key": "exception.stacktrace",
+           "value": {
+            "stringValue": "Traceback (most recent call last):\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/telemetry/_instrumentation.py\", line 601, in record_tool_execution\n    yield tel_ctx\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 921, in _execute_single_prepared_call\n    tel_ctx.function_response_event = await _run_with_trace()\n                                      ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 864, in _run_with_trace\n    raise tool_error\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 851, in _run_with_trace\n    function_response = await tool_runner()\n                        ^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 434, in _call_tool_async\n    result: object = await tool.run_async(args=args, tool_context=tool_context)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/tools/function_tool.py\", line 419, in run_async\n    return await self._invoke_callable(self.func, args_to_call)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/tools/function_tool.py\", line 460, in _invoke_callable\n    return target(**args_to_call)\n  File \"/app/gen_traces.py\", line 302, in get_stock_price\n    raise ValueError(f\"ticker not found: {ticker}\")\nValueError: ticker not found: XYZ\n"
+           }
+          },
+          {
+           "key": "exception.escaped",
+           "value": {
+            "stringValue": "False"
+           }
+          }
+         ]
+        },
+        {
+         "timeUnixNano": "1790607510434644001",
+         "name": "exception",
+         "attributes": [
+          {
+           "key": "exception.type",
+           "value": {
+            "stringValue": "ValueError"
+           }
+          },
+          {
+           "key": "exception.message",
+           "value": {
+            "stringValue": "ticker not found: XYZ"
+           }
+          },
+          {
+           "key": "exception.stacktrace",
+           "value": {
+            "stringValue": "Traceback (most recent call last):\n  File \"/app/.venv/lib/python3.13/site-packages/opentelemetry/trace/__init__.py\", line 608, in use_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/opentelemetry/sdk/trace/__init__.py\", line 1177, in start_as_current_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/opentelemetry/trace/__init__.py\", line 443, in start_as_current_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/telemetry/_instrumentation.py\", line 601, in record_tool_execution\n    yield tel_ctx\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 921, in _execute_single_prepared_call\n    tel_ctx.function_response_event = await _run_with_trace()\n                                      ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 864, in _run_with_trace\n    raise tool_error\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 851, in _run_with_trace\n    function_response = await tool_runner()\n                        ^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 434, in _call_tool_async\n    result: object = await tool.run_async(args=args, tool_context=tool_context)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/tools/function_tool.py\", line 419, in run_async\n    return await self._invoke_callable(self.func, args_to_call)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/tools/function_tool.py\", line 460, in _invoke_callable\n    return target(**args_to_call)\n  File \"/app/gen_traces.py\", line 302, in get_stock_price\n    raise ValueError(f\"ticker not found: {ticker}\")\nValueError: ticker not found: XYZ\n"
+           }
+          },
+          {
+           "key": "exception.escaped",
+           "value": {
+            "stringValue": "False"
+           }
+          }
+         ]
+        }
+       ],
+       "status": {
+        "message": "ValueError: ticker not found: XYZ",
+        "code": 2
+       },
+       "flags": 256
+      },
+      {
+       "traceId": "ef78e41d9b937ba1cddedb3be236370a",
+       "spanId": "14048389f2a003c5",
+       "parentSpanId": "3250d859a1f9de4f",
+       "name": "call_llm",
+       "kind": 1,
+       "startTimeUnixNano": "1790607510433017166",
+       "endTimeUnixNano": "1790607510434737669",
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gcp.vertex.agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gemini-2.5-flash"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.invocation_id",
+         "value": {
+          "stringValue": "e-30d145c7-2109-4c2a-949f-d1dac7bb9ea2"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.session_id",
+         "value": {
+          "stringValue": "sess-S6a-v2_default"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.event_id",
+         "value": {
+          "stringValue": "c08dca34-a4e5-4df2-9d13-05e12d1b5b37"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_request",
+         "value": {
+          "stringValue": "{\"model\": \"gemini-2.5-flash\", \"config\": {\"system_instruction\": \"Answer stock questions using tools.\\n\\nYou are an agent. Your internal name is \\\"stock_agent\\\".\", \"tools\": [{\"function_declarations\": [{\"description\": \"Returns the stock price for a ticker.\", \"name\": \"get_stock_price\", \"parameters_json_schema\": {\"properties\": {\"ticker\": {\"title\": \"Ticker\", \"type\": \"string\"}}, \"required\": [\"ticker\"], \"title\": \"get_stock_priceParams\", \"type\": \"object\"}}]}], \"labels\": {\"adk_agent_name\": \"stock_agent\"}}, \"contents\": [{\"parts\": [{\"text\": \"What is the price of XYZ?\"}], \"role\": \"user\"}]}"
+         }
+        },
+        {
+         "key": "gcp.vertex.agent.llm_response",
+         "value": {
+          "stringValue": "{\"model_version\":\"gemini-2.5-flash-001\",\"content\":{\"parts\":[{\"function_call\":{\"args\":{\"ticker\":\"XYZ\"},\"name\":\"get_stock_price\"}}],\"role\":\"model\"},\"finish_reason\":\"STOP\",\"usage_metadata\":{\"candidates_token_count\":6,\"prompt_token_count\":18,\"total_token_count\":24}}"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "18"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        }
+       ],
+       "status": {},
+       "flags": 256
+      },
+      {
+       "traceId": "ef78e41d9b937ba1cddedb3be236370a",
+       "spanId": "3250d859a1f9de4f",
+       "parentSpanId": "2073070370b34eab",
+       "name": "invoke_agent stock_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607510432276904",
+       "endTimeUnixNano": "1790607510435905703",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": ""
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6a-v2_default"
+         }
+        }
+       ],
+       "events": [
+        {
+         "timeUnixNano": "1790607510435901622",
+         "name": "exception",
+         "attributes": [
+          {
+           "key": "exception.type",
+           "value": {
+            "stringValue": "ValueError"
+           }
+          },
+          {
+           "key": "exception.message",
+           "value": {
+            "stringValue": "ticker not found: XYZ"
+           }
+          },
+          {
+           "key": "exception.stacktrace",
+           "value": {
+            "stringValue": "Traceback (most recent call last):\n  File \"/app/.venv/lib/python3.13/site-packages/opentelemetry/trace/__init__.py\", line 608, in use_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/opentelemetry/sdk/trace/__init__.py\", line 1177, in start_as_current_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/opentelemetry/trace/__init__.py\", line 443, in start_as_current_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/telemetry/_instrumentation.py\", line 561, in record_agent_invocation\n    yield scope\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/agents/base_agent.py\", line 392, in _run\n    async for event in agen:\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/agents/llm_agent.py\", line 632, in _run_async_impl\n    async for event in agen:\n    ...<8 lines>...\n        should_pause = True\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/base_llm_flow.py\", line 359, in run_async\n    async for event in agen:\n      last_event = event\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/base_llm_flow.py\", line 455, in _run_one_step_async\n    async for event in agen:\n    ...<5 lines>...\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/base_llm_flow.py\", line 556, in _postprocess_async\n    async for event in agen:\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/base_llm_flow.py\", line 610, in _postprocess_handle_function_calls_async\n    async for event in agen:\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/core/_function_call_postprocessor.py\", line 68, in postprocess_handle_function_calls_async\n    if function_response_event := await functions.handle_function_calls_async(\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        invocation_context, function_call_event, llm_request.tools_dict\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ):\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_functions.py\", line 277, in handle_function_calls_async\n    return await functions.handle_function_call_list_async(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ...<5 lines>...\n    )\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_functions.py\", line 257, in handle_function_call_list_async\n    return await _batch_tool_executor.handle_function_call_list_async(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ...<5 lines>...\n    )\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_batch_executor.py\", line 405, in handle_function_call_list_async\n    return await _execute_prepared_function_calls_async(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        invocation_context, prepared_calls, agent\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_batch_executor.py\", line 326, in _execute_prepared_function_calls_async\n    maybe_function_response_events = await _gather_or_cancel(tasks)\n                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_batch_executor.py\", line 192, in _gather_or_cancel\n    return list(await asyncio.gather(*tasks))\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 938, in _execute_single_prepared_call_async\n    return await _execute_single_prepared_call(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ...<8 lines>...\n    )\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 921, in _execute_single_prepared_call\n    tel_ctx.function_response_event = await _run_with_trace()\n                                      ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 864, in _run_with_trace\n    raise tool_error\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 851, in _run_with_trace\n    function_response = await tool_runner()\n                        ^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 434, in _call_tool_async\n    result: object = await tool.run_async(args=args, tool_context=tool_context)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/tools/function_tool.py\", line 419, in run_async\n    return await self._invoke_callable(self.func, args_to_call)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/tools/function_tool.py\", line 460, in _invoke_callable\n    return target(**args_to_call)\n  File \"/app/gen_traces.py\", line 302, in get_stock_price\n    raise ValueError(f\"ticker not found: {ticker}\")\nValueError: ticker not found: XYZ\n"
+           }
+          },
+          {
+           "key": "exception.escaped",
+           "value": {
+            "stringValue": "False"
+           }
+          }
+         ]
+        }
+       ],
+       "status": {
+        "message": "ValueError: ticker not found: XYZ",
+        "code": 2
+       },
+       "flags": 256
+      },
+      {
+       "traceId": "ef78e41d9b937ba1cddedb3be236370a",
+       "spanId": "2073070370b34eab",
+       "name": "invoke_workflow stock_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1790607510431818228",
+       "endTimeUnixNano": "1790607510441035518",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_workflow"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "sess-S6a-v2_default"
+         }
+        },
+        {
+         "key": "gen_ai.workflow.name",
+         "value": {
+          "stringValue": "stock_agent"
+         }
+        }
+       ],
+       "events": [
+        {
+         "timeUnixNano": "1790607510441028063",
+         "name": "exception",
+         "attributes": [
+          {
+           "key": "exception.type",
+           "value": {
+            "stringValue": "ValueError"
+           }
+          },
+          {
+           "key": "exception.message",
+           "value": {
+            "stringValue": "ticker not found: XYZ"
+           }
+          },
+          {
+           "key": "exception.stacktrace",
+           "value": {
+            "stringValue": "Traceback (most recent call last):\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/workflow/_node_runner_utils.py\", line 241, in _drive_root_node\n    await root_ctx._run_node_internal(  # pylint: disable=protected-access\n    ...<3 lines>...\n    )\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/agents/context.py\", line 515, in _run_node_internal\n    return await _dynamic_node_scheduler.run_node_internal(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ...<12 lines>...\n    )\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/workflow/_dynamic_node_scheduler.py\", line 738, in run_node_internal\n    raise DynamicNodeFailError(\n    ...<3 lines>...\n    )\ngoogle.adk.workflow._errors.DynamicNodeFailError: Dynamic node stock_agent failed\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/app/.venv/lib/python3.13/site-packages/opentelemetry/trace/__init__.py\", line 608, in use_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/opentelemetry/sdk/trace/__init__.py\", line 1177, in start_as_current_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/opentelemetry/trace/__init__.py\", line 443, in start_as_current_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/telemetry/node_tracing.py\", line 264, in _use_invoke_workflow_span\n    yield span\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/telemetry/_instrumentation.py\", line 176, in record_invocation\n    yield\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/workflow/_node_runner_utils.py\", line 274, in _run\n    await runner._cleanup_root_task(task, runner.agent.name)  # pylint: disable=protected-access\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/runners.py\", line 812, in _cleanup_root_task\n    await task\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/workflow/_node_runner_utils.py\", line 250, in _drive_root_node\n    raise e.error\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/workflow/_node_runner.py\", line 138, in run\n    await self._execute_node(ctx, node_input)\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/workflow/_node_runner.py\", line 304, in _execute_node\n    await self._run_node_loop(ctx, node_input)\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/workflow/_node_runner.py\", line 318, in _run_node_loop\n    async for event in agen:\n      self._track_event_in_context(event, ctx)\n      await self._enqueue_event(event, ctx)\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/workflow/_base_node.py\", line 190, in run\n    async for item in agen:\n    ...<12 lines>...\n        yield Event(output=validated)\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/agents/llm_agent.py\", line 683, in _run_impl\n    async for event in agen:\n    ...<4 lines>...\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/workflow/_llm_agent_wrapper.py\", line 482, in run_llm_agent_as_node\n    async for event in run_iter:\n    ...<31 lines>...\n        break\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/agents/base_agent.py\", line 328, in run_async\n    async for event in agen:\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/agents/base_agent.py\", line 422, in _run_with_lifecycle\n    async for event in agen:\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/utils/_runner_utils.py\", line 42, in _with_caller_context\n    async for item in a:\n    ...<4 lines>...\n        context.detach(token)\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/agents/base_agent.py\", line 392, in _run\n    async for event in agen:\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/agents/llm_agent.py\", line 632, in _run_async_impl\n    async for event in agen:\n    ...<8 lines>...\n        should_pause = True\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/base_llm_flow.py\", line 359, in run_async\n    async for event in agen:\n      last_event = event\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/base_llm_flow.py\", line 455, in _run_one_step_async\n    async for event in agen:\n    ...<5 lines>...\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/base_llm_flow.py\", line 556, in _postprocess_async\n    async for event in agen:\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/base_llm_flow.py\", line 610, in _postprocess_handle_function_calls_async\n    async for event in agen:\n      yield event\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/core/_function_call_postprocessor.py\", line 68, in postprocess_handle_function_calls_async\n    if function_response_event := await functions.handle_function_calls_async(\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        invocation_context, function_call_event, llm_request.tools_dict\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ):\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_functions.py\", line 277, in handle_function_calls_async\n    return await functions.handle_function_call_list_async(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ...<5 lines>...\n    )\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_functions.py\", line 257, in handle_function_call_list_async\n    return await _batch_tool_executor.handle_function_call_list_async(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ...<5 lines>...\n    )\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_batch_executor.py\", line 405, in handle_function_call_list_async\n    return await _execute_prepared_function_calls_async(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        invocation_context, prepared_calls, agent\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_batch_executor.py\", line 326, in _execute_prepared_function_calls_async\n    maybe_function_response_events = await _gather_or_cancel(tasks)\n                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_batch_executor.py\", line 192, in _gather_or_cancel\n    return list(await asyncio.gather(*tasks))\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 938, in _execute_single_prepared_call_async\n    return await _execute_single_prepared_call(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ...<8 lines>...\n    )\n    ^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 921, in _execute_single_prepared_call\n    tel_ctx.function_response_event = await _run_with_trace()\n                                      ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 864, in _run_with_trace\n    raise tool_error\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 851, in _run_with_trace\n    function_response = await tool_runner()\n                        ^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/flows/llm_flows/tools/_caller.py\", line 434, in _call_tool_async\n    result: object = await tool.run_async(args=args, tool_context=tool_context)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/tools/function_tool.py\", line 419, in run_async\n    return await self._invoke_callable(self.func, args_to_call)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/.venv/lib/python3.13/site-packages/google/adk/tools/function_tool.py\", line 460, in _invoke_callable\n    return target(**args_to_call)\n  File \"/app/gen_traces.py\", line 302, in get_stock_price\n    raise ValueError(f\"ticker not found: {ticker}\")\nValueError: ticker not found: XYZ\n"
+           }
+          },
+          {
+           "key": "exception.escaped",
+           "value": {
+            "stringValue": "False"
+           }
+          }
+         ]
+        }
+       ],
+       "status": {
+        "message": "ValueError: ticker not found: XYZ",
+        "code": 2
+       },
+       "flags": 256
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ],
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "telemetry.sdk.language",
+      "value": {
+       "stringValue": "python"
+      }
+     },
+     {
+      "key": "telemetry.sdk.name",
+      "value": {
+       "stringValue": "opentelemetry"
+      }
+     },
+     {
+      "key": "telemetry.sdk.version",
+      "value": {
+       "stringValue": "1.42.1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "adk-empirical"
+      }
+     },
+     {
+      "key": "emp.mode",
+      "value": {
+       "stringValue": "v2_default"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "gcp.vertex.agent",
+      "version": "2.10.0"
+     },
+     "logRecords": [
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "ef78e41d9b937ba1cddedb3be236370a",
+       "spanId": "d4d149813ec462be",
+       "observedTimeUnixNano": "1790607510433089676",
+       "eventName": "gen_ai.system.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "ef78e41d9b937ba1cddedb3be236370a",
+       "spanId": "d4d149813ec462be",
+       "observedTimeUnixNano": "1790607510433107918",
+       "eventName": "gen_ai.user.message"
+      },
+      {
+       "body": {
+        "kvlistValue": {
+         "values": [
+          {
+           "key": "content",
+           "value": {
+            "stringValue": "<elided>"
+           }
+          },
+          {
+           "key": "index",
+           "value": {
+            "intValue": "0"
+           }
+          },
+          {
+           "key": "finish_reason",
+           "value": {
+            "stringValue": "STOP"
+           }
+          }
+         ]
+        }
+       },
+       "attributes": [
+        {
+         "key": "gen_ai.system",
+         "value": {
+          "stringValue": "gemini"
+         }
+        }
+       ],
+       "flags": 3,
+       "traceId": "ef78e41d9b937ba1cddedb3be236370a",
+       "spanId": "d4d149813ec462be",
+       "observedTimeUnixNano": "1790607510433180137",
+       "eventName": "gen_ai.choice"
+      }
+     ],
+     "schemaUrl": "https://opentelemetry.io/schemas/1.36.0"
+    }
+   ]
+  }
+ ]
+}

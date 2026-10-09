@@ -1,7 +1,7 @@
 """Pydantic response and event models for the agentevals API.
 
 Provides a StandardResponse[T] envelope, typed REST response models,
-SSE evaluation event models, and WebSocket/UI broadcast event models.
+SSE evaluation event models, and live UI broadcast event models.
 """
 
 from __future__ import annotations
@@ -145,6 +145,7 @@ class TraceConversionMetadata(CamelModel):
 
 class TraceConversionEntry(CamelModel):
     trace_id: str
+    trace_ids: list[str] = Field(default_factory=list)
     invocations: list[dict[str, Any]]
     warnings: list[str] = Field(default_factory=list)
     metadata: TraceConversionMetadata = Field(default_factory=TraceConversionMetadata)
@@ -205,7 +206,7 @@ class SSEErrorEvent(CamelModel):
 
 
 # ---------------------------------------------------------------------------
-# WebSocket / UI broadcast event models
+# Live UI broadcast event models
 # ---------------------------------------------------------------------------
 
 
@@ -223,48 +224,4 @@ class WSSessionCompleteEvent(CamelModel):
 class WSSessionRemovedEvent(CamelModel):
     type: str = "session_removed"
     session_id: str
-    absorbed_by: str
-
-
-class WSSpanReceivedEvent(CamelModel):
-    type: str = "span_received"
-    session_id: str
-    span: dict[str, Any]
-
-
-class WSUserInputEvent(CamelModel):
-    type: str = "user_input"
-    session_id: str
-    invocation_id: str
-    text: str
-    timestamp: float
-
-
-class WSAgentResponseEvent(CamelModel):
-    type: str = "agent_response"
-    session_id: str
-    invocation_id: str
-    text: str
-    timestamp: float
-
-
-class WSToolCallEvent(CamelModel):
-    type: str = "tool_call"
-    session_id: str
-    invocation_id: str
-    tool_call: dict[str, Any]
-    timestamp: float
-
-
-class WSTokenUpdateEvent(CamelModel):
-    type: str = "token_update"
-    session_id: str
-    invocation_id: str | None = None
-    input_tokens: int
-    output_tokens: int
-    model: str | None = None
-
-
-class WSErrorEvent(CamelModel):
-    type: str = "error"
-    message: str
+    absorbed_by: str | None = None

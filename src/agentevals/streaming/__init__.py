@@ -1,120 +1,67 @@
-"""Live streaming support for agentevals."""
+"""Live streaming support for agentevals.
+
+``enable_streaming`` and ``enable_streaming_sync`` are deprecated wrappers kept for existing
+callers; use :class:`agentevals.AgentEvals` sessions instead.
+"""
 
 from __future__ import annotations
 
-import asyncio
-import logging
-import uuid
+import warnings
 from contextlib import asynccontextmanager
+from typing import Any
 
-logger = logging.getLogger(__name__)
+from ..otel.sdk_export import LEGACY_WS_URL
+
+
+def _deprecated(name: str) -> None:
+    warnings.warn(
+        f"{name} is deprecated and will be removed in a future version. "
+        "Use AgentEvals().session() or AgentEvals().session_async() instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 @asynccontextmanager
 async def enable_streaming(
-    ws_url: str = "ws://localhost:8001/ws/traces",
+    ws_url: str = LEGACY_WS_URL,
     eval_set_id: str | None = None,
     session_name: str | None = None,
 ):
-    """Enable live streaming of OTel spans to agentevals dev server.
+    """Deprecated: stream the spans produced inside the block to the agentevals dev server."""
+    from ..sdk import AgentEvals
 
-    Usage:
-        from agentevals.streaming import enable_streaming
+    _deprecated("enable_streaming")
+    async with AgentEvals(ws_url=ws_url, auto_instrument=False).session_async(
+        eval_set_id=eval_set_id, session_name=session_name
+    ) as name:
+        yield name
 
-        async with enable_streaming("ws://localhost:8001/ws/traces", eval_set_id="my-eval"):
-            # Your agent code here
-            agent.invoke("...")
-    """
-    try:
-        from opentelemetry import trace
-        from opentelemetry.sdk.trace import TracerProvider
 
-        from .processor import AgentEvalsStreamingProcessor
-    except ImportError:
-        logger.error("opentelemetry-sdk required for streaming. Install with: pip install opentelemetry-sdk websockets")
-        raise
+class StreamingHandle:
+    """An open session started by :func:`enable_streaming_sync`; call :meth:`shutdown` to end it."""
 
-    session_id = session_name or f"session-{uuid.uuid4().hex[:8]}"
-    trace_id = uuid.uuid4().hex
+    def __init__(self, cm: Any, session_id: str):
+        self._cm = cm
+        self.session_id = session_id
 
-    processor = AgentEvalsStreamingProcessor(ws_url, session_id, trace_id)
-    await processor.connect(eval_set_id=eval_set_id)
-
-    tracer_provider = trace.get_tracer_provider()
-    if isinstance(tracer_provider, TracerProvider):
-        tracer_provider.add_span_processor(processor)
-    else:
-        logger.warning(
-            "No TracerProvider found. Streaming may not work. Ensure OpenTelemetry is configured in your agent."
-        )
-
-    try:
-        yield session_id
-    finally:
-        await processor.shutdown_async()
+    def shutdown(self) -> None:
+        if self._cm is not None:
+            cm, self._cm = self._cm, None
+            cm.__exit__(None, None, None)
 
 
 def enable_streaming_sync(
-    ws_url: str = "ws://localhost:8001/ws/traces",
+    ws_url: str = LEGACY_WS_URL,
     eval_set_id: str | None = None,
     session_name: str | None = None,
-):
-    """Synchronous wrapper for enable_streaming (sets up processor but doesn't manage lifecycle).
+) -> StreamingHandle:
+    """Deprecated: start a session in the current context and return a handle that ends it."""
+    from ..sdk import AgentEvals
 
-    .. deprecated:: 0.2.0
-        Use the async :func:`enable_streaming` context manager instead.
-        This function modifies the global event loop and can interfere with existing async code.
-
-    For use in non-async code. Note: You need to manually manage the event loop.
-
-    Args:
-        ws_url: WebSocket URL of the agentevals dev server
-        eval_set_id: Optional ID of eval set to use for evaluation
-        session_name: Optional custom session name
-
-    Returns:
-        AgentEvalsStreamingProcessor instance that must be manually shut down
-
-    Warning:
-        This function is deprecated and will be removed in a future version.
-        Prefer using the async version for better compatibility.
-    """
-    import warnings
-
-    warnings.warn(
-        "enable_streaming_sync is deprecated and will be removed in a future version. "
-        "Use the async enable_streaming() context manager instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    try:
-        from opentelemetry import trace
-        from opentelemetry.sdk.trace import TracerProvider
-
-        from .processor import AgentEvalsStreamingProcessor
-    except ImportError:
-        logger.error("opentelemetry-sdk required for streaming. Install with: pip install opentelemetry-sdk websockets")
-        return
-
-    session_id = session_name or f"session-{uuid.uuid4().hex[:8]}"
-    trace_id = uuid.uuid4().hex
-
-    processor = AgentEvalsStreamingProcessor(ws_url, session_id, trace_id)
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(processor.connect(eval_set_id=eval_set_id))
-
-    tracer_provider = trace.get_tracer_provider()
-    if isinstance(tracer_provider, TracerProvider):
-        tracer_provider.add_span_processor(processor)
-
-    print("[agentevals] Connected to dev server")
-    print(f"[agentevals] Session: {session_id}")
-    if eval_set_id:
-        print(f"[agentevals] Eval set: {eval_set_id}")
-
-    return processor
+    _deprecated("enable_streaming_sync")
+    cm = AgentEvals(ws_url=ws_url, auto_instrument=False).session(eval_set_id=eval_set_id, session_name=session_name)
+    return StreamingHandle(cm, cm.__enter__())
 
 
-__all__ = ["enable_streaming", "enable_streaming_sync"]
+__all__ = ["StreamingHandle", "enable_streaming", "enable_streaming_sync"]

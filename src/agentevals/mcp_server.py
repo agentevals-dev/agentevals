@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-import tempfile
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from mcp.server import FastMCP
@@ -137,12 +137,13 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
             raise RuntimeError(f"API error: {response_json['error']}")
         return response_json["data"]
 
-    async def _get(path: str) -> Any:
+    async def _get(path: str, *, envelope: bool = True) -> Any:
+        """``envelope=False`` for routes that return a bare document, such as the OTLP export."""
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 r = await client.get(f"{_url}{path}")
                 r.raise_for_status()
-                return _unwrap(r.json())
+                return _unwrap(r.json()) if envelope else r.json()
         except httpx.ConnectError as exc:
             raise RuntimeError(
                 f"Cannot reach agentevals server at {_url}. Start it with: uv run agentevals serve --dev"
@@ -373,45 +374,31 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
                     - tool: the tool/function name
                     - args: arguments passed to the tool
         """
-        from agentevals.converter import convert_traces
-        from agentevals.loader.otlp import OtlpJsonLoader
+        from agentevals.genai.extract import extract_conversation
+        from agentevals.genai.messages import text_of
+        from agentevals.otel.decode import decode_json_document
+        from agentevals.otel.model import build_traces
 
-        raw = await _post("/api/streaming/get-trace", {"session_id": session_id})
+        document = await _get(f"/api/streaming/sessions/{quote(session_id, safe='')}/otlp", envelope=False)
+        decoded = decode_json_document(document, strict=False)
+        traces, _ = build_traces(decoded.spans, decoded.logs)
+        conversation = extract_conversation(traces, session_id)
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False, encoding="utf-8") as f:
-            f.write(raw["traceContent"])
-            tmp_path = f.name
-
-        traces = OtlpJsonLoader().load(tmp_path)
-        if not traces:
-            return SummarizeSessionResponse(
-                session_id=session_id,
-                num_spans=raw["numSpans"],
-                invocations=[],
+        invocations = [
+            InvocationSummaryResponse(
+                user=text_of(turn.user_input) or "",
+                response=text_of(turn.final_output) or "",
+                tool_calls=[
+                    ToolCallResponse(tool=t.name, args=t.arguments if isinstance(t.arguments, dict) else {})
+                    for t in turn.tool_calls
+                ],
             )
-
-        invocations = []
-        for conv in convert_traces(traces):
-            for inv in conv.invocations:
-                tool_calls = []
-                if inv.intermediate_data:
-                    tool_calls = [
-                        ToolCallResponse(tool=tu.name, args=getattr(tu, "args", {}))
-                        for tu in inv.intermediate_data.tool_uses
-                    ]
-                invocations.append(
-                    InvocationSummaryResponse(
-                        user=next((p.text for p in inv.user_content.parts if p.text), "") if inv.user_content else "",
-                        response=next((p.text for p in inv.final_response.parts if p.text), "")
-                        if inv.final_response
-                        else "",
-                        tool_calls=tool_calls,
-                    )
-                )
+            for turn in conversation.turns
+        ]
 
         return SummarizeSessionResponse(
             session_id=session_id,
-            num_spans=raw["numSpans"],
+            num_spans=sum(len(t.spans) for t in traces),
             num_invocations=len(invocations),
             invocations=invocations,
         )
@@ -429,7 +416,8 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
 
         This is the primary tool for regression testing streamed agent sessions.
         The server automatically builds an eval set from the golden session's
-        trace, then evaluates every other completed session against it. No file
+        trace, then evaluates every completed session against it, the golden
+        session included (it should score as a match against itself). No file
         creation or pre-existing eval set is needed.
 
         Typical workflow:

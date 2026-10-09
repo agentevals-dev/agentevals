@@ -14,7 +14,9 @@ a trace manager.
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
+import re
 
 import httpx
 import pytest
@@ -27,8 +29,8 @@ from opentelemetry.proto.trace.v1.trace_pb2 import Span
 
 from agentevals.api.otlp_app import create_otlp_app
 from agentevals.api.otlp_http import MAX_GZIP_MEMBERS
-from agentevals.streaming.session import MAX_LOGS_PER_SESSION, MAX_SPANS_PER_SESSION
-from agentevals.streaming.ws_server import StreamingTraceManager
+from agentevals.otel.store import Limits
+from agentevals.streaming.manager import LiveManager
 
 JSON = "application/json"
 PROTOBUF = "application/x-protobuf"
@@ -36,15 +38,18 @@ PROTOBUF = "application/x-protobuf"
 
 @pytest.fixture
 async def trace_manager():
-    """Fresh StreamingTraceManager with fast timers."""
-    mgr = StreamingTraceManager(
-        completion_grace_seconds=0.1,
-        idle_timeout_seconds=0.5,
-        reextraction_delay_seconds=0.1,
-    )
-    mgr.start_cleanup_task()
+    """Fresh LiveManager with fast timers."""
+    mgr = LiveManager(completion_grace_seconds=0.1, idle_timeout_seconds=0.5)
+    mgr.start()
     yield mgr
     await mgr.shutdown()
+
+
+def hex_id(label: str, nbytes: int = 16) -> str:
+    """Receivers accept only hex ids; readable test labels map to stable ones."""
+    if re.fullmatch(r"[0-9a-f]+", label) and len(label) == 2 * nbytes:
+        return label
+    return hashlib.sha256(label.encode()).hexdigest()[: 2 * nbytes]
 
 
 @pytest.fixture
@@ -61,14 +66,14 @@ async def otlp_client(trace_manager):
 # ---------------------------------------------------------------------------
 
 
-def trace_request(trace_id: str, session_name: str = "http-test", span: bool = True) -> dict:
+def trace_request(trace_id: str, session_name: str = "http-test", span: bool = True, span_id: str = "bb" * 8) -> dict:
     """Build an ExportTraceServiceRequest JSON body."""
     spans = []
     if span:
         spans.append(
             {
-                "traceId": trace_id,
-                "spanId": "bb" * 8,
+                "traceId": hex_id(trace_id),
+                "spanId": span_id,
                 "name": "chat gpt-4o-mini",
                 "kind": 3,
                 "attributes": [
@@ -102,7 +107,7 @@ def log_request(trace_id: str, event_name: str = "gen_ai.user.message", session_
                         "logRecords": [
                             {
                                 "eventName": event_name,
-                                "traceId": trace_id,
+                                "traceId": hex_id(trace_id),
                                 "observedTimeUnixNano": "1500000000",
                                 "body": {
                                     "kvlistValue": {"values": [{"key": "content", "value": {"stringValue": "hello"}}]}
@@ -117,7 +122,7 @@ def log_request(trace_id: str, event_name: str = "gen_ai.user.message", session_
     }
 
 
-def proto_trace_request(trace_id_hex: str, session_name: str = "http-test") -> bytes:
+def proto_trace_request(trace_id_hex: str, session_name: str = "http-test", span_id_hex: str = "bb" * 8) -> bytes:
     """Build a serialized ExportTraceServiceRequest, as a Collector would send it."""
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 
@@ -130,7 +135,7 @@ def proto_trace_request(trace_id_hex: str, session_name: str = "http-test") -> b
     scope_spans.scope.name = "test"
     span = scope_spans.spans.add()
     span.trace_id = bytes.fromhex(trace_id_hex)
-    span.span_id = bytes.fromhex("bb" * 8)
+    span.span_id = bytes.fromhex(span_id_hex)
     span.name = "chat gpt-4o-mini"
     span.kind = Span.SPAN_KIND_CLIENT
     span.attributes.append(KeyValue(key="gen_ai.conversation.id", value=AnyValue(string_value="conv-1")))
@@ -159,7 +164,7 @@ class TestContentEncoding:
             headers={"Content-Type": JSON, "Content-Encoding": "gzip"},
         )
         assert resp.status_code == 200
-        assert trace_manager.sessions["http-test"].spans
+        assert trace_manager.sessions["http-test"].span_count
 
     async def test_gzip_protobuf_body_is_accepted(self, trace_manager, otlp_client):
         """The stock Collector case: protobuf compressed with gzip (its default)."""
@@ -170,7 +175,7 @@ class TestContentEncoding:
             headers={"Content-Type": PROTOBUF, "Content-Encoding": "gzip"},
         )
         assert resp.status_code == 200
-        assert trace_manager.sessions["http-test"].spans
+        assert trace_manager.sessions["http-test"].span_count
 
     async def test_content_encoding_is_case_insensitive(self, otlp_client):
         payload = gzip.compress(json.dumps(trace_request("gzip-upper")).encode())
@@ -280,7 +285,7 @@ class TestContentEncoding:
     async def test_large_body_parsing_runs_off_the_event_loop(self, otlp_client, monkeypatch):
         """Decode is threaded too, not just decompression.
 
-        Parsing dominates: decode_protobuf_traces measures ~40ms per MiB (~1.2s for
+        Parsing dominates: decoding protobuf measures ~40ms per MiB (~1.2s for
         a 32 MiB export), and it used to run entirely on the loop shared with the
         dashboard API, the UI streams and the gRPC receiver.
         """
@@ -292,9 +297,9 @@ class TestContentEncoding:
         parse_threads: list[int] = []
         original = otlp_http._parse_body
 
-        def spy(raw, decode_protobuf, media_type, container_key):
+        def spy(*args):
             parse_threads.append(threading.get_ident())
-            return original(raw, decode_protobuf, media_type, container_key)
+            return original(*args)
 
         monkeypatch.setattr(otlp_http, "_parse_body", spy)
         # Force the threaded branch; the real threshold is exercised by size.
@@ -320,9 +325,9 @@ class TestContentEncoding:
         parse_threads: list[int] = []
         original = otlp_http._parse_body
 
-        def spy(raw, decode_protobuf, media_type, container_key):
+        def spy(*args):
             parse_threads.append(threading.get_ident())
-            return original(raw, decode_protobuf, media_type, container_key)
+            return original(*args)
 
         monkeypatch.setattr(otlp_http, "_parse_body", spy)
 
@@ -362,7 +367,7 @@ class TestContentEncoding:
         )
 
         assert resp.status_code == 200
-        assert trace_manager.sessions["http-test"].spans
+        assert trace_manager.sessions["http-test"].span_count
 
     async def test_trailing_nul_padding_is_tolerated(self, otlp_client):
         """The gzip FAQ permits NUL padding; gzip.GzipFile skipped it, so we must too."""
@@ -407,7 +412,7 @@ class TestContentEncoding:
             headers={"Content-Type": JSON, "Content-Encoding": "gzip"},
         )
         assert resp.status_code == 200
-        assert trace_manager.sessions["http-test"].spans
+        assert trace_manager.sessions["http-test"].span_count
 
     async def test_member_count_is_capped(self, otlp_client):
         """A body past the member cap is rejected rather than decompressed.
@@ -598,7 +603,7 @@ class TestErrorResponses:
         async def boom(*args, **kwargs):
             raise RuntimeError("kaboom")
 
-        monkeypatch.setattr(routes, "process_traces", boom)
+        monkeypatch.setattr(routes, "ingest_traces", boom)
         resp = await otlp_client.post(
             "/v1/traces", content=json.dumps(trace_request("boom")).encode(), headers={"Content-Type": JSON}
         )
@@ -672,26 +677,28 @@ class TestPartialSuccess:
             content=json.dumps(trace_request(trace_id)).encode(),
             headers={"Content-Type": JSON},
         )
-        session = trace_manager.sessions["http-test"]
-        session.spans.extend([{}] * (MAX_SPANS_PER_SESSION - 1))
+        trace_manager.store.limits = Limits(spans_per_trace=1)
 
         resp = await otlp_client.post(
-            "/v1/traces", content=json.dumps(trace_request(trace_id)).encode(), headers={"Content-Type": JSON}
+            "/v1/traces",
+            content=json.dumps(trace_request(trace_id, span_id="cc" * 8)).encode(),
+            headers={"Content-Type": JSON},
         )
         assert resp.status_code == 200
         partial = json.loads(resp.content)["partialSuccess"]
         # proto3 JSON maps int64 to a string, and rejected_spans is int64.
         assert int(partial["rejectedSpans"]) == 1
-        assert "maximum span limit" in partial["errorMessage"]
+        assert "trace span limit" in partial["errorMessage"]
 
     async def test_span_limit_reports_rejected_spans_over_protobuf(self, trace_manager, otlp_client):
         trace_id = "dd" * 16
         await otlp_client.post("/v1/traces", content=proto_trace_request(trace_id), headers={"Content-Type": PROTOBUF})
-        session = trace_manager.sessions["http-test"]
-        session.spans.extend([{}] * (MAX_SPANS_PER_SESSION - 1))
+        trace_manager.store.limits = Limits(spans_per_trace=1)
 
         resp = await otlp_client.post(
-            "/v1/traces", content=proto_trace_request(trace_id), headers={"Content-Type": PROTOBUF}
+            "/v1/traces",
+            content=proto_trace_request(trace_id, span_id_hex="cc" * 8),
+            headers={"Content-Type": PROTOBUF},
         )
         assert resp.status_code == 200
         parsed = ExportTraceServiceResponse.FromString(resp.content)
@@ -705,9 +712,7 @@ class TestPartialSuccess:
             content=json.dumps(trace_request(trace_id)).encode(),
             headers={"Content-Type": JSON},
         )
-        session = trace_manager.sessions["http-test"]
-        # The first request contributed a span, not a log, so fill logs to the cap.
-        session.logs.extend([{}] * MAX_LOGS_PER_SESSION)
+        trace_manager.store.limits = Limits(logs_per_trace=0)
 
         resp = await otlp_client.post(
             "/v1/logs", content=json.dumps(log_request(trace_id)).encode(), headers={"Content-Type": JSON}
@@ -715,7 +720,7 @@ class TestPartialSuccess:
         assert resp.status_code == 200
         partial = json.loads(resp.content)["partialSuccess"]
         assert int(partial["rejectedLogRecords"]) == 1
-        assert "maximum log limit" in partial["errorMessage"]
+        assert "trace log limit" in partial["errorMessage"]
 
     async def test_span_without_trace_id_is_reported(self, trace_manager, otlp_client):
         body = trace_request("missing-trace-id")
@@ -724,7 +729,7 @@ class TestPartialSuccess:
         assert resp.status_code == 200
         partial = json.loads(resp.content)["partialSuccess"]
         assert int(partial["rejectedSpans"]) == 1
-        assert "trace_id" in partial["errorMessage"]
+        assert "no traceId or spanId field" in partial["errorMessage"]
 
     async def test_filtered_non_genai_logs_are_not_reported_as_rejected(self, otlp_client):
         """Non-gen_ai.* records are filtered by design, not rejected: no partial success."""

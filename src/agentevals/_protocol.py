@@ -19,7 +19,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-PROTOCOL_VERSION = "1.0"
+PROTOCOL_VERSION = "1.1"
 
 
 class ToolCallData(BaseModel):
@@ -27,14 +27,17 @@ class ToolCallData(BaseModel):
 
     name: str
     args: dict[str, Any] = Field(default_factory=dict)
+    id: Optional[str] = Field(default=None, description="Tool call id, when the producer recorded one (1.1).")
 
 
 class ToolResponseData(BaseModel):
     """A single tool response received by the agent."""
 
     name: str
-    output: str = ""
+    output: str = Field(default="", description="The result as JSON text (1.1; a Python repr in 1.0).")
     status: Optional[str] = None
+    id: Optional[str] = Field(default=None, description="Id of the tool call this responds to (1.1).")
+    response: Any = Field(default=None, description="The result as a structured JSON value (1.1).")
 
 
 class IntermediateStepData(BaseModel):
@@ -52,6 +55,8 @@ class InvocationData(BaseModel):
     final_response: Optional[str] = None
     intermediate_steps: IntermediateStepData = Field(default_factory=IntermediateStepData)
     performance_metrics: Optional[dict[str, Any]] = None
+    trace_id: Optional[str] = Field(default=None, description="Trace of the turn's anchor span (1.1).")
+    span_id: Optional[str] = Field(default=None, description="Anchor span of the turn, same as invocation_id (1.1).")
 
 
 class EvalInput(BaseModel):

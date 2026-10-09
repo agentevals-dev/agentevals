@@ -2,10 +2,11 @@
 # Global
 # ==============================================================================
 
-# -- Number of replicas. The default in-memory backend has no shared state, so
-# scale beyond 1 only when storage.backend is "postgres" (durable runs/results
-# in Postgres are safe to share across replicas via SELECT FOR UPDATE SKIP
-# LOCKED claim semantics).
+# -- Number of replicas. Keep 1 when agents or a Collector send OTLP to this
+# release: live sessions are held in the memory of the pod that receives them,
+# so with more replicas one session's traces and logs end up split across pods.
+# Postgres (storage.backend "postgres") shares only runs and results between
+# replicas (SELECT FOR UPDATE SKIP LOCKED claims), not live sessions.
 replicaCount: 1
 
 # -- Global container image registry (prepended to image.repository)

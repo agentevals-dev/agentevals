@@ -1,6 +1,8 @@
 import json
 
-from agentevals.loader.base import Span, Trace
+from agentevals.genai.extract import extract_conversation
+from agentevals.loader import Trace
+from agentevals.loader.otlp import OtlpJsonLoader
 from agentevals.trace_metrics import (
     _calc_percentiles,
     _calc_summary_stats,
@@ -64,6 +66,32 @@ class TestCalcPercentiles:
         assert result["p99"] == 100.0
 
 
+def _span(span_id: str, name: str, start_us: int, duration_us: int, attrs: dict, parent: str | None = "r" * 16) -> dict:
+    out = {
+        "traceId": "a" * 32,
+        "spanId": span_id,
+        "name": name,
+        "startTimeUnixNano": str(start_us * 1000),
+        "endTimeUnixNano": str((start_us + duration_us) * 1000),
+        "attributes": [
+            {"key": k, "value": {"intValue": str(v)} if isinstance(v, int) else {"stringValue": v}}
+            for k, v in attrs.items()
+        ],
+    }
+    if parent:
+        out["parentSpanId"] = parent
+    return out
+
+
+def _trace(spans: list[dict]) -> Trace:
+    doc = {"resourceSpans": [{"resource": {}, "scopeSpans": [{"scope": {"name": "test"}, "spans": spans}]}]}
+    return OtlpJsonLoader().load_from_dict(doc)[0]
+
+
+def _metrics(trace: Trace) -> dict:
+    return extract_performance_metrics(extract_conversation([trace]), [trace])
+
+
 def _make_genai_trace(
     num_llm_calls: int = 2,
     num_tool_calls: int = 1,
@@ -74,94 +102,72 @@ def _make_genai_trace(
     cache_creation: int = 0,
     cache_read: int = 0,
 ) -> Trace:
-    """Build a GenAI semconv trace with configurable LLM and tool spans."""
+    """A GenAI semconv trace: one non GenAI root with chat and execute_tool children."""
     if tool_names is None:
         tool_names = [f"tool_{i}" for i in range(num_tool_calls)]
-
-    root = Span(
-        trace_id="t1",
-        span_id="root",
-        parent_span_id=None,
-        operation_name="agent_run",
-        start_time=0,
-        duration=5_000_000,
-        tags={},
-    )
-    spans = [root]
-
+    spans = [_span("r" * 16, "agent_run", 0, 5_000_000, {}, parent=None)]
     for i in range(num_llm_calls):
-        tags = {
+        attrs = {
+            "gen_ai.operation.name": "chat",
             "gen_ai.request.model": model,
             "gen_ai.usage.input_tokens": prompt_tokens,
             "gen_ai.usage.output_tokens": output_tokens,
         }
         if cache_creation and i == 0:
-            tags["gen_ai.usage.cache_creation.input_tokens"] = cache_creation
+            attrs["gen_ai.usage.cache_creation.input_tokens"] = cache_creation
         if cache_read and i == 0:
-            tags["gen_ai.usage.cache_read.input_tokens"] = cache_read
-        span = Span(
-            trace_id="t1",
-            span_id=f"llm_{i}",
-            parent_span_id="root",
-            operation_name="chat",
-            start_time=1_000_000 + i * 500_000,
-            duration=400_000 + i * 100_000,
-            tags=tags,
-        )
-        spans.append(span)
-
+            attrs["gen_ai.usage.cache_read.input_tokens"] = cache_read
+        spans.append(_span(f"{i + 1:016x}", "chat", 1_000_000 + i * 500_000, 400_000 + i * 100_000, attrs))
     for i, name in enumerate(tool_names):
-        span = Span(
-            trace_id="t1",
-            span_id=f"tool_{i}",
-            parent_span_id="root",
-            operation_name=f"execute_tool {name}",
-            start_time=2_000_000 + i * 100_000,
-            duration=50_000 + i * 10_000,
-            tags={"gen_ai.tool.name": name},
+        spans.append(
+            _span(
+                f"{i + 100:016x}",
+                f"execute_tool {name}",
+                2_000_000 + i * 100_000,
+                50_000 + i * 10_000,
+                {"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": name},
+            )
         )
-        spans.append(span)
-
-    return Trace(trace_id="t1", root_spans=[root], all_spans=spans)
+    return _trace(spans)
 
 
 class TestExtractPerformanceMetrics:
     def test_counts(self):
         trace = _make_genai_trace(num_llm_calls=3, num_tool_calls=2)
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         assert result["counts"]["llm_calls"] == 3
         assert result["counts"]["tool_calls"] == 2
 
     def test_models(self):
         trace = _make_genai_trace(model="gpt-4o")
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         assert result["models"] == ["gpt-4o"]
 
     def test_tool_names(self):
         trace = _make_genai_trace(tool_names=["search", "read_file"])
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         assert result["tool_names"] == ["read_file", "search"]
 
     def test_tool_names_deduped(self):
         trace = _make_genai_trace(tool_names=["search", "search", "read"])
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         assert result["tool_names"] == ["read", "search"]
 
     def test_cache_tokens(self):
         trace = _make_genai_trace(cache_creation=500, cache_read=1200)
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         assert result["tokens"]["cache_creation_tokens"] == 500
         assert result["tokens"]["cache_read_tokens"] == 1200
 
     def test_cache_tokens_zero_when_absent(self):
         trace = _make_genai_trace()
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         assert result["tokens"]["cache_creation_tokens"] == 0
         assert result["tokens"]["cache_read_tokens"] == 0
 
     def test_latency_has_summary_stats(self):
         trace = _make_genai_trace(num_llm_calls=3)
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         llm_lat = result["latency"]["llm_calls"]
         assert llm_lat["count"] == 3
         assert llm_lat["min"] > 0
@@ -169,7 +175,7 @@ class TestExtractPerformanceMetrics:
 
     def test_latency_backwards_compat(self):
         trace = _make_genai_trace()
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         for key in ("overall", "llm_calls", "tool_executions"):
             lat = result["latency"][key]
             assert "p50" in lat
@@ -178,14 +184,14 @@ class TestExtractPerformanceMetrics:
 
     def test_tokens_total(self):
         trace = _make_genai_trace(num_llm_calls=2, prompt_tokens=500, output_tokens=50)
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         assert result["tokens"]["total_prompt"] == 1000
         assert result["tokens"]["total_output"] == 100
         assert result["tokens"]["total"] == 1100
 
     def test_per_llm_call_has_summary_stats(self):
         trace = _make_genai_trace(num_llm_calls=3)
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         per_call = result["tokens"]["per_llm_call"]
         assert "min" in per_call
         assert "median" in per_call
@@ -194,34 +200,22 @@ class TestExtractPerformanceMetrics:
         assert per_call["count"] == 3
 
     def test_empty_trace(self):
-        trace = Trace(trace_id="t1", root_spans=[], all_spans=[])
-        result = extract_performance_metrics(trace)
+        result = extract_performance_metrics(extract_conversation([]), [])
         assert result["counts"]["llm_calls"] == 0
         assert result["counts"]["tool_calls"] == 0
         assert result["models"] == []
         assert result["tool_names"] == []
 
     def test_tool_name_from_operation_name_fallback(self):
-        root = Span(
-            trace_id="t1",
-            span_id="root",
-            parent_span_id=None,
-            operation_name="agent",
-            start_time=0,
-            duration=1_000_000,
-            tags={},
+        """An execute_tool span without gen_ai.tool.name falls back to the span name token."""
+        trace = _trace(
+            [
+                _span("r" * 16, "agent", 0, 1_000_000, {}, parent=None),
+                _span("1" * 16, "chat", 10_000, 50_000, {"gen_ai.operation.name": "chat", "gen_ai.request.model": "m"}),
+                _span("2" * 16, "execute_tool my_tool", 100_000, 50_000, {"gen_ai.operation.name": "execute_tool"}),
+            ]
         )
-        tool_span = Span(
-            trace_id="t1",
-            span_id="tool1",
-            parent_span_id="root",
-            operation_name="execute_tool my_tool",
-            start_time=100_000,
-            duration=50_000,
-            tags={"otel.scope.name": "gcp.vertex.agent"},
-        )
-        trace = Trace(trace_id="t1", root_spans=[root], all_spans=[root, tool_span])
-        result = extract_performance_metrics(trace)
+        result = _metrics(trace)
         assert "my_tool" in result["tool_names"]
 
 

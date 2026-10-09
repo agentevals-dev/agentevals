@@ -1,9 +1,10 @@
 """High-level SDK for streaming agent traces to the agentevals UI.
 
-Wraps OpenTelemetry, WebSocket, and processor boilerplate into a simple
-context manager or decorator API.
+Each session exports the spans and GenAI log events produced inside it to the agentevals OTLP
+receiver (``agentevals serve``, port 4318), stamped with the session name, eval set id and run
+id. The application's own OpenTelemetry exporters are unaffected.
 
-Usage (context manager — primary API):
+Usage (context manager, the primary API):
 
     from agentevals import AgentEvals
 
@@ -12,7 +13,7 @@ Usage (context manager — primary API):
     with app.session(eval_set_id="my-eval"):
         result = my_agent.invoke("Hello!")
 
-Usage (decorator — shorthand for simple agents):
+Usage (decorator, shorthand for simple agents):
 
     app = AgentEvals(eval_set_id="my-eval")
 
@@ -23,21 +24,15 @@ Usage (decorator — shorthand for simple agents):
     app.run(["Hello!", "Tell me a joke"])
 
 Disabling streaming:
-    Pass ``streaming=False`` to skip all WebSocket/OTel setup. The context
-    managers become no-ops and your agent code runs without any agentevals
-    connection. Useful for gating on an env var so the SDK stays wired up
-    in code but only streams when the dev server is running::
+    Pass ``streaming=False`` to skip all export setup. The context managers become no-ops and
+    your agent code runs without any agentevals connection::
 
         app = AgentEvals(streaming=os.getenv("AGENTEVALS_STREAM", "1") == "1")
 
-Provider lifecycle:
-    The SDK adds an ``AgentEvalsStreamingProcessor`` to the active
-    ``TracerProvider`` for the duration of a session.  After shutdown the
-    processor is inert (``on_end`` short-circuits) but remains registered
-    because OTel's ``TracerProvider`` has no ``remove_span_processor``
-    API.  This is harmless for typical dev workflows.  If you need a clean
-    provider between sessions, pass a fresh ``TracerProvider`` via the
-    ``tracer_provider`` parameter.
+Endpoint:
+    ``endpoint=`` wins, then ``AGENTEVALS_OTLP_ENDPOINT``, then ``http://localhost:4318``.
+    ``OTEL_EXPORTER_OTLP_*`` is never read, so credentials meant for another backend are never
+    sent to agentevals.
 """
 
 from __future__ import annotations
@@ -46,7 +41,6 @@ import asyncio
 import inspect
 import logging
 import os
-import threading
 import uuid
 from collections.abc import Callable
 from contextlib import asynccontextmanager, contextmanager
@@ -54,25 +48,25 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from .otel import sdk_export
+from .otel.sdk_export import LEGACY_WS_URL
+
 if TYPE_CHECKING:
     from opentelemetry.sdk._logs import LoggerProvider
     from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
-
-    from .streaming.processor import AgentEvalsLogStreamingProcessor, AgentEvalsStreamingProcessor
 
 __all__ = ["AgentEvals"]
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_WS_URL = "ws://localhost:8001/ws/traces"
+_DEFAULT_WS_URL = LEGACY_WS_URL
 
 
 @dataclass(slots=True)
 class _OtelSetup:
     tracer_provider: SdkTracerProvider
-    processor: AgentEvalsStreamingProcessor
+    export: Any
     logger_provider: LoggerProvider | None = field(default=None)
-    log_processor: AgentEvalsLogStreamingProcessor | None = field(default=None)
 
 
 class AgentEvals:
@@ -86,8 +80,10 @@ class AgentEvals:
         auto_instrument: bool = True,
         capture_message_content: bool = True,
         streaming: bool = True,
+        endpoint: str | None = None,
     ):
         self.ws_url = ws_url
+        self.endpoint = endpoint
         self.eval_set_id = eval_set_id
         self.metadata = metadata or {}
         self.auto_instrument = auto_instrument
@@ -146,66 +142,28 @@ class AgentEvals:
         metadata: dict[str, Any] | None = None,
         tracer_provider: SdkTracerProvider | None = None,
     ):
-        """Sync context manager that sets up OTel streaming.
+        """Sync context manager that exports the spans and GenAI events produced inside it.
 
         Args:
             eval_set_id: Evaluation set ID for matching against a golden session.
             session_name: Custom session name (auto-generated if omitted).
-            metadata: Custom metadata sent with the session.
+            metadata: Custom metadata shown with the session.
             tracer_provider: Explicit TracerProvider to use (e.g. from StrandsTelemetry).
                 Falls back to the global provider, then creates a new one.
         """
         eff_session_name = session_name or self._generate_session_id()
-
         if not self.streaming:
             logger.debug("Streaming disabled, running without agentevals connection")
             yield eff_session_name
             return
 
-        eff_eval_set_id = eval_set_id or self.eval_set_id
-        eff_metadata = {**self.metadata, **(metadata or {})}
-
-        setup = self._setup_otel(eff_session_name, tracer_provider)
-
-        loop = asyncio.new_event_loop()
-        thread = threading.Thread(
-            target=lambda: (asyncio.set_event_loop(loop), loop.run_forever()),
-            daemon=True,
-        )
-        thread.start()
-
-        try:
-            future = asyncio.run_coroutine_threadsafe(
-                setup.processor.connect(eval_set_id=eff_eval_set_id, metadata=eff_metadata),
-                loop,
-            )
-            future.result(timeout=10)
-        except Exception as exc:
-            loop.call_soon_threadsafe(loop.stop)
-            thread.join(timeout=5)
-            raise ConnectionError(
-                f"[agentevals] Could not connect to {self.ws_url}. Is 'agentevals serve --dev' running?\n  {exc}"
-            ) from exc
-
-        setup.tracer_provider.add_span_processor(setup.processor)
-        if setup.logger_provider and setup.log_processor:
-            setup.logger_provider.add_log_record_processor(setup.log_processor)
-
-        logger.info("Streaming to %s (session: %s)", self.ws_url, eff_session_name)
-
+        context, setup = self._open(eff_session_name, eval_set_id, metadata, tracer_provider)
+        token = sdk_export.enter(context)
         try:
             yield eff_session_name
         finally:
-            setup.tracer_provider.force_flush()
-            if setup.logger_provider:
-                setup.logger_provider.force_flush()
-            fut = asyncio.run_coroutine_threadsafe(setup.processor.shutdown_async(), loop)
-            try:
-                fut.result(timeout=10)
-            except Exception as exc:
-                logger.warning("Shutdown error: %s", exc)
-            loop.call_soon_threadsafe(loop.stop)
-            thread.join(timeout=5)
+            sdk_export.leave(context, token)
+            sdk_export.flush(setup.export)
 
     @asynccontextmanager
     async def session_async(
@@ -215,50 +173,53 @@ class AgentEvals:
         metadata: dict[str, Any] | None = None,
         tracer_provider: SdkTracerProvider | None = None,
     ):
-        """Async context manager that sets up OTel streaming.
+        """Async context manager that exports the spans and GenAI events produced inside it.
 
         Args:
             eval_set_id: Evaluation set ID for matching against a golden session.
             session_name: Custom session name (auto-generated if omitted).
-            metadata: Custom metadata sent with the session.
+            metadata: Custom metadata shown with the session.
             tracer_provider: Explicit TracerProvider to use. Falls back to the global
                 provider, then creates a new one.
         """
         eff_session_name = session_name or self._generate_session_id()
-
         if not self.streaming:
             logger.debug("Streaming disabled, running without agentevals connection")
             yield eff_session_name
             return
 
-        eff_eval_set_id = eval_set_id or self.eval_set_id
-        eff_metadata = {**self.metadata, **(metadata or {})}
-
-        setup = self._setup_otel(eff_session_name, tracer_provider)
-
-        try:
-            await setup.processor.connect(eval_set_id=eff_eval_set_id, metadata=eff_metadata)
-        except Exception as exc:
-            raise ConnectionError(
-                f"[agentevals] Could not connect to {self.ws_url}. Is 'agentevals serve --dev' running?\n  {exc}"
-            ) from exc
-
-        setup.tracer_provider.add_span_processor(setup.processor)
-        if setup.logger_provider and setup.log_processor:
-            setup.logger_provider.add_log_record_processor(setup.log_processor)
-
-        logger.info("Streaming to %s (session: %s)", self.ws_url, eff_session_name)
-
+        context, setup = await asyncio.to_thread(self._open, eff_session_name, eval_set_id, metadata, tracer_provider)
+        token = sdk_export.enter(context)
         try:
             yield eff_session_name
         finally:
-            setup.tracer_provider.force_flush()
-            if setup.logger_provider:
-                setup.logger_provider.force_flush()
-            try:
-                await setup.processor.shutdown_async()
-            except Exception as exc:
-                logger.warning("Shutdown error: %s", exc)
+            sdk_export.leave(context, token)
+            await asyncio.to_thread(sdk_export.flush, setup.export)
+
+    def _open(
+        self,
+        session_name: str,
+        eval_set_id: str | None,
+        metadata: dict[str, Any] | None,
+        tracer_provider: SdkTracerProvider | None,
+    ) -> tuple[sdk_export.SessionContext, _OtelSetup]:
+        endpoint = sdk_export.resolve_endpoint(self.endpoint, self.ws_url)
+        try:
+            sdk_export.preflight(endpoint)
+        except ConnectionError as exc:
+            raise ConnectionError(
+                f"[agentevals] Could not reach the OTLP receiver at {endpoint}. "
+                f"Is 'agentevals serve --dev' running?\n  {exc}"
+            ) from exc
+        setup = self._setup_otel(session_name, tracer_provider, endpoint=endpoint)
+        context = sdk_export.SessionContext(
+            name=session_name,
+            run_id=uuid.uuid4().hex,
+            eval_set_id=eval_set_id or self.eval_set_id,
+            metadata={**self.metadata, **(metadata or {})},
+        )
+        logger.info("Streaming to %s (session: %s)", endpoint, session_name)
+        return context, setup
 
     # --- Decorator run helpers ---
 
@@ -320,22 +281,21 @@ class AgentEvals:
         self,
         session_name: str,
         explicit_tracer_provider: SdkTracerProvider | None = None,
+        *,
+        endpoint: str | None = None,
     ) -> _OtelSetup:
-        """Configure OTel providers and create a streaming processor.
+        """Resolve the providers and register the session exporters on them (once per provider).
 
         Provider resolution order:
         1. ``explicit_tracer_provider`` if given
         2. Existing global ``TracerProvider`` (e.g. set by StrandsTelemetry)
         3. New ``TracerProvider`` created and set globally
 
-        A ``LoggerProvider`` is only created when the OpenAI OTel instrumentor
-        is installed, since it's the only pattern that emits message content
-        via OTel log records rather than span events.
+        The global SDK ``LoggerProvider`` is reused, or created and set, so GenAI events emitted
+        as log records (OpenAI v2, util-genai based instrumentations) reach agentevals too.
         """
         from opentelemetry import trace
         from opentelemetry.sdk.trace import TracerProvider
-
-        from .streaming.processor import AgentEvalsLogStreamingProcessor, AgentEvalsStreamingProcessor
 
         if self.capture_message_content:
             os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "true")
@@ -348,54 +308,30 @@ class AgentEvals:
                 tracer_provider = TracerProvider()
                 trace.set_tracer_provider(tracer_provider)
 
-        processor = AgentEvalsStreamingProcessor(
-            ws_url=self.ws_url,
-            session_id=session_name,
-            trace_id=uuid.uuid4().hex,
-        )
-
         logger_provider = None
-        log_processor = None
-        if self._should_setup_log_provider():
-            try:
-                from opentelemetry._logs import get_logger_provider, set_logger_provider
-                from opentelemetry.sdk._logs import LoggerProvider
+        try:
+            from opentelemetry._logs import get_logger_provider, set_logger_provider
+            from opentelemetry.sdk._logs import LoggerProvider
 
-                existing_lp = get_logger_provider()
-                if isinstance(existing_lp, LoggerProvider):
-                    logger_provider = existing_lp
-                else:
-                    logger_provider = LoggerProvider()
-                    set_logger_provider(logger_provider)
+            existing = get_logger_provider()
+            if isinstance(existing, LoggerProvider):
+                logger_provider = existing
+            else:
+                logger_provider = LoggerProvider()
+                set_logger_provider(logger_provider)
+        except ImportError:
+            pass
 
-                log_processor = AgentEvalsLogStreamingProcessor(processor)
-            except ImportError:
-                pass
+        export = sdk_export.install(
+            tracer_provider,
+            endpoint or sdk_export.resolve_endpoint(self.endpoint, self.ws_url),
+            logger_provider,
+        )
 
         if self.auto_instrument:
             self._auto_instrument()
 
-        return _OtelSetup(
-            tracer_provider=tracer_provider,
-            processor=processor,
-            logger_provider=logger_provider,
-            log_processor=log_processor,
-        )
-
-    def _should_setup_log_provider(self) -> bool:
-        """Check whether the OpenAI OTel instrumentor is installed.
-
-        Only the logs-based GenAI semconv pattern (used by
-        ``opentelemetry-instrumentation-openai-v2``) requires a
-        ``LoggerProvider``.  Strands and ADK emit content via span
-        events or native attributes and don't need one.
-        """
-        try:
-            import opentelemetry.instrumentation.openai_v2  # noqa: F401
-
-            return True
-        except ImportError:
-            return False
+        return _OtelSetup(tracer_provider=tracer_provider, export=export, logger_provider=logger_provider)
 
     def _auto_instrument(self) -> None:
         """Best-effort discovery and activation of OTel instrumentors.

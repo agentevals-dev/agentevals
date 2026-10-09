@@ -1,0 +1,29 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "adk_py/v2_span_only_contrib/S1",
+ "source": "adk-python 2.10 recording, mode v2_span_only_contrib, scenario S1",
+ "content_captured": true,
+ "turns": [
+  {
+   "user_text": "Hello, who are you?",
+   "final_text": "I am a helpful assistant built with ADK.",
+   "intermediate_texts": [],
+   "agents": [
+    "assistant"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 12,
+    "output": 9
+   }
+  }
+ ],
+ "tokens": {
+  "input": 12,
+  "output": 9
+ },
+ "notes": [
+  "single turn, no tools",
+  "evidence lost model call agent names in this mode; agents taken from the same scenario in v2_default"
+ ]
+}
