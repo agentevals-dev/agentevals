@@ -53,12 +53,25 @@ processors:
     check_interval: 1s
     limit_percentage: 80
     spike_limit_percentage: 20
+  filter/drop_genai_content_events:
+    error_mode: ignore
+    traces:
+      spanevent:
+        - IsMatch(spanevent.name, "^gen_ai\\.(client\\.inference\\.operation\\.details|(system|user|assistant|tool)\\.message|choice|content\\.(prompt|completion))$")
+    logs:
+      log_record:
+        - IsMatch(log.event_name, "^gen_ai\\.(client\\.inference\\.operation\\.details|(system|user|assistant|tool)\\.message|choice|content\\.(prompt|completion))$")
+        - IsMatch(log.attributes["event.name"], "^gen_ai\\.(client\\.inference\\.operation\\.details|(system|user|assistant|tool)\\.message|choice|content\\.(prompt|completion))$")
   transform/drop_genai_content:
+    error_mode: ignore
     trace_statements:
-      - delete_key(span.attributes, "gen_ai.input.messages")
-      - delete_key(span.attributes, "gen_ai.output.messages")
-      - delete_key(span.attributes, "gen_ai.system_instructions")
+      - delete_matching_keys(span.attributes, "^gen_ai\\.(input\\.messages|output\\.messages|system_instructions|tool\\.definitions|tool\\.call\\.(arguments|result)|retrieval\\.(query\\.text|documents)|memory\\.(query\\.text|records)|prompt\\.variable\\..+)$")
+      - delete_matching_keys(span.attributes, "^(gen_ai\\.(prompt|completion)(\\.[0-9]+\\..+)?|gcp\\.vertex\\.agent\\.(llm_request|llm_response|tool_call_args|tool_response|data)|traceloop\\.entity\\.(input|output))$")
+    log_statements:
+      - delete_matching_keys(log.attributes, "^gen_ai\\.(input\\.messages|output\\.messages|system_instructions|tool\\.definitions|tool\\.call\\.(arguments|result)|retrieval\\.(query\\.text|documents)|memory\\.(query\\.text|records)|prompt\\.variable\\..+)$")
+      - delete_matching_keys(log.attributes, "^(gen_ai\\.(prompt|completion)(\\.[0-9]+\\..+)?|gcp\\.vertex\\.agent\\.(llm_request|llm_response|tool_call_args|tool_response|data)|traceloop\\.entity\\.(input|output))$")
   filter/not_from_agentevals:
+    error_mode: ignore
     logs:
       log_record:
         - resource.attributes["service.name"] == "agentevals"
@@ -90,7 +103,7 @@ service:
   pipelines:
     traces/backend:
       receivers: [otlp]
-      processors: [memory_limiter, transform/drop_genai_content]
+      processors: [memory_limiter, filter/drop_genai_content_events, transform/drop_genai_content]
       exporters: [otlp/backend]
     traces/agentevals:
       receivers: [otlp]
@@ -98,7 +111,7 @@ service:
       exporters: [otlphttp/agentevals]
     logs/backend:
       receivers: [otlp]
-      processors: [memory_limiter]
+      processors: [memory_limiter, filter/drop_genai_content_events, transform/drop_genai_content]
       exporters: [otlp/backend, signaltometrics]
     logs/agentevals:
       receivers: [otlp]
@@ -111,6 +124,7 @@ service:
 
 Notes:
 
+* `filter/drop_genai_content_events` and `transform/drop_genai_content` remove content from spans, span events and logs: GenAI convention attributes and events, the older message events, and the ADK and OpenLLMetry attributes. Model, token, tool name and error data stay. Other instrumentations (for example OpenInference `input.value` and `output.value`) need their keys added.
 * `filter/not_from_agentevals` keeps agentevals' own results out of the agentevals branch. agentevals also drops them itself.
 * If you sample, sample whole traces and only on the backend branch. agentevals needs complete traces.
 * For producers that use OpenInference or OpenLLMetry attribute names, the contrib `gen_ai_normalizer` processor (alpha) can map them to GenAI conventions on the agentevals branch.

@@ -132,21 +132,24 @@ def resolve_endpoint(endpoint: str | None = None, ws_url: str | None = None) -> 
     return DEFAULT_ENDPOINT
 
 
-def _isolated(exporter: Any) -> Any:
-    """Never present the application's TLS client identity, which the exporter reads from the
-    environment when it is not passed explicitly."""
-    for attr in ("_client_key_file", "_client_certificate_file"):
-        if hasattr(exporter, attr):
-            setattr(exporter, attr, None)
-    return exporter
-
-
 def _http_session() -> Any:
     """A requests session that ignores ``.netrc`` and proxy variables, so nothing configured for
-    other hosts is applied to the agentevals endpoint."""
+    other hosts is applied to the agentevals endpoint.
+
+    It also drops the TLS options of every request. The exporters build them in ``__init__`` from
+    ``OTEL_EXPORTER_OTLP_*CERTIFICATE`` and ``*CLIENT_KEY`` when they are not passed, and an empty
+    value cannot be passed, so the application's client certificate and CA bundle would otherwise
+    be used for agentevals. Requests verify against the default trust store with no client
+    certificate."""
     import requests
 
-    session = requests.Session()
+    class _IsolatedSession(requests.Session):
+        def request(self, method: str, url: str, **kwargs: Any) -> Any:
+            kwargs["verify"] = True
+            kwargs["cert"] = None
+            return super().request(method, url, **kwargs)
+
+    session = _IsolatedSession()
     session.trust_env = False
     return session
 
@@ -155,14 +158,12 @@ def _span_exporter(endpoint: str) -> Any:
     from opentelemetry.exporter.otlp.proto.http import Compression
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-    return _isolated(
-        OTLPSpanExporter(
-            endpoint=f"{endpoint}/v1/traces",
-            headers=dict(_SDK_HEADER),
-            timeout=EXPORT_TIMEOUT_SECONDS,
-            compression=Compression.Gzip,
-            session=_http_session(),
-        )
+    return OTLPSpanExporter(
+        endpoint=f"{endpoint}/v1/traces",
+        headers=dict(_SDK_HEADER),
+        timeout=EXPORT_TIMEOUT_SECONDS,
+        compression=Compression.Gzip,
+        session=_http_session(),
     )
 
 
@@ -170,14 +171,12 @@ def _log_exporter(endpoint: str) -> Any:
     from opentelemetry.exporter.otlp.proto.http import Compression
     from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 
-    return _isolated(
-        OTLPLogExporter(
-            endpoint=f"{endpoint}/v1/logs",
-            headers=dict(_SDK_HEADER),
-            timeout=EXPORT_TIMEOUT_SECONDS,
-            compression=Compression.Gzip,
-            session=_http_session(),
-        )
+    return OTLPLogExporter(
+        endpoint=f"{endpoint}/v1/logs",
+        headers=dict(_SDK_HEADER),
+        timeout=EXPORT_TIMEOUT_SECONDS,
+        compression=Compression.Gzip,
+        session=_http_session(),
     )
 
 
