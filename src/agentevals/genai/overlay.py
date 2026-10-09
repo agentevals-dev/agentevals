@@ -342,9 +342,18 @@ def _operation(span: Span, is_adk: bool) -> str | None:
         if span.name == "invocation":
             return sc.OP_INVOKE_WORKFLOW
     raw = span.attributes
-    if raw.get(sc.REQUEST_MODEL) and (raw.get("gen_ai.system") or raw.get(sc.PROVIDER_NAME)):
+    if raw.get(sc.REQUEST_MODEL) and (raw.get("gen_ai.system") or raw.get(sc.PROVIDER_NAME)) and _records_a_call(raw):
         return sc.OP_CHAT
     return None
+
+
+_CALL_RECORD_PREFIXES = ("gen_ai.usage.", "gen_ai.prompt.", "gen_ai.completion.")
+
+
+def _records_a_call(raw: Mapping[str, Any]) -> bool:
+    """Usage or messages on the span itself. Model and provider alone are identity: some producers
+    copy their resource attributes onto every span, which would make each of them a model call."""
+    return any(k.startswith(_CALL_RECORD_PREFIXES) or k in (sc.INPUT_MESSAGES, sc.OUTPUT_MESSAGES) for k in raw)
 
 
 def overlay(span: Span, logs: Sequence[LogRecord] = ()) -> SpanView:

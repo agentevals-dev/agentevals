@@ -305,6 +305,61 @@ class TestPromotion:
         assert list(store.sessions) == ["conv-parent"]
         assert store.counters["session key conflicts"] == 1
 
+    def test_a_session_id_session_moves_to_the_conversation_learned_later(self):
+        store, _ = make_store()
+        ingest(store, request([_subprocess_span("t1", "h1", "sess-1", 2_000)]))
+        assert list(store.sessions) == ["sess-1"]
+        ingest(store, request([_agent_with_conversation("t1", "a1", "conv-1", 1_000)]))
+        assert list(store.sessions) == ["conv-1"]
+        assert ("removed", "sess-1", "conv-1") in store.events
+        assert store.sessions["conv-1"].span_count == 2
+
+    def test_the_next_turn_of_the_subprocess_joins_the_same_conversation(self):
+        store, _ = make_store()
+        for trace in ("t1", "t2"):
+            ingest(store, request([_subprocess_span(trace, f"h-{trace}", "sess-1", 2_000)]))
+            ingest(store, request([_agent_with_conversation(trace, f"a-{trace}", "conv-1", 1_000)]))
+        assert list(store.sessions) == ["conv-1"]
+        assert len(store.sessions["conv-1"].trace_ids) == 2
+
+    def test_a_weaker_key_arriving_later_is_not_a_conflict(self):
+        store, _ = make_store()
+        ingest(store, request([_agent_with_conversation("t1", "a1", "conv-1", 1_000)]))
+        ingest(store, request([_subprocess_span("t1", "h1", "sess-1", 2_000, parent="a1")]))
+        assert list(store.sessions) == ["conv-1"]
+        assert store.counters["session key conflicts"] == 0
+
+
+def _subprocess_span(
+    trace: str, span_id: str, session_id: str, start: int, parent: str | None = "elsewhere", flags: int | None = None
+) -> dict:
+    """A harness subprocess span: keyed only by ``session.id``, continuing a trace from its parent process."""
+    return span(
+        trace=trace,
+        span_id=span_id,
+        parent=parent,
+        attrs={"session.id": session_id},
+        start=start,
+        end=3_000,
+        flags=flags,
+    )
+
+
+class TestCompletionRoots:
+    def test_a_remote_parent_span_inside_a_longer_trace_does_not_complete_it(self):
+        store, clock = make_store(completion_grace_seconds=3.0, idle_timeout_seconds=30.0)
+        ingest(store, request([span(span_id="rpc", parent="root", start=1_000, end=9_000)], named("s")))
+        ingest(store, request([_subprocess_span("t1", "h1", "sess-1", 2_000, flags=0x300)], named("s")))
+        assert _complete(store, clock, 4) == []
+        assert _complete(store, clock, 27) == ["s"]
+
+    def test_a_remote_parent_span_enclosing_the_trace_completes_it_after_the_grace(self):
+        store, clock = make_store(completion_grace_seconds=3.0, idle_timeout_seconds=30.0)
+        entry = span(span_id="entry", parent="caller", start=1_000, end=9_000, flags=0x300)
+        ingest(store, request([span(span_id="work", parent="entry", start=2_000, end=3_000)], named("s")))
+        ingest(store, request([entry], named("s")))
+        assert _complete(store, clock, 4) == ["s"]
+
 
 class TestAccounting:
     def test_a_log_never_evicts_the_staged_trace_it_is_written_to(self):

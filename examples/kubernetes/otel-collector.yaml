@@ -41,7 +41,7 @@ data:
               - set(span.attributes["gen_ai.response.model"], span.attributes["model"]) where span.name == "claude_code.llm_request"
               - set(span.attributes["gen_ai.usage.input_tokens"], span.attributes["input_tokens"] + span.attributes["cache_read_tokens"] + span.attributes["cache_creation_tokens"]) where span.name == "claude_code.llm_request"
               - set(span.attributes["gen_ai.usage.cache_read.input_tokens"], span.attributes["cache_read_tokens"]) where span.name == "claude_code.llm_request"
-              - set(span.attributes["gen_ai.usage.cache_creation.input_tokens"], span.attributes["cache_creation_tokens"]) where span.name == "claude_code.llm_request"
+              - set(span.attributes["gen_ai.usage.cache_write.input_tokens"], span.attributes["cache_creation_tokens"]) where span.name == "claude_code.llm_request"
               - set(span.attributes["gen_ai.usage.output_tokens"], span.attributes["output_tokens"]) where span.name == "claude_code.llm_request"
 
       filter/not_from_agentevals:

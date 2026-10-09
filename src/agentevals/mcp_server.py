@@ -416,7 +416,8 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
 
         This is the primary tool for regression testing streamed agent sessions.
         The server automatically builds an eval set from the golden session's
-        trace, then evaluates every other completed session against it. No file
+        trace, then evaluates every completed session against it, the golden
+        session included (it should score as a match against itself). No file
         creation or pre-existing eval set is needed.
 
         Typical workflow:
