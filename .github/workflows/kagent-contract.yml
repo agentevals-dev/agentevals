@@ -1,0 +1,143 @@
+name: kagent contract
+
+# Checks every day, with Weaver, that kagent's telemetry registry still has what
+# agentevals reads from kagent spans, and keeps one labelled issue up to date
+# while it does not. It never runs on pull requests: kagent changes on its own
+# schedule. See tests/contract/kagent/.
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: kagent-contract
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  ISSUE_LABEL: kagent-contract
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Self test the contract policy
+        run: tests/contract/kagent/test.sh
+
+      # The release tag is fetched and used in one step, and check.sh validates it
+      # before use, so nothing fetched passes through GITHUB_ENV or an expression.
+      - name: Check kagent main and the newest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release="$(gh release view --repo kagent-dev/kagent --json tagName --jq .tagName)"
+          tests/contract/kagent/check.sh report.md main "$release"
+
+      - name: Summarize
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            if [ -f report.md ]; then cat report.md; fi
+            echo
+            echo "## kagent main against the committed snapshot"
+            echo
+            tests/contract/kagent/weaver.sh registry diff --v2 --diff-format markdown \
+              -r "https://github.com/kagent-dev/kagent.git@main[telemetry/registry]" \
+              --baseline-registry /contract/registries/main-2cc3ffae
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kagent-contract-report
+          path: report.md
+          if-no-files-found: ignore
+
+  # The issue body is fixed text plus the report, whose fetched content sits in a
+  # code block without backticks. It is always passed as a file, never through the shell.
+  report-failure:
+    needs: check
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          name: kagent-contract-report
+
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          {
+            echo "The daily kagent contract check failed: $RUN_URL"
+            echo
+            if [ -f report.md ]; then
+              cat report.md
+            else
+              echo "The check failed before it wrote a report (for example in the self test). See the run log."
+              echo
+              echo "<!-- kagent-contract-report: none -->"
+            fi
+          } > body.md
+          # The report appends its marker last, so the last match is the real one.
+          marker="$(grep -o 'kagent-contract-report: [0-9a-f]*' body.md | tail -n 1)"
+
+          number="$(gh issue list --label "$ISSUE_LABEL" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            gh label create "$ISSUE_LABEL" --color B60205 --force \
+              --description "The daily check of kagent's telemetry registry failed"
+            gh issue create --title "kagent telemetry contract check failed" \
+              --label "$ISSUE_LABEL" --body-file body.md
+            exit 0
+          fi
+
+          # Only comment when the report changed since the last update. Comments
+          # from people are ignored, so nobody can hide a change by quoting a marker.
+          latest="$(gh issue view "$number" --json body,comments \
+            --jq '([.comments[] | select(.author.login == "github-actions")] | last | .body) // .body')"
+          if grep -qF "$marker" <<<"$latest"; then
+            echo "Issue #$number already has this report."
+          else
+            gh issue comment "$number" --body-file body.md
+          fi
+
+  close-resolved:
+    needs: check
+    if: success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    steps:
+      - name: Close the issue once the check passes again
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          number="$(gh issue list --label "$ISSUE_LABEL" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            gh issue close "$number" --comment "The kagent contract check passes again: $RUN_URL"
+          fi

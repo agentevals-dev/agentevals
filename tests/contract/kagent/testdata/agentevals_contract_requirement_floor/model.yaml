@@ -1,0 +1,14 @@
+file_format: definition/2
+imports:
+  spans:
+    - gen_ai.client.inference
+    - gen_ai.invoke_agent.internal
+    - gen_ai.execute_tool.internal
+span_refinements:
+  - id: fixture.invoke_agent.internal
+    ref: gen_ai.invoke_agent.internal
+    brief: An invoke_agent span whose conversation id is only recommended.
+    stability: development
+    attributes:
+      - ref: gen_ai.conversation.id
+        requirement_level: recommended
