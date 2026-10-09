@@ -134,15 +134,36 @@ class TestExporterIsolation:
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", "authorization=Bearer app-token")
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_HEADERS", "x-api-key=app-key")
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://observability.example.com")
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_CLIENT_KEY", "/etc/app/client.key")
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE", "/etc/app/client.crt")
         exporter = sdk_export._span_exporter("http://localhost:4318")
         assert exporter._endpoint == "http://localhost:4318/v1/traces"
         assert exporter._headers == {"x-agentevals-sdk": "1"}
         assert "authorization" not in {k.lower() for k in exporter._session.headers}
-        assert exporter._client_key_file is None
-        assert exporter._client_certificate_file is None
         assert exporter._session.trust_env is False
+
+    @pytest.mark.parametrize("factory", ["_span_exporter", "_log_exporter"])
+    def test_exports_never_use_application_tls_settings(self, factory, monkeypatch):
+        import requests.adapters
+        from requests.models import Response
+
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_CERTIFICATE", "/etc/app/ca.pem")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_CLIENT_KEY", "/etc/app/client.key")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE", "/etc/app/client.crt")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE", "/etc/app/traces.crt")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_CLIENT_CERTIFICATE", "/etc/app/logs.crt")
+        sent = []
+
+        def send(adapter, request, **kwargs):
+            sent.append(kwargs)
+            response = Response()
+            response.status_code = 200
+            response.request = request
+            return response
+
+        monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
+        getattr(sdk_export, factory)("https://agentevals.example:4318")._export(b"payload")
+        assert len(sent) == 1
+        assert sent[0]["cert"] is None
+        assert sent[0]["verify"] is True
 
     def test_log_exporter_ignores_application_otlp_settings(self, monkeypatch):
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", "authorization=Bearer app-token")

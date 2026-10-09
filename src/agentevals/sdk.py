@@ -62,6 +62,19 @@ logger = logging.getLogger(__name__)
 _DEFAULT_WS_URL = LEGACY_WS_URL
 
 
+def _content_capture_default() -> str:
+    """The content capture value the instrumentations accept in the current semconv mode.
+
+    In ``gen_ai_latest_experimental`` mode util-genai based instrumentations only accept a mode
+    name and fall back to no content for ``true``. In the default mode openai-v2 only accepts
+    ``true``. ``SPAN_ONLY`` puts content where agentevals reads it first, without a duplicate
+    copy in log events."""
+    opt_in = os.environ.get("OTEL_SEMCONV_STABILITY_OPT_IN", "")
+    if "gen_ai_latest_experimental" in {value.strip() for value in opt_in.split(",")}:
+        return "SPAN_ONLY"
+    return "true"
+
+
 @dataclass(slots=True)
 class _OtelSetup:
     tracer_provider: SdkTracerProvider
@@ -298,7 +311,7 @@ class AgentEvals:
         from opentelemetry.sdk.trace import TracerProvider
 
         if self.capture_message_content:
-            os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "true")
+            os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", _content_capture_default())
 
         if explicit_tracer_provider is not None:
             tracer_provider = explicit_tracer_provider

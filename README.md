@@ -6,10 +6,10 @@
   </picture>
 </p>
 
-<h1 align="center">Agent evaluation, OpenTelemetry native</h1>
+<h1 align="center">OpenTelemetry-native agent evaluation</h1>
 
 <p align="center">
-Send OTLP. Score what your agent did. Get the results back as OpenTelemetry events.<br>
+Send OTLP traces. Score what your agent did. Get the results back as OpenTelemetry GenAI eval events.<br>
 No SDK, no reruns, no platform to host.
 </p>
 
