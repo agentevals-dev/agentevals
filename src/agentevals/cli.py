@@ -547,6 +547,7 @@ async def _run_servers(
     import uvicorn
 
     from .api.app import create_app
+    from .api.models import OtlpReceiverPorts
     from .api.otlp_app import create_otlp_app
     from .streaming.manager import LiveManager
 
@@ -558,7 +559,11 @@ async def _run_servers(
     from . import evaluation_events as emit
 
     mgr = LiveManager(emitter_instance_id=emit.instance_id() if emit.enabled() else None)
-    main_app = create_app(trace_manager=mgr, enable_streaming=True)
+    main_app = create_app(
+        trace_manager=mgr,
+        enable_streaming=True,
+        otlp_ports=OtlpReceiverPorts(http_port=otlp_http_port, grpc_port=otlp_grpc_port),
+    )
     otlp_app = create_otlp_app(trace_manager=mgr)
 
     main_server = uvicorn.Server(uvicorn.Config(main_app, port=port, **shared_kwargs))

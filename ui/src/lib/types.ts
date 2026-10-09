@@ -478,7 +478,7 @@ export const AVAILABLE_METRICS: MetricMetadata[] = [
 
 // Streaming / Live session types
 export interface ConversationElement {
-  type: 'user_input' | 'tool_call' | 'tool_result' | 'agent_response';
+  type: 'user_input' | 'tool_call' | 'tool_result' | 'agent_response' | 'turn_error';
   timestamp: number;
   invocationId: string;
   data: any;
@@ -502,6 +502,10 @@ export interface StreamingInvocation {
   toolCalls: Array<{ name: string; args: any; id?: string }>;
   toolResponses?: Array<{ name: string; response: any; id?: string }>;
   modelInfo?: Record<string, any>;
+  status?: 'unset' | 'ok' | 'error';
+  errorType?: string | null;
+  contentCaptured?: boolean;
+  warnings?: string[];
   /** ``gen_ai.evaluation.result`` events found in the telemetry (from other evaluators). */
   externalEvaluations?: ExternalEvaluation[];
 }

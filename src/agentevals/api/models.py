@@ -44,8 +44,14 @@ class ApiKeyStatus(CamelModel):
     openai: bool
 
 
+class OtlpReceiverPorts(CamelModel):
+    http_port: int
+    grpc_port: int
+
+
 class ConfigData(CamelModel):
     api_keys: ApiKeyStatus
+    otlp: OtlpReceiverPorts | None = None
 
 
 class MetricInfo(CamelModel):

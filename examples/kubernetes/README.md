@@ -10,6 +10,13 @@ kagent agents --> OTel Collector --> agentevals (UI on :8001)
 
 Tested with kagent `46fdd3d7` (`v1.0.0-alpha9` plus a UI only commit, `v1alpha3` agents on Substrate), Claude Code 2.1.285, Collector contrib 0.162.0, and `claude-haiku-4-5` for both agents.
 
+What you get depends on the kagent version:
+
+| kagent | Go ADK | Claude Code harness | Codex harness |
+|---|---|---|---|
+| `v1.0.0-alpha9` (tested) | Model and tool calls with arguments, results and tokens | Native Claude Code spans only. The `transform/claude_code` recipe turns them into tool names and model calls with tokens | Not tested |
+| With runtime GenAI spans ([kagent#3121](https://github.com/kagent-dev/kagent/pull/3121), not released yet) | Same | The runtime writes `chat` and `execute_tool` spans with tool names, call ids and tokens, but no tool arguments. The recipe steps aside by itself | Runtime spans, not tested yet |
+
 ## Set it up
 
 You need a cluster with kagent 1.0 already running.
@@ -60,6 +67,42 @@ Open the kagent UI at http://localhost:8080. For `adk-go-test`, and then `claude
 2. *Now use your tools to list the services in the agentevals namespace. One sentence.*
 
 Use a new chat after the agents got their new revision. Older chats stay on the old one and send nothing.
+
+### Or from the command line
+
+To repeat a run without clicking through the UI, talk to the kagent controller:
+
+```bash
+kubectl port-forward -n kagent svc/kagent-controller 8083:8083
+```
+
+With the kagent CLI, which uses `http://localhost:8083` by default:
+
+```bash
+for agent in adk-go-test claude-test; do
+  session=$(kagent agent session create --agent "$agent" -o json | jq -r .session.id)
+  kagent agent invoke --session "$session" -t "Use your tools to list the namespaces in this cluster, then tell me how many pods are running in the kagent namespace. Answer in two short sentences."
+  kagent agent invoke --session "$session" -t "Now use your tools to list the services in the agentevals namespace. One sentence."
+done
+```
+
+Without the CLI, send the same prompts over A2A. The first message starts a session; pass its `contextId` to continue it:
+
+```bash
+send() {
+  curl -sS --max-time 300 "http://localhost:8083/agents/kagent/$1" \
+    -H 'Content-Type: application/json' -H 'X-User-Id: admin@kagent.dev' \
+    -d "$(jq -n --arg t "$2" --arg c "${3:-}" --arg id "$(uuidgen)" \
+      '{jsonrpc: "2.0", id: "1", method: "SendMessage",
+        params: {message: ({messageId: $id, role: "ROLE_USER", parts: [{text: $t}]}
+                           + (if $c == "" then {} else {contextId: $c} end))}}')"
+}
+
+ctx=$(send adk-go-test "Use your tools to list the namespaces in this cluster, then tell me how many pods are running in the kagent namespace. Answer in two short sentences." | jq -r .result.task.contextId)
+send adk-go-test "Now use your tools to list the services in the agentevals namespace. One sentence." "$ctx"
+```
+
+Each session (one `contextId`) shows up in agentevals as one session.
 
 Now open agentevals at http://localhost:8001 and click **Local Development** in the sidebar. Each chat shows up as one session with two turns, and is marked complete a few seconds after the last answer. If the page stops loading after agentevals restarts, restart its port forward.
 
@@ -123,6 +166,10 @@ Span ID: 0b95fefded63d107
 The trace and span id point at the turn's `invoke_agent` span, so your backend shows the score on the exact turn it belongs to. `gen_ai.conversation.id` is the kagent chat id, which is also the session id in agentevals.
 
 Events carry no prompts or answers. Set `AGENTEVALS_EVALUATION_EVENTS_EXPLANATION=true` to add the evaluator's explanation, which can contain content. To forward events to a real backend and turn scores into a histogram metric, see [OpenTelemetry pipelines](../../docs/opentelemetry-pipeline.md). Outside Kubernetes, `agentevals run ... --emit-otel` and `agentevals serve --emit-otel` do the same.
+
+## Long turns
+
+kagent writes a TaskStore gRPC span for every streamed chunk, so a long turn can have thousands of them. agentevals keeps the first 10,000 spans of a trace, and a turn that passes that loses its `invoke_agent` span. The `filter/kagent_taskstore` processor in `otel-collector.yaml` drops those RPC spans before they reach agentevals. Turns, tool calls and tokens come out the same.
 
 ## Claude Code workaround
 

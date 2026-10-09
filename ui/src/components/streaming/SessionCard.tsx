@@ -2,27 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { LiveConversationPanel } from './LiveConversationPanel';
 import type { ConversationElement } from './LiveConversationPanel';
 import { SessionMetadata } from './SessionMetadata';
-import type { AnnotationQueue } from '../../lib/types';
-
-interface Invocation {
-  invocationId: string;
-  userText: string;
-  agentText: string;
-  toolCalls: Array<{ name: string; args: any }>;
-  modelInfo?: {
-    models?: string[];
-    inputTokens?: number;
-    outputTokens?: number;
-    provider?: string;
-    responseModels?: string[];
-    finishReasons?: string[];
-    cacheCreationTokens?: number;
-    cacheReadTokens?: number;
-    temperature?: number;
-    maxTokens?: number;
-    errorTypes?: string[];
-  };
-}
+import { isFailedTurn, lacksContent } from './turnStatus';
+import type { AnnotationQueue, StreamingInvocation } from '../../lib/types';
 
 interface SessionCardProps {
   session: {
@@ -32,7 +13,7 @@ interface SessionCardProps {
     spans: any[];
     status: 'active' | 'complete';
     metadata: Record<string, any>;
-    invocations?: Invocation[];
+    invocations?: StreamingInvocation[];
     liveElements?: ConversationElement[];
     liveStats?: {
       totalInputTokens: number;
@@ -104,6 +85,11 @@ export function SessionCard({ session, isSelected, onSelect, onRemove, evaluatio
 
   const totalCacheCreation = session.invocations?.reduce((sum, inv) => sum + (inv.modelInfo?.cacheCreationTokens || 0), 0) || 0;
   const totalCacheRead = session.invocations?.reduce((sum, inv) => sum + (inv.modelInfo?.cacheReadTokens || 0), 0) || 0;
+
+  const failedTurns = session.invocations?.filter(isFailedTurn).length ?? 0;
+  const noContent = lacksContent(session.invocations);
+  const warnings = Array.from(new Set(session.invocations?.flatMap(inv => inv.warnings ?? []) ?? []));
+  const evalSetBlocked = noContent && !isSelected;
 
   return (
     <div
@@ -188,6 +174,52 @@ export function SessionCard({ session, isSelected, onSelect, onRemove, evaluatio
                 cache {totalCacheRead > 0 ? `${totalCacheRead.toLocaleString()} read` : ''}
                 {totalCacheCreation > 0 && totalCacheRead > 0 ? ' / ' : ''}
                 {totalCacheCreation > 0 ? `${totalCacheCreation.toLocaleString()} created` : ''}
+              </span>
+            )}
+
+            {failedTurns > 0 && (
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--status-failure)',
+                background: 'rgba(239, 68, 68, 0.1)',
+                padding: '4px 10px',
+                borderRadius: '6px',
+              }}>
+                {failedTurns} failed turn{failedTurns !== 1 ? 's' : ''}
+              </span>
+            )}
+
+            {noContent && (
+              <span
+                title="No prompts or answers were captured. Turn on message content capture in your instrumentation."
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#f59e0b',
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                }}
+              >
+                content off
+              </span>
+            )}
+
+            {warnings.length > 0 && (
+              <span
+                title={warnings.join('\n')}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--text-tertiary)',
+                  background: 'var(--bg-primary)',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  cursor: 'help',
+                }}
+              >
+                {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
               </span>
             )}
 
@@ -379,6 +411,10 @@ export function SessionCard({ session, isSelected, onSelect, onRemove, evaluatio
               e.stopPropagation();
               onSelect();
             }}
+            disabled={evalSetBlocked}
+            title={evalSetBlocked
+              ? 'This session has no message content, so it cannot be a golden run. Turn on content capture and run the agent again.'
+              : undefined}
             style={{
               padding: '8px 16px',
               borderRadius: '8px',
@@ -387,7 +423,8 @@ export function SessionCard({ session, isSelected, onSelect, onRemove, evaluatio
               color: isSelected ? 'white' : 'var(--text-primary)',
               fontSize: '13px',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: evalSetBlocked ? 'not-allowed' : 'pointer',
+              opacity: evalSetBlocked ? 0.4 : 1,
               transition: 'all 0.2s',
               whiteSpace: 'nowrap',
             }}
@@ -440,6 +477,16 @@ export function SessionCard({ session, isSelected, onSelect, onRemove, evaluatio
           </button>
         </div>
       </div>
+
+      {evalSetBlocked && (
+        <p style={{
+          fontSize: '12px',
+          color: 'var(--text-secondary)',
+          margin: '-8px 0 16px 0',
+        }}>
+          This session has no message content, so it cannot be set as the EvalSet. Turn on content capture in your instrumentation and run the agent again.
+        </p>
+      )}
 
       {expanded && session.startedAt && (totalTokens > 0 || Object.keys(session.metadata).length > 0) && (
         <SessionMetadata

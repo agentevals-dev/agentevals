@@ -144,3 +144,21 @@ export function AgentMessage({ text, isStreaming }: AgentMessageProps) {
     </div>
   );
 }
+
+interface TurnErrorMessageProps {
+  errorType?: string | null;
+  timestamp: number;
+}
+
+export function TurnErrorMessage({ errorType }: TurnErrorMessageProps) {
+  return (
+    <div style={{
+      marginBottom: '16px',
+      fontSize: '12px',
+      fontWeight: 600,
+      color: 'var(--status-failure)',
+    }}>
+      Turn failed{errorType ? `: ${errorType}` : ''}
+    </div>
+  );
+}

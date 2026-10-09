@@ -425,6 +425,18 @@ class TestConfigEndpoint:
         assert keys["anthropic"] is True
         assert keys["openai"] is False
 
+    def test_config_without_receivers_reports_no_otlp_ports(self):
+        body = _assert_envelope(self.client.get("/api/config"))
+        assert body["data"]["otlp"] is None
+
+    def test_config_reports_the_receiver_ports_the_server_started(self):
+        from agentevals.api.app import create_app
+        from agentevals.api.models import OtlpReceiverPorts
+
+        app = create_app(otlp_ports=OtlpReceiverPorts(http_port=14318, grpc_port=14317))
+        body = _assert_envelope(TestClient(app).get("/api/config"))
+        assert body["data"]["otlp"] == {"httpPort": 14318, "grpcPort": 14317}
+
 
 # ---------------------------------------------------------------------------
 # GET /api/metrics

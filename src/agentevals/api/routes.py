@@ -221,14 +221,15 @@ async def health_check():
 
 
 @router.get("/config", response_model=StandardResponse[ConfigData])
-async def get_config():
+async def get_config(request: Request):
     return StandardResponse(
         data=ConfigData(
             api_keys=ApiKeyStatus(
                 google=bool(os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")),
                 anthropic=bool(os.environ.get("ANTHROPIC_API_KEY")),
                 openai=bool(os.environ.get("OPENAI_API_KEY")),
-            )
+            ),
+            otlp=getattr(request.app.state, "otlp_ports", None),
         )
     )
 

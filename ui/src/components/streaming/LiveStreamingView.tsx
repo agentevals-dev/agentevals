@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useTraceContext } from '../../context/TraceContext';
 import { SessionCard } from './SessionCard';
 import { config } from '../../config';
+import { getConfig } from '../../api/client';
+import { isFailedTurn, pairToolResponses } from './turnStatus';
 import type { ConversationElement, LiveSession, StreamingInvocation } from '../../lib/types';
 
 function invocationsToElements(invocations: StreamingInvocation[]): ConversationElement[] {
@@ -18,14 +20,16 @@ function invocationsToElements(invocations: StreamingInvocation[]): Conversation
         data: { text: inv.userText },
       });
     }
-    for (const tc of inv.toolCalls || []) {
+    const toolCalls = inv.toolCalls || [];
+    const responses = pairToolResponses(toolCalls, inv.toolResponses || []);
+    toolCalls.forEach((tc, i) => {
       elements.push({
         type: 'tool_call',
         timestamp: base + seq++,
         invocationId: inv.invocationId,
         data: { toolCall: tc },
       });
-      const tr = inv.toolResponses?.find(r => r.id === tc.id || r.name === tc.name);
+      const tr = responses[i];
       if (tr) {
         elements.push({
           type: 'tool_result',
@@ -34,13 +38,21 @@ function invocationsToElements(invocations: StreamingInvocation[]): Conversation
           data: { response: tr.response, isError: !!tr.response?.isError },
         });
       }
-    }
+    });
     if (inv.agentText) {
       elements.push({
         type: 'agent_response',
         timestamp: base + seq++,
         invocationId: inv.invocationId,
         data: { text: inv.agentText },
+      });
+    }
+    if (isFailedTurn(inv)) {
+      elements.push({
+        type: 'turn_error',
+        timestamp: base + seq++,
+        invocationId: inv.invocationId,
+        data: { errorType: inv.errorType },
       });
     }
     return elements;
@@ -54,6 +66,11 @@ export function LiveStreamingView() {
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [selectedGoldenId, setSelectedGoldenId] = useState<string | null>(null);
   const [isPreparingEvaluation, setIsPreparingEvaluation] = useState(false);
+  const [otlpPorts, setOtlpPorts] = useState<{ httpPort: number; grpcPort: number } | null>(null);
+
+  useEffect(() => {
+    getConfig().then(cfg => setOtlpPorts(cfg.otlp ?? null)).catch(() => {});
+  }, []);
 
   const totalQueuedSessions = state.annotationQueues.reduce((sum, q) => sum + q.items.length, 0);
 
@@ -502,13 +519,16 @@ export function LiveStreamingView() {
     }
   };
 
+  const startedAtMs = (s: LiveSession) => Date.parse(s.startedAt) || 0;
+  const newestFirst = (a: LiveSession, b: LiveSession) =>
+    startedAtMs(b) - startedAtMs(a) || b.sessionId.localeCompare(a.sessionId);
   const sessions = Array.from(activeSessions.values());
   const activeLiveSessions = sessions
     .filter(s => s.status === 'active')
-    .sort((a, b) => b.sessionId.localeCompare(a.sessionId));
+    .sort(newestFirst);
   const completedSessions = sessions
     .filter(s => s.status === 'complete')
-    .sort((a, b) => b.sessionId.localeCompare(a.sessionId));
+    .sort(newestFirst);
   const allSessions = [...activeLiveSessions, ...completedSessions];
 
   return (
@@ -763,12 +783,45 @@ export function LiveStreamingView() {
           <p style={{
             fontSize: '14px',
             color: 'var(--text-secondary)',
-            maxWidth: '400px',
-            margin: '0 auto',
+            maxWidth: '480px',
+            margin: '0 auto 20px',
             lineHeight: '1.6',
           }}>
-            Run your agent with streaming enabled to see traces appear here in real-time
+            Send OpenTelemetry traces and logs from your agent, or from your Collector, to agentevals.
           </p>
+          <div style={{
+            display: 'inline-grid',
+            gridTemplateColumns: 'auto auto',
+            gap: '6px 16px',
+            textAlign: 'left',
+            fontSize: '13px',
+            marginBottom: '20px',
+          }}>
+            <span style={{ color: 'var(--text-tertiary)', fontWeight: 600 }}>OTLP HTTP</span>
+            <code style={{ color: 'var(--text-primary)' }}>
+              http://{window.location.hostname}:{otlpPorts?.httpPort ?? 4318}
+            </code>
+            <span style={{ color: 'var(--text-tertiary)', fontWeight: 600 }}>OTLP gRPC</span>
+            <code style={{ color: 'var(--text-primary)' }}>
+              {window.location.hostname}:{otlpPorts?.grpcPort ?? 4317}
+            </code>
+          </div>
+          <ol style={{
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+            maxWidth: '480px',
+            margin: '0 auto',
+            paddingLeft: '20px',
+            textAlign: 'left',
+            lineHeight: '1.7',
+          }}>
+            <li>
+              Set <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> (or your Collector's exporter) to one of the endpoints above.
+            </li>
+            <li>
+              Turn on message content capture in your instrumentation. Without it, turns arrive with no text and cannot become an EvalSet.
+            </li>
+          </ol>
         </div>
       ) : (
         <div>
