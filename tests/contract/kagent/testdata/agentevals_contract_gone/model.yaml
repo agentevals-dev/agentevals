@@ -1,0 +1,11 @@
+file_format: definition/2
+# No imports block: only invoke_agent is defined, as in kagent v1.0.0-alpha9,
+# but under a newer schema, so inference and execute_tool count as gone.
+span_refinements:
+  - id: fixture.invoke_agent.internal
+    ref: gen_ai.invoke_agent.internal
+    brief: The only GenAI span this registry defines.
+    stability: development
+    attributes:
+      - ref: gen_ai.operation.name
+        requirement_level: required

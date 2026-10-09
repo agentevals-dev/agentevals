@@ -1,0 +1,26 @@
+name: kagent contract policy
+
+# Tests the kagent contract policy against its local registries and negative
+# cases when the policy or its tooling changes. It never fetches kagent itself.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tests/contract/kagent/**"
+      - ".github/workflows/kagent-contract.yml"
+      - ".github/workflows/kagent-contract-policy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Self test the contract policy
+        run: tests/contract/kagent/test.sh

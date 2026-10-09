@@ -4,8 +4,8 @@
 # are printed by the debug exporter (kubectl logs deploy/otel-collector).
 #
 # transform/claude_code is a workaround for Claude Code native telemetry, checked with
-# Claude Code 2.1.285 (kagent Claude harness). Remove it once the producer emits GenAI
-# execute_tool and chat spans itself, or both would be counted.
+# Claude Code 2.1.285 (kagent Claude harness). It skips processes whose resource has
+# kagent.genai.producer, where the runtime writes its own chat and execute_tool spans.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -31,8 +31,9 @@ data:
         error_mode: ignore
         trace_statements:
           - context: span
+            # One condition on purpose: entries of this list are ORed.
             conditions:
-              - instrumentation_scope.name == "com.anthropic.claude_code.tracing"
+              - instrumentation_scope.name == "com.anthropic.claude_code.tracing" and resource.attributes["kagent.genai.producer"] == nil
             statements:
               - set(span.attributes["gen_ai.operation.name"], "execute_tool") where span.name == "claude_code.tool"
               - set(span.attributes["gen_ai.tool.name"], span.attributes["tool_name"]) where span.name == "claude_code.tool"

@@ -8,7 +8,7 @@ kagent agents --> OTel Collector --> agentevals (UI on :8001)
                         +---- scores -----+
 ```
 
-Tested with kagent main at `46fdd3d7` (chart `v1.0.0-alpha3-82`, `v1alpha3` agents on Substrate), Claude Code 2.1.285, Collector contrib 0.162.0, and `claude-haiku-4-5` for both agents.
+Tested with kagent `46fdd3d7` (`v1.0.0-alpha9` plus a UI only commit, `v1alpha3` agents on Substrate), Claude Code 2.1.285, Collector contrib 0.162.0, and `claude-haiku-4-5` for both agents.
 
 ## Set it up
 
@@ -133,7 +133,7 @@ The `transform/claude_code` processor in `otel-collector.yaml` fills the gap for
 * `claude_code.tool` becomes `execute_tool`, with `gen_ai.tool.name` taken from `tool_name` (minus the `mcp__<server>__` prefix)
 * `claude_code.llm_request` becomes `chat`, with the model and token usage, cache reads and writes included
 
-Recheck it when you upgrade the harness, since those names can change. Drop it once the harness emits GenAI spans itself, or calls get counted twice.
+Recheck it when you upgrade the harness, since those names can change. The recipe is for kagent releases whose Claude runtime does not write its own GenAI spans, and it skips processes that do (their resource has `kagent.genai.producer`), so calls are never counted twice.
 
 Still missing with this version:
 

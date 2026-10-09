@@ -1,0 +1,25 @@
+file_format: definition/2
+attributes:
+  - key: gen_ai.operation.name
+    brief: The operation.
+    stability: development
+    type: string
+    examples: ["execute_tool"]
+  - key: gen_ai.tool.name
+    brief: The tool.
+    stability: development
+    type: string
+    examples: ["search"]
+spans:
+  - type: gen_ai.execute_tool.internal
+    requirement_level: recommended
+    kind: internal
+    name:
+      note: execute_tool {gen_ai.tool.name}
+    brief: An execute_tool span without gen_ai.tool.call.id or error.type.
+    stability: development
+    attributes:
+      - ref: gen_ai.operation.name
+        requirement_level: required
+      - ref: gen_ai.tool.name
+        requirement_level: required

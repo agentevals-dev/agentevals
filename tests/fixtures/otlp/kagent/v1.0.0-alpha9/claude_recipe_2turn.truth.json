@@ -1,0 +1,116 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "kagent/v1.0.0-alpha9/claude_recipe_2turn",
+ "source": "kagent 46fdd3d7 Claude harness, examples/kubernetes transform/claude_code applied by Collector contrib 0.162.0",
+ "session_key": {
+  "kind": "conversation",
+  "value": "01a11b1c-41b6-794e-8982-485f493e0b4e"
+ },
+ "turns": [
+  {
+   "user_text": "Use your tools to list the namespaces in this cluster, then tell me how many pods are running in the kagent namespace. Answer in two short sentences.",
+   "final_text": "The cluster has 10 namespaces: agentvals, ate-system, default, kagent, kube-node-lease, kube-public, kube-system, local-path-storage, metallb-system, and podcertificate-controller-system. There are 14 pods running in the kagent namespace, all in Running status.",
+   "intermediate_texts": [],
+   "agents": [
+    "claude-test"
+   ],
+   "tool_calls": [
+    {
+     "name": "ToolSearch",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "Bash",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "Bash",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "Bash",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "Bash",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "Bash",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "ToolSearch",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "k8s_get_resources",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "k8s_get_resources",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 173436,
+    "output": 2140
+   },
+   "llm_calls": 7
+  },
+  {
+   "user_text": "Now use your tools to list the services in the agentevals namespace. One sentence.",
+   "final_text": "The agentevals namespace has two services: agentevals (ClusterIP on ports 8001, 4318, 4317, 8080) and otel-collector (ClusterIP on ports 4317, 4318).",
+   "intermediate_texts": [],
+   "agents": [
+    "claude-test"
+   ],
+   "tool_calls": [
+    {
+     "name": "k8s_get_resources",
+     "args": null,
+     "result": null,
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 56462,
+    "output": 290
+   },
+   "llm_calls": 2
+  }
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 229898,
+  "output": 2430
+ }
+}

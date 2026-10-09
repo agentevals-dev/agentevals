@@ -1,0 +1,5 @@
+file_format: definition_manifest/2.0
+name: fixture
+description: A registry that the agentevals contract must reject.
+schema_url: https://agentevals.dev/schemas/kagent-contract-fixture/0.1.0
+stability: development
