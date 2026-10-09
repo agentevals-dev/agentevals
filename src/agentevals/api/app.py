@@ -24,6 +24,7 @@ from ..storage import StorageSettings, build_repos
 from ..storage.postgres.migrator import Migrator, discover_migrations
 from ..utils.log_buffer import log_buffer
 from .debug_routes import debug_router
+from .models import OtlpReceiverPorts
 from .routes import router
 from .runs_routes import runs_router
 
@@ -145,8 +146,10 @@ def create_app(
     trace_manager: LiveManager | None = None,
     enable_streaming: bool = False,
     static_dir: Path | None = None,
+    otlp_ports: OtlpReceiverPorts | None = None,
 ) -> FastAPI:
-    """Create the main agentevals API app."""
+    """Create the main agentevals API app. ``otlp_ports`` are the receivers started next to it,
+    reported by ``/api/config`` so the UI can say where to send telemetry."""
     from ..evaluator.resolver import require_index_membership
 
     require_index_membership()
@@ -185,6 +188,7 @@ def create_app(
 
     if trace_manager is not None:
         app.state.trace_manager = trace_manager
+    app.state.otlp_ports = otlp_ports
 
     if enable_streaming:
         if trace_manager is None:

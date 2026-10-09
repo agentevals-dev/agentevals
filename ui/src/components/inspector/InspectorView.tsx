@@ -172,33 +172,10 @@ export const InspectorView: React.FC = () => {
     ? invocations.find(inv => inv.invocationId === selectedInvocationId)
     : invocations[0];
 
-  // Match with expected invocation
-  const matchExpectedInvocation = (actual: Invocation): Invocation | null => {
-    if (expectedInvocations.length === 0) return null;
-
-    // If only one expected invocation, use it
-    if (expectedInvocations.length === 1) {
-      return expectedInvocations[0];
-    }
-
-    // Try to match by user content text
-    const actualUserText = actual.userContent.parts
-      .filter(p => p.text)
-      .map(p => p.text)
-      .join(' ')
-      .toLowerCase()
-      .trim();
-
-    return expectedInvocations.find(exp => {
-      const expUserText = exp.userContent.parts
-        .filter(p => p.text)
-        .map(p => p.text)
-        .join(' ')
-        .toLowerCase()
-        .trim();
-      return expUserText === actualUserText;
-    }) || null;
-  };
+  // Same pairing as scoring: turn N against expected turn N. Matching by user text breaks when
+  // content was not captured, since every text is then empty.
+  const matchExpectedInvocation = (actual: Invocation): Invocation | null =>
+    expectedInvocations[invocations.indexOf(actual)] ?? null;
 
   const expectedInvocation = selectedInvocation ? matchExpectedInvocation(selectedInvocation) : null;
 

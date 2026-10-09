@@ -114,6 +114,10 @@ def invocation_dict(turn: Turn, spans: dict[tuple[str, str], Span]) -> dict[str,
             {"name": t.name, "response": t.result, "id": t.call_id} for t in turn.tool_calls if t.result is not None
         ],
         "modelInfo": model_info(turn, spans),
+        "status": turn.status,
+        "errorType": turn.error_type,
+        "contentCaptured": turn.content_captured,
+        "warnings": turn.warnings,
         "externalEvaluations": [
             {
                 "name": e.name,

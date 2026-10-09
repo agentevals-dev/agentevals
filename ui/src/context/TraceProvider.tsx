@@ -333,7 +333,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
             const newItem = {
               sessionId: session.sessionId,
               traceId: session.traceId,
-              agentName: session.metadata?.agentName,
+              agentName: session.metadata?.['gen_ai.agent.name'] || session.metadata?.['service.name'],
               startTime: session.startedAt,
               model: session.liveStats?.model || session.metadata?.model,
               totalTokens: totalTokens > 0 ? totalTokens : undefined,

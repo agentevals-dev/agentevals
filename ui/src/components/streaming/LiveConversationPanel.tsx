@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
-import { UserMessage, ToolCallMessage, ToolResultMessage, AgentMessage } from './LiveMessage';
+import { UserMessage, ToolCallMessage, ToolResultMessage, AgentMessage, TurnErrorMessage } from './LiveMessage';
 import type { ConversationElement } from '../../lib/types';
 
 export type { ConversationElement };
@@ -113,6 +113,8 @@ export function LiveConversationPanel({ elements, isActive }: LiveConversationPa
                 timestamp={element.timestamp}
                 isStreaming={false}
               />;
+            case 'turn_error':
+              return <TurnErrorMessage key={idx} errorType={element.data.errorType} timestamp={element.timestamp} />;
             default:
               return null;
           }

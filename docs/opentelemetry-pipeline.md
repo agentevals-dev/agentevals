@@ -15,21 +15,38 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 exporters:
-  otlphttp/agentevals:
+  otlp_http/agentevals:
     endpoint: http://agentevals:4318
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [otlphttp/agentevals]
+      exporters: [otlp_http/agentevals]
     logs:
       receivers: [otlp]
-      exporters: [otlphttp/agentevals]
+      exporters: [otlp_http/agentevals]
 ```
 
-The `otlphttp` exporter uses gzip by default, which agentevals accepts. Send logs as well as traces: several instrumentations put message content in log events.
+The `otlp_http` exporter uses gzip by default, which agentevals accepts. Send logs as well as traces: several instrumentations put message content in log events.
+
+`otlp_http` and `otlp_grpc` are the current exporter names. The older `otlphttp` and `otlp` still work, but the Collector logs them as deprecated.
 
 Send to one agentevals instance. Live sessions are kept in the memory of the process that receives them, so behind a load balancer with several replicas a session is split between them. The Helm chart keeps `replicaCount: 1` for this reason.
+
+## Drop high volume spans that are not GenAI
+
+agentevals keeps the first 10,000 spans of a trace. A producer that writes a span for every streamed chunk or storage call can push a long turn past that, and the turn loses its agent span. Drop those spans in the Collector with a `filter` processor on the agentevals branch. For kagent, whose TaskStore gRPC calls make up most of a turn's spans:
+
+```yaml
+processors:
+  filter/kagent_taskstore:
+    error_mode: ignore
+    traces:
+      span:
+        - IsMatch(span.attributes["rpc.method"], "^kagent\\.api\\.v1alpha1\\.TaskStoreService/")
+```
+
+Add it to the `processors` of the traces pipeline that exports to agentevals. Turns, tool calls and tokens come out the same; only the RPC spans go.
 
 ## Production: backend and agentevals side by side
 
@@ -76,7 +93,7 @@ processors:
       log_record:
         - resource.attributes["service.name"] == "agentevals"
 connectors:
-  signaltometrics:
+  signal_to_metrics:
     logs:
       - name: agentevals.evaluation.score
         description: Scores from gen_ai.evaluation.result events
@@ -91,11 +108,11 @@ connectors:
           buckets: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
           value: Double(log.attributes["gen_ai.evaluation.score.value"])
 exporters:
-  otlp/backend:
+  otlp_grpc/backend:
     endpoint: ${env:BACKEND_OTLP_ENDPOINT}
     sending_queue:
       enabled: true
-  otlphttp/agentevals:
+  otlp_http/agentevals:
     endpoint: http://agentevals:4318
     sending_queue:
       enabled: true
@@ -104,22 +121,22 @@ service:
     traces/backend:
       receivers: [otlp]
       processors: [memory_limiter, filter/drop_genai_content_events, transform/drop_genai_content]
-      exporters: [otlp/backend]
+      exporters: [otlp_grpc/backend]
     traces/agentevals:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlphttp/agentevals]
+      exporters: [otlp_http/agentevals]
     logs/backend:
       receivers: [otlp]
       processors: [memory_limiter, filter/drop_genai_content_events, transform/drop_genai_content]
-      exporters: [otlp/backend, signaltometrics]
+      exporters: [otlp_grpc/backend, signal_to_metrics]
     logs/agentevals:
       receivers: [otlp]
       processors: [memory_limiter, filter/not_from_agentevals]
-      exporters: [otlphttp/agentevals]
+      exporters: [otlp_http/agentevals]
     metrics:
-      receivers: [signaltometrics]
-      exporters: [otlp/backend]
+      receivers: [signal_to_metrics]
+      exporters: [otlp_grpc/backend]
 ```
 
 Notes:

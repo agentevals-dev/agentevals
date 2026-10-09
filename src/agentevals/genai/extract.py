@@ -190,7 +190,8 @@ def analyze(trace: Trace) -> TraceAnalysis:
         if span_id in agentic_anchors:
             view = info[span_id].view
             has_messages = view.messages(sc.INPUT_MESSAGES) or view.messages(sc.OUTPUT_MESSAGES)
-            if INFERENCE in kinds or TOOL in kinds or has_messages:
+            failed = _status(view.span) == "error" or attr_str(view.attrs, sc.ERROR_TYPE) is not None
+            if INFERENCE in kinds or TOOL in kinds or has_messages or failed:
                 anchors.append(span_id)
             else:
                 warnings.append(f"agent span {span_id} has no inference, tools or messages; not a turn")
