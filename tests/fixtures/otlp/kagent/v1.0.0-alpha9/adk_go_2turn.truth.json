@@ -1,0 +1,90 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "kagent/v1.0.0-alpha9/adk_go_2turn",
+ "source": "kagent 46fdd3d7 Go ADK runtime, through the Collector",
+ "session_key": {
+  "kind": "conversation",
+  "value": "01a11b1c-41b6-794d-b0be-65a187d1fbcc"
+ },
+ "turns": [
+  {
+   "user_text": "Use your tools to list the namespaces in this cluster, then tell me how many pods are running in the kagent namespace. Answer in two short sentences.",
+   "final_text": "The cluster has 10 namespaces including default, kube-system, kagent, and others. There are 14 pods currently running in the kagent namespace.",
+   "intermediate_texts": [
+    "I'll help you list the namespaces and check the pod count in the kagent namespace."
+   ],
+   "agents": [
+    "adk_go_test"
+   ],
+   "tool_calls": [
+    {
+     "name": "k8s_get_resources",
+     "args": {
+      "namespace": "kagent",
+      "resource_type": "pod"
+     },
+     "result": {
+      "output": {
+       "output": "NAME                                              READY   STATUS    RESTARTS   AGE   IP            NODE                   NOMINATED NODE   READINESS GATES\nkagent-controller-6d8d66bbd9-t8gvh                1/1     Running   0          11m   10.244.0.40   kagent-control-plane   <none>           <none>\nkagent-default-664bcdb8d4-6rcgw                   1/1     Running   0          35m   10.244.0.27   kagent-control-plane   <none>           <none>\nkagent-default-664bcdb8d4-7x6pb                   1/1     Running   0          35m   10.244.0.33   kagent-control-plane   <none>           <none>\nkagent-default-664bcdb8d4-f9mjh                   1/1     Running   0          35m   10.244.0.29   kagent-control-plane   <none>           <none>\nkagent-default-664bcdb8d4-fh7fc                   1/1     Running   0          35m   10.244.0.31   kagent-control-plane   <none>           <none>\nkagent-default-664bcdb8d4-pkmbw                   1/1     Running   0          35m   10.244.0.28   kagent-control-plane   <none>           <none>\nkagent-default-664bcdb8d4-qlbbs                   1/1     Running   0          35m   10.244.0.34   kagent-control-plane   <none>           <none>\nkagent-default-664bcdb8d4-qwwjw                   1/1     Running   0          35m   10.244.0.32   kagent-control-plane   <none>           <none>\nkagent-default-664bcdb8d4-qzqpg                   1/1     Running   0          35m   10.244.0.30   kagent-control-plane   <none>           <none>\nkagent-grafana-mcp-568bc7c755-t7rvq               1/1     Running   0          38m   10.244.0.10   kagent-control-plane   <none>           <none>\nkagent-kmcp-controller-manager-74dbfc486d-7fw92   1/1     Running   0          38m   10.244.0.6    kagent-control-plane   <none>           <none>\nkagent-postgresql-55c5c59944-p58pf                1/1     Running   0          38m   10.244.0.12   kagent-control-plane   <none>           <none>\nkagent-tools-787df48f55-2wqp7                     1/1     Running   0          38m   10.244.0.7    kagent-control-plane   <none>           <none>\nkagent-ui-6b7bd58dc9-9cvjx                        1/1     Running   0          38m   10.244.0.8    kagent-control-plane   <none>           <none>\n"
+      }
+     },
+     "is_error": false,
+     "error_type": null
+    },
+    {
+     "name": "k8s_get_resources",
+     "args": {
+      "all_namespaces": true,
+      "resource_type": "namespace"
+     },
+     "result": {
+      "output": {
+       "output": "NAME                               STATUS   AGE\nagentevals                         Active   26m\nate-system                         Active   36m\ndefault                            Active   49m\nkagent                             Active   48m\nkube-node-lease                    Active   49m\nkube-public                        Active   49m\nkube-system                        Active   49m\nlocal-path-storage                 Active   48m\nmetallb-system                     Active   48m\npodcertificate-controller-system   Active   36m\n"
+      }
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 30833,
+    "output": 201
+   },
+   "llm_calls": 2
+  },
+  {
+   "user_text": "Now use your tools to list the services in the agentevals namespace. One sentence.",
+   "final_text": "The agentevals namespace has 2 services: \"agentevals\" (ClusterIP) and \"otel-collector\" (ClusterIP).",
+   "intermediate_texts": [],
+   "agents": [
+    "adk_go_test"
+   ],
+   "tool_calls": [
+    {
+     "name": "k8s_get_resources",
+     "args": {
+      "namespace": "agentevals",
+      "resource_type": "service"
+     },
+     "result": {
+      "output": {
+       "output": "NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                               AGE   SELECTOR\nagentevals       ClusterIP   10.96.201.104   <none>        8001/TCP,4318/TCP,4317/TCP,8080/TCP   26m   app.kubernetes.io/component=agentevals,app.kubernetes.io/instance=agentevals,app.kubernetes.io/name=agentevals\notel-collector   ClusterIP   10.96.246.74    <none>        4317/TCP,4318/TCP                     20m   app=otel-collector\n"
+      }
+     },
+     "is_error": false,
+     "error_type": null
+    }
+   ],
+   "tokens": {
+    "input": 32563,
+    "output": 118
+   },
+   "llm_calls": 2
+  }
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 63396,
+  "output": 319
+ }
+}

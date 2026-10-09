@@ -1,0 +1,30 @@
+{
+ "schema": "otel_core.truth/v1",
+ "fixture": "kagent/v1.0.0-alpha9/claude_native_1turn_subagent",
+ "source": "kagent 46fdd3d7 Claude harness, Claude Code native spans, Agent subagent",
+ "session_key": {
+  "kind": "conversation",
+  "value": "01a11b07-989c-75f1-a60f-369a2f489b92"
+ },
+ "turns": [
+  {
+   "user_text": "Use your tools to list the namespaces in this cluster, then tell me how many pods are running in the kagent namespace. Answer in two short sentences.",
+   "final_text": "I've launched an agent to query the Kubernetes cluster. It's running in the background and will report back with the namespaces and pod count shortly. count shortly.I'll help you query the Kubernetes cluster. First, let me fetch the schema for the k8s_get_resources tool.Now I'll make the two queries to get the namespaces and pod count.I got the namespaces successfully, but the pod query returned a very large result. Let me read the saved file to count the pods.Let me use bash to extract the pod count from the JSON file.Let me try a different approach using grep to count the pods.Perfect! I've successfully queried the Kubernetes cluster. Here's what I found:\n\n## Namespaces in the Cluster\n\nThe cluster has **10 namespaces**:\n\n1. **agentevals** - Active\n2. **ate-system** - Active\n3. **default** - Active\n4. **kagent** - Active (the target namespace)\n5. **kube-node-lease** - Active\n6. **kube-public** - Active\n7. **kube-system** - Active\n8. **local-path-storage** - Active\n9. **metallb-system** - Active\n10. **podcertificate-controller-system** - Active\n\n## Pods in the kagent Namespace\n\nThe **kagent namespace** is currently running **14 pods**.The cluster has 10 namespaces: agentevals, ate-system, default, kagent, kube-node-lease, kube-public, kube-system, local-path-storage, metallb-system, and podcertificate-controller-system. There are currently 14 pods running in the kagent namespace.",
+   "intermediate_texts": [],
+   "agents": [
+    "claude-test"
+   ],
+   "tool_calls": [],
+   "tokens": {
+    "input": 0,
+    "output": 0
+   },
+   "llm_calls": 0
+  }
+ ],
+ "content_captured": true,
+ "tokens": {
+  "input": 0,
+  "output": 0
+ }
+}
