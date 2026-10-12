@@ -70,7 +70,12 @@ class RoutingPolicy(Protocol):
         """A record agentevals emitted itself, refused so a pipeline loop cannot feed it back."""
         ...
 
+    def is_own_span(self, span: Span) -> bool:
+        """A span of agentevals' own server, accepted and dropped so a pipeline loop cannot store it."""
+        ...
 
+
+DROPPED_OWN_SPANS = "span emitted by agentevals"
 REASON_TRACE_SPANS = "span(s) rejected: trace span limit reached"
 REASON_SESSION_SPANS = "span(s) rejected: session span limit reached"
 REASON_SESSION_TRACES = "span(s) rejected: session trace limit reached"
@@ -566,6 +571,12 @@ class TelemetryStore:
     def ingest_spans(self, spans: Sequence[Span]) -> IngestResult:
         """Apply spans of one trace sharing one resource (one routing unit)."""
         result = IngestResult()
+        own = sum(1 for s in spans if self.policy.is_own_span(s))
+        if own:
+            result.accepted += own
+            result.dropped[DROPPED_OWN_SPANS] += own
+            self.counters[DROPPED_OWN_SPANS] += own
+            spans = [s for s in spans if not self.policy.is_own_span(s)]
         if not spans:
             return result
         now = self.clock()

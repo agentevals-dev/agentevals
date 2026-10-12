@@ -39,12 +39,16 @@ dependencies = [
     { name = "google-adk", extra = ["eval"] },
     { name = "googleapis-common-protos" },
     { name = "grpcio" },
+    { name = "grpcio-health-checking" },
+    { name = "grpcio-reflection" },
+    { name = "grpcio-status" },
     { name = "httpx" },
     { name = "idna" },
     { name = "litellm" },
     { name = "nltk" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-instrumentation-grpc" },
     { name = "opentelemetry-proto" },
     { name = "opentelemetry-sdk" },
     { name = "protobuf" },
@@ -103,6 +107,9 @@ requires-dist = [
     { name = "google-adk", extras = ["eval"], specifier = ">=2.5.0,<3" },
     { name = "googleapis-common-protos", specifier = ">=1.72.0" },
     { name = "grpcio", specifier = ">=1.78" },
+    { name = "grpcio-health-checking", specifier = ">=1.78" },
+    { name = "grpcio-reflection", specifier = ">=1.78" },
+    { name = "grpcio-status", specifier = ">=1.78" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "httpx", marker = "extra == 'live'", specifier = ">=0.27.0" },
     { name = "idna", specifier = ">=3.18" },
@@ -112,6 +119,7 @@ requires-dist = [
     { name = "nltk", specifier = ">=3.10.2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.38" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.38" },
+    { name = "opentelemetry-instrumentation-grpc", specifier = ">=0.59b0" },
     { name = "opentelemetry-proto", specifier = ">=1.36.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.38" },
     { name = "protobuf", specifier = ">=6.33.5,<7" },
@@ -1302,6 +1310,32 @@ wheels = [
 ]
 
 [[package]]
+name = "grpcio-health-checking"
+version = "1.78.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "grpcio" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8e/ac/8eb871f4e47b11abfe45497e6187a582ec680ccd7232706d228474a8c7a5/grpcio_health_checking-1.78.0.tar.gz", hash = "sha256:78526d5c60b9b99fd18954b89f86d70033c702e96ad6ccc9749baf16136979b3", size = 17008, upload-time = "2026-02-06T10:01:47.269Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8e/30/dbaf47e2210697e2923b49eb62a6a2c07d5ee55bb40cff1e6cc0c5bb22e1/grpcio_health_checking-1.78.0-py3-none-any.whl", hash = "sha256:309798c098c5de72a9bff7172d788fdf309d246d231db9955b32e7c1c773fbeb", size = 19010, upload-time = "2026-02-06T10:01:37.949Z" },
+]
+
+[[package]]
+name = "grpcio-reflection"
+version = "1.78.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "grpcio" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/31/06/337546aae558675f79cae2a8c1ce0c9b1952cbc5c28b01878f68d040f5bb/grpcio_reflection-1.78.0.tar.gz", hash = "sha256:e6e60c0b85dbcdf963b4d4d150c0f1d238ba891d805b575c52c0365d07fc0c40", size = 19098, upload-time = "2026-02-06T10:01:52.225Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/6d/4d095d27ccd049865ecdafc467754e9e47ad0f677a30dda969c3590f6582/grpcio_reflection-1.78.0-py3-none-any.whl", hash = "sha256:06fcfde9e6888cdd12e9dd1cf6dc7c440c2e9acf420f696ccbe008672ed05b60", size = 22800, upload-time = "2026-02-06T10:01:33.822Z" },
+]
+
+[[package]]
 name = "grpcio-status"
 version = "1.78.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2288,6 +2322,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/da/6d/4de72d97ff54db1ed270c7a59c9b904b917c0ac7af429c086c388b824ddb/opentelemetry_instrumentation-0.63b1.tar.gz", hash = "sha256:32368d6ae52c8de20aa790a6ad86b10a76f09956092337ae37d675773990e541", size = 41081, upload-time = "2026-05-21T16:36:14.206Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/35/a1/9314e621c143e4d82a5bf7a43c2ff7a745d31023506336857607c8c543cc/opentelemetry_instrumentation-0.63b1-py3-none-any.whl", hash = "sha256:f1986716d52cc316ea5f60189098726a9071d8ecc0eee96c9ed110be08bade9c", size = 35577, upload-time = "2026-05-21T16:34:56.818Z" },
+]
+
+[[package]]
+name = "opentelemetry-instrumentation-grpc"
+version = "0.63b1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/db/84/7c297486a6e9b99db041e5bd47f054aab29422be69659272908e292ed57a/opentelemetry_instrumentation_grpc-0.63b1.tar.gz", hash = "sha256:48d93e06872208a15ed720555ded9f366039924f41f3e16ea0da6ec937701e84", size = 31746, upload-time = "2026-05-21T16:36:33.561Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/2a/f4ad01d283550affaf3fa434671e3f6625095a4de90b9156bebaa4426aba/opentelemetry_instrumentation_grpc-0.63b1-py3-none-any.whl", hash = "sha256:40d30a2c5e97f90a28a8c4e688e368b4dcacc7654d358489cea92744311ff8d9", size = 24244, upload-time = "2026-05-21T16:35:31.098Z" },
 ]
 
 [[package]]

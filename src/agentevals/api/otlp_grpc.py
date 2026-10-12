@@ -73,6 +73,11 @@ class OtlpLogsService(logs_service_pb2_grpc.LogsServiceServicer):
         return build_logs_response(result)
 
 
+def listen_address(host: str, port: int) -> str:
+    """``host:port`` for grpcio, with an IPv6 host in brackets."""
+    return f"[{host}]:{port}" if ":" in host and not host.startswith("[") else f"{host}:{port}"
+
+
 def create_otlp_grpc_server(
     host: str,
     port: int,
@@ -98,7 +103,7 @@ def create_otlp_grpc_server(
     trace_service_pb2_grpc.add_TraceServiceServicer_to_server(OtlpTraceService(manager), server)
     logs_service_pb2_grpc.add_LogsServiceServicer_to_server(OtlpLogsService(manager), server)
 
-    listen_addr = f"{host}:{port}"
+    listen_addr = listen_address(host, port)
     bound_port = server.add_insecure_port(listen_addr)
     if bound_port == 0:
         raise RuntimeError(f"Failed to bind OTLP gRPC receiver to {listen_addr}")

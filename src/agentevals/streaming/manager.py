@@ -1,11 +1,16 @@
-"""Live session manager: ingest into the store, completion ticker, recompute and the SSE diff.
+"""Live session manager: ingest into the store, completion ticker, recompute and the watchers.
 
 The store is synchronous; this module owns the event loop side. Exports are applied one routing
 unit at a time, yielding the loop on a time budget so a large export never holds it. Conversations
-are recomputed on frozen snapshots in a worker thread, with turns memoized per trace version, and
-the result is diffed against what each session already sent. The diff only appends: every live
-element has an identity, so a span arriving late never repeats or retracts an element. After a
-session has completed once, only ``session_complete`` is sent for it.
+are recomputed on frozen snapshots in a worker thread, with turns memoized per trace version.
+
+Each recompute builds the session's view (``api.views``) in the same thread and publishes it to
+every watcher. A watcher keeps only the latest pending event per session, so it never holds more
+than the session limit and a slow reader is never dropped: it skips intermediate states.
+
+The legacy SSE diff (``live_events``) is still sent alongside: it only appends, every live element
+has an identity, so a span arriving late never repeats or retracts an element. After a session
+has completed once, only ``session_complete`` is sent for it.
 """
 
 from __future__ import annotations
@@ -22,12 +27,16 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from google.protobuf import json_format
+
 from ..api.models import (
     SessionInfo,
     WSSessionCompleteEvent,
     WSSessionRemovedEvent,
     WSSessionStartedEvent,
 )
+from ..api.v1alpha1 import sessions_pb2
+from ..api.views import SessionFacts, session_view
 from ..genai.extract import conversation_from_turns, extract_turns
 from ..genai.grouping import SESSION_NAME
 from ..genai.messages import has_text, text_of, user_turn_messages
@@ -54,6 +63,8 @@ BROADCAST_BATCH = 100
 
 
 MAX_BYTES_ENV = "AGENTEVALS_LIVE_MAX_BYTES"
+MAX_WATCHERS = 32
+_SYNCED_KEY = ""
 
 
 def _max_bytes_from_env() -> int | None:
@@ -268,6 +279,74 @@ class SseClient:
         self.dropped = False
 
 
+@dataclass(frozen=True, slots=True)
+class WatchEvent:
+    """One ``WatchSessionsResponse`` in the forms watchers send. Shared and never mutated."""
+
+    with_turns: sessions_pb2.WatchSessionsResponse
+    summary_only: sessions_pb2.WatchSessionsResponse
+    json: str
+
+    @classmethod
+    def of(cls, with_turns: sessions_pb2.WatchSessionsResponse, summary_only=None) -> WatchEvent:
+        return cls(with_turns, summary_only or with_turns, json_format.MessageToJson(with_turns, indent=None))
+
+    @classmethod
+    def upsert(cls, session) -> WatchEvent:
+        summary_only = sessions_pb2.WatchSessionsResponse()
+        summary_only.upsert.summary.CopyFrom(session.summary)
+        return cls.of(sessions_pb2.WatchSessionsResponse(upsert=session), summary_only)
+
+
+class TooManyWatchers(RuntimeError):
+    pass
+
+
+class Watcher:
+    """One subscriber: the latest pending event per session, in the order they changed."""
+
+    def __init__(self, include_turns: bool) -> None:
+        self.include_turns = include_turns
+        self._pending: OrderedDict[str, WatchEvent] = OrderedDict()
+        self._wake = asyncio.Event()
+        self.closed = False
+
+    def put(self, key: str, event: WatchEvent) -> None:
+        self._pending.pop(key, None)
+        self._pending[key] = event
+        self._wake.set()
+
+    def close(self) -> None:
+        self.closed = True
+        self._wake.set()
+
+    async def next(self) -> WatchEvent | None:
+        """The next event, or ``None`` once the watcher is closed."""
+        while not self._pending:
+            if self.closed:
+                return None
+            self._wake.clear()
+            await self._wake.wait()
+        return self._pending.popitem(last=False)[1]
+
+    def response(self, event: WatchEvent) -> sessions_pb2.WatchSessionsResponse:
+        return event.with_turns if self.include_turns else event.summary_only
+
+
+def session_facts(session: LiveSession) -> SessionFacts:
+    return SessionFacts(
+        session_id=session.session_id,
+        received_at=session.started_at,
+        is_complete=session.is_complete,
+        trace_ids=tuple(session.trace_ids),
+        span_count=session.span_count,
+        eval_set_id=session.eval_set_id,
+    )
+
+
+_SYNCED = WatchEvent.of(sessions_pb2.WatchSessionsResponse(synced=sessions_pb2.Synced()))
+
+
 @dataclass(slots=True)
 class _Pending:
     first: float
@@ -303,6 +382,8 @@ class LiveManager:
         limits = dataclasses.replace(limits or Limits(), **overrides)
         self.store = TelemetryStore(GenAIRoutingPolicy(emitter_instance_id), limits)
         self.clients: list[SseClient] = []
+        self.watchers: list[Watcher] = []
+        self._views: dict[str, WatchEvent] = {}
         self._states: dict[str, LiveState] = {}
         self._pending: dict[str, _Pending] = {}
         self._running: dict[str, asyncio.Task] = {}
@@ -327,6 +408,7 @@ class LiveManager:
     async def shutdown(self) -> None:
         for client in list(self.clients):
             self._close(client)
+        self.close_watchers()
         tasks = [t for t in (self._ticker, *self._running.values()) if t is not None]
         self._ticker = None
         for task in tasks:
@@ -366,6 +448,41 @@ class LiveManager:
                 client.dropped = True
                 logger.warning("SSE client fell behind by %d events; disconnecting it", SSE_QUEUE_SIZE)
                 self._close(client)
+
+    # ------------------------------------------------------------ watchers
+
+    def subscribe(self, *, include_turns: bool) -> Watcher:
+        """A watcher holding every current session, newest first, then ``synced``."""
+        if len(self.watchers) >= MAX_WATCHERS:
+            raise TooManyWatchers(f"at most {MAX_WATCHERS} session watchers")
+        watcher = Watcher(include_turns)
+        for session in sorted(self.store.sessions.values(), key=lambda s: s.started_at, reverse=True):
+            watcher.put(session.session_id, self.view(session))
+        watcher.put(_SYNCED_KEY, _SYNCED)
+        self.watchers.append(watcher)
+        return watcher
+
+    def close_watchers(self) -> None:
+        for watcher in list(self.watchers):
+            self.unsubscribe(watcher)
+
+    def unsubscribe(self, watcher: Watcher) -> None:
+        if watcher in self.watchers:
+            self.watchers.remove(watcher)
+        watcher.close()
+
+    def view(self, session: LiveSession) -> WatchEvent:
+        """The session's latest view; a summary from the store until its first recompute."""
+        cached = self._views.get(session.session_id)
+        return cached if cached is not None else WatchEvent.upsert(session_view(session_facts(session)))
+
+    def _publish(self, session_id: str, event: WatchEvent) -> None:
+        for watcher in self.watchers:
+            watcher.put(session_id, event)
+
+    def _publish_removed(self, session_id: str, absorbed_by: str | None) -> None:
+        removed = sessions_pb2.SessionRemoved(id=session_id, absorbed_by=absorbed_by or "")
+        self._publish(session_id, WatchEvent.of(sessions_pb2.WatchSessionsResponse(removed=removed)))
 
     # ------------------------------------------------------------ views
 
@@ -440,11 +557,13 @@ class LiveManager:
                 if session is not None:
                     self._states[session_id] = LiveState()
                     self.broadcast(WSSessionStartedEvent(session=self.session_info(session)).model_dump(by_alias=True))
+                    self._publish(session_id, self.view(session))
             elif kind == "removed":
                 self._forget(session_id)
                 self.broadcast(
                     WSSessionRemovedEvent(session_id=session_id, absorbed_by=event[2]).model_dump(by_alias=True)
                 )
+                self._publish_removed(session_id, event[2])
             elif kind == "spans":
                 stubs = [_span_stub(s) for s in event[2]]
                 self.broadcast({"type": "span_received", "sessionId": session_id, "span": stubs[0], "spans": stubs})
@@ -459,6 +578,7 @@ class LiveManager:
 
     def _forget(self, session_id: str) -> None:
         self._states.pop(session_id, None)
+        self._views.pop(session_id, None)
         self._pending.pop(session_id, None)
         self._durations.pop(session_id, None)
         task = self._running.pop(session_id, None)
@@ -523,14 +643,21 @@ class LiveManager:
 
     async def _recompute(self, session_id: str, completed_now: bool) -> None:
         try:
+            live = self.store.sessions.get(session_id)
+            if live is None:
+                return
+            facts = session_facts(live)
             snapshots = self.store.snapshot(session_id)
             started = time.monotonic()
             conversation, spans = await asyncio.to_thread(self._conversation, session_id, snapshots)
             invocations = await asyncio.to_thread(lambda: [invocation_dict(t, spans) for t in conversation.turns])
+            view = await asyncio.to_thread(lambda: WatchEvent.upsert(session_view(facts, conversation, spans)))
             self._durations[session_id] = time.monotonic() - started
             session = self.store.sessions.get(session_id)
-            if session is None:
+            if session is not live:
                 return
+            self._views[session_id] = view
+            self._publish(session_id, view)
             session.invocations = invocations
             if not session.completed_once:
                 state = self._states.setdefault(session_id, LiveState())

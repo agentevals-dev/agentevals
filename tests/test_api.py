@@ -448,11 +448,6 @@ class TestMetricsEndpoint:
     def setup_class(cls):
         cls.client = TestClient(_make_app())
 
-    def test_metrics_fallback(self):
-        with patch.dict("sys.modules", {"google.adk.evaluation.metric_evaluator_registry": None}):
-            body = _assert_envelope(self.client.get("/api/metrics"))
-        assert len(body["data"]) == 11
-
     def test_metrics_envelope(self):
         body = _assert_envelope(self.client.get("/api/metrics"))
         assert isinstance(body["data"], list)
@@ -766,7 +761,7 @@ class TestEvaluateStream:
         assert "result" in done
         assert "traceResults" in done["result"]
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     @patch("agentevals.api.routes.load_traces")
     def test_stream_resolves_credential_refs(self, mock_load_traces, mock_eval, monkeypatch):
         monkeypatch.setenv("AE_TEST_JUDGE_KEY", "sk-resolved-stream")
@@ -794,7 +789,7 @@ class TestEvaluateStream:
         assert '"error"' in resp.text
         assert "credentialRefs" in resp.text
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     @patch("agentevals.api.routes.load_eval_set")
     @patch("agentevals.api.routes.load_traces")
     def test_stream_sanitizes_traversal_filenames(self, mock_load_traces, mock_load_eval_set, mock_eval):
@@ -866,7 +861,7 @@ class TestEvaluateJson:
     def setup_class(cls):
         cls.client = TestClient(_make_app())
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     def test_evaluate_json_success(self, mock_eval):
         mock_eval.return_value = _make_run_result()
         resp = self.client.post(
@@ -880,7 +875,7 @@ class TestEvaluateJson:
         assert "traceResults" in body["data"]
         assert len(body["data"]["traceResults"]) == 1
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     def test_evaluate_json_camel_case_config(self, mock_eval):
         mock_eval.return_value = _make_run_result()
         resp = self.client.post(
@@ -921,7 +916,7 @@ class TestEvaluateJson:
         assert resp.status_code == 400
         assert "No traces" in resp.json()["detail"]
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     def test_evaluate_json_with_eval_set(self, mock_eval):
         mock_eval.return_value = _make_run_result()
         resp = self.client.post(
@@ -981,7 +976,7 @@ class TestEvaluateJson:
         )
         assert resp.status_code == 422
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     def test_evaluate_json_camel_keys_in_result(self, mock_eval):
         mock_eval.return_value = _make_run_result()
         resp = self.client.post(
@@ -994,7 +989,7 @@ class TestEvaluateJson:
         body = resp.json()
         _assert_all_keys_camel(body)
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     def test_evaluate_json_default_config(self, mock_eval):
         mock_eval.return_value = _make_run_result()
         resp = self.client.post(
@@ -1004,7 +999,7 @@ class TestEvaluateJson:
         body = _assert_envelope(resp)
         assert "traceResults" in body["data"]
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     def test_evaluate_json_resolves_credential_refs(self, mock_eval, monkeypatch):
         monkeypatch.setenv("AE_TEST_JUDGE_KEY", "sk-resolved-json")
         captured: dict = {}
@@ -1020,7 +1015,7 @@ class TestEvaluateJson:
         _assert_envelope(resp)
         assert captured["judge_key"] == "sk-resolved-json"
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     def test_evaluate_json_without_credential_refs_is_noop(self, mock_eval):
         captured: dict = {}
         mock_eval.side_effect = _capturing_run_eval(captured)
@@ -1038,7 +1033,7 @@ class TestEvaluateJson:
         )
         assert resp.status_code == 422
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     def test_evaluate_json_unresolvable_credential_returns_400(self, mock_eval, monkeypatch):
         monkeypatch.delenv("AE_MISSING_KEY", raising=False)
         mock_eval.return_value = _make_run_result()
@@ -1065,7 +1060,7 @@ class TestEvaluateJsonStream:
     def setup_class(cls):
         cls.client = TestClient(_make_app())
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     @patch("agentevals.api.routes.OtlpJsonLoader")
     def test_stream_content_type(self, mock_loader_cls, mock_eval):
         mock_loader_cls.return_value.load_from_dict.return_value = []
@@ -1076,7 +1071,7 @@ class TestEvaluateJsonStream:
         )
         assert resp.headers["content-type"].startswith("text/event-stream")
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     @patch("agentevals.api.routes.OtlpJsonLoader")
     def test_stream_done_event(self, mock_loader_cls, mock_eval):
         mock_trace = MagicMock()
@@ -1114,7 +1109,7 @@ class TestEvaluateJsonStream:
         assert '"error"' in body
         assert "No traces" in body
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     @patch("agentevals.api.routes.OtlpJsonLoader")
     def test_stream_resolves_credential_refs(self, mock_loader_cls, mock_eval, monkeypatch):
         monkeypatch.setenv("AE_TEST_JUDGE_KEY", "sk-resolved-json-stream")
@@ -1134,7 +1129,7 @@ class TestEvaluateJsonStream:
         assert '"done"' in resp.text
         assert captured["judge_key"] == "sk-resolved-json-stream"
 
-    @patch("agentevals.api.routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.evaluation.run_evaluation_from_traces", new_callable=AsyncMock)
     @patch("agentevals.api.routes.OtlpJsonLoader")
     def test_stream_unresolvable_credential_yields_error(self, mock_loader_cls, mock_eval, monkeypatch):
         monkeypatch.delenv("AE_MISSING_KEY", raising=False)

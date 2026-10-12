@@ -30,6 +30,7 @@ from .runs_routes import runs_router
 
 if TYPE_CHECKING:
     from ..streaming.manager import LiveManager
+    from .rpc.server import ApiGrpcSettings
 
 logger = logging.getLogger(__name__)
 
@@ -126,8 +127,22 @@ def _build_lifespan():
             app.state.run_worker = worker
             log_registered_sinks()
 
+        api_server = None
+        api_grpc: ApiGrpcSettings | None = getattr(app.state, "api_grpc", None)
+        if api_grpc is not None and mgr is not None:
+            from .rpc.server import start_api_server
+            from .rpc.services import ApiContext
+
+            context = ApiContext(manager=mgr, run_service=getattr(app.state, "run_service", None), ports=api_grpc.ports)
+            api_server = await start_api_server(context, api_grpc.host, api_grpc.port)
+
         yield
 
+        if api_server is not None:
+            from .rpc.server import stop_api_server
+
+            mgr.close_watchers()
+            await stop_api_server(api_server)
         if worker is not None:
             await worker.stop()
         repos = getattr(app.state, "repos", None)
@@ -147,9 +162,11 @@ def create_app(
     enable_streaming: bool = False,
     static_dir: Path | None = None,
     otlp_ports: OtlpReceiverPorts | None = None,
+    api_grpc: ApiGrpcSettings | None = None,
 ) -> FastAPI:
     """Create the main agentevals API app. ``otlp_ports`` are the receivers started next to it,
-    reported by ``/api/config`` so the UI can say where to send telemetry."""
+    reported by ``/api/config`` so the UI can say where to send telemetry. With ``api_grpc`` and a
+    trace manager, the lifespan also serves the gRPC API."""
     from ..evaluator.resolver import require_index_membership
 
     require_index_membership()
@@ -189,6 +206,7 @@ def create_app(
     if trace_manager is not None:
         app.state.trace_manager = trace_manager
     app.state.otlp_ports = otlp_ports
+    app.state.api_grpc = api_grpc
 
     if enable_streaming:
         if trace_manager is None:

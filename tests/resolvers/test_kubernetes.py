@@ -40,7 +40,7 @@ class TestResolve:
         with pytest.raises(ValueError, match="namespace, name, key"):
             await resolver.resolve({"kind": "kubernetes"})
 
-    async def test_key_not_found_lists_names_not_values(self):
+    async def test_key_not_found_names_neither_keys_nor_values(self):
         secret_value = _b64("sk-do-not-leak")
         client = _client_returning({"api-key": secret_value, "tls.crt": _b64("cert")})
         resolver = KubernetesSecretResolver(client)
@@ -49,8 +49,9 @@ class TestResolve:
             await resolver.resolve({"namespace": "ns", "name": "creds", "key": "wrong"})
 
         message = str(exc.value)
-        assert "api-key" in message and "tls.crt" in message
-        # The enumeration must never echo the base64-encoded secret values.
+        assert "'wrong' not found in Secret ns/creds" in message
+        # The error reaches API callers, so it must not reveal what else the Secret holds.
+        assert "api-key" not in message and "tls.crt" not in message
         assert secret_value not in message
 
 

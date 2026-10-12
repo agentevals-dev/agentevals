@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from google.adk.evaluation.eval_case import (
@@ -53,6 +54,62 @@ METRICS_NEEDING_GCP = {
     "multi_turn_trajectory_quality_v1",
     "multi_turn_tool_use_quality_v1",
 }
+
+
+_METRIC_CATEGORIES = {
+    "tool_trajectory_avg_score": "trajectory",
+    "response_match_score": "response",
+    "response_evaluation_score": "response",
+    "final_response_match_v2": "response",
+    "rubric_based_final_response_quality_v1": "quality",
+    "rubric_based_tool_use_quality_v1": "quality",
+    "hallucinations_v1": "safety",
+    "safety_v1": "safety",
+    "per_turn_user_simulator_quality_v1": "simulation",
+    "multi_turn_task_success_v1": "multi-turn",
+    "multi_turn_trajectory_quality_v1": "multi-turn",
+    "multi_turn_tool_use_quality_v1": "multi-turn",
+    "rubric_based_multi_turn_trajectory_quality_v1": "multi-turn",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class MetricDescription:
+    name: str
+    category: str
+    description: str
+    requires_eval_set: bool
+    requires_llm: bool
+    requires_gcp: bool
+    requires_rubrics: bool
+    working: bool
+
+
+def metric_catalog() -> list[MetricDescription]:
+    """The built-in metrics agentevals can run, from ADK's registry."""
+    from google.adk.evaluation.metric_evaluator_registry import DEFAULT_METRIC_EVALUATOR_REGISTRY
+
+    from .config import UNSUPPORTED_BUILTIN_METRICS
+
+    out = []
+    for metric in DEFAULT_METRIC_EVALUATOR_REGISTRY.get_registered_metrics():
+        name = metric.metric_name
+        if name in UNSUPPORTED_BUILTIN_METRICS:
+            continue
+        rubrics = name.startswith("rubric_based_")
+        out.append(
+            MetricDescription(
+                name=name,
+                category=_METRIC_CATEGORIES.get(name, "other"),
+                description=metric.description or "No description available",
+                requires_eval_set=name in METRICS_NEEDING_EXPECTED,
+                requires_llm=name in METRICS_NEEDING_LLM,
+                requires_gcp=name in METRICS_NEEDING_GCP,
+                requires_rubrics=rubrics,
+                working=not rubrics,
+            )
+        )
+    return out
 
 
 def _to_invocation_events(inv: Invocation) -> Invocation:

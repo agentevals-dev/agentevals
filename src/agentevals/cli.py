@@ -540,15 +540,18 @@ async def _run_servers(
     otlp_http_port: int,
     otlp_grpc_port: int,
     *,
+    api_grpc_port: int = 0,
     mcp_port: int | None = None,
     log_level: str = "warning",
 ) -> None:
-    """Start API, OTLP HTTP+gRPC receivers, and optional MCP (Streamable HTTP)."""
+    """Start the REST API and UI, the gRPC API, the OTLP HTTP and gRPC receivers, and optional MCP."""
     import uvicorn
 
     from .api.app import create_app
     from .api.models import OtlpReceiverPorts
     from .api.otlp_app import create_otlp_app
+    from .api.rpc.server import ApiGrpcSettings
+    from .api.rpc.services import Ports
     from .streaming.manager import LiveManager
 
     shared_kwargs: dict = {
@@ -563,6 +566,13 @@ async def _run_servers(
         trace_manager=mgr,
         enable_streaming=True,
         otlp_ports=OtlpReceiverPorts(http_port=otlp_http_port, grpc_port=otlp_grpc_port),
+        api_grpc=ApiGrpcSettings(
+            host=host,
+            port=api_grpc_port,
+            ports=Ports(http=port, otlp_http=otlp_http_port, otlp_grpc=otlp_grpc_port, api_grpc=api_grpc_port),
+        )
+        if api_grpc_port
+        else None,
     )
     otlp_app = create_otlp_app(trace_manager=mgr)
 
@@ -630,6 +640,12 @@ async def _run_servers(
     help="Port for OTLP gRPC receiver (default: 4317, standard OTLP gRPC port).",
 )
 @click.option(
+    "--api-grpc-port",
+    type=click.IntRange(min=0),
+    default=8002,
+    help="Port for the gRPC API (default: 8002; 0 turns it off). Expose it only to trusted callers.",
+)
+@click.option(
     "--mcp-port",
     default=None,
     type=int,
@@ -667,6 +683,7 @@ def serve(
     port: int,
     otlp_http_port: int,
     otlp_grpc_port: int,
+    api_grpc_port: int,
     mcp_port: int | None,
     eval_sets: str | None,
     headless: bool,
@@ -717,46 +734,38 @@ def serve(
         click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}  (OTEL_EXPORTER_OTLP_ENDPOINT default)")
         click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}  (OTEL_EXPORTER_OTLP_PROTOCOL=grpc)")
         click.echo(f"  API:       http://{host}:{port}/api")
-        if mcp_port is not None:
-            click.echo(f"  MCP:       http://{host}:{mcp_port}/mcp")
-        click.echo("  Web UI:    http://localhost:5173")
-        click.echo()
-
-        if eval_sets:
-            click.echo(f"  Eval sets: {eval_sets}")
-            click.echo()
-
-        click.echo("Waiting for agent connections...")
-        click.echo()
-
-        asyncio.run(
-            _run_servers(
-                host,
-                port,
-                otlp_http_port,
-                otlp_grpc_port,
-                mcp_port=mcp_port,
-                log_level="info",
-            )
-        )
     elif has_ui and not headless:
         click.echo(f"agentevals: http://{host}:{port}")
         click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}")
         click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}")
-        if mcp_port is not None:
-            click.echo(f"  MCP (Streamable HTTP): http://{host}:{mcp_port}/mcp")
-        click.echo()
-
-        asyncio.run(_run_servers(host, port, otlp_http_port, otlp_grpc_port, mcp_port=mcp_port))
     else:
         click.echo(f"agentevals API:  http://{host}:{port}/api")
         click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}")
         click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}")
-        if mcp_port is not None:
-            click.echo(f"  MCP (Streamable HTTP): http://{host}:{mcp_port}/mcp")
+    if api_grpc_port:
+        click.echo(f"  gRPC API:  {host}:{api_grpc_port}")
+    if mcp_port is not None:
+        click.echo(f"  MCP:       http://{host}:{mcp_port}/mcp")
+    if dev:
+        click.echo("  Web UI:    http://localhost:5173")
+        if eval_sets:
+            click.echo()
+            click.echo(f"  Eval sets: {eval_sets}")
         click.echo()
+        click.echo("Waiting for agent connections...")
+    click.echo()
 
-        asyncio.run(_run_servers(host, port, otlp_http_port, otlp_grpc_port, mcp_port=mcp_port))
+    asyncio.run(
+        _run_servers(
+            host,
+            port,
+            otlp_http_port,
+            otlp_grpc_port,
+            api_grpc_port=api_grpc_port,
+            mcp_port=mcp_port,
+            log_level="info" if dev else "warning",
+        )
+    )
 
 
 # ---------------------------------------------------------------------------

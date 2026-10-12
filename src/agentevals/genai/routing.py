@@ -11,8 +11,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import Any
 
-from ..otel.identity import EMITTER_SCOPE
-from ..otel.model import LogRecord, Span
+from ..otel.identity import API_SPAN_PREFIX, EMITTER_SCOPE, GRPC_INSTRUMENTATION_SCOPE
+from ..otel.model import SPAN_KIND_SERVER, LogRecord, Span
 from .extract import IGNORED, NON_GENAI, classify
 from .grouping import KeyKind, identity_key
 from .overlay import overlay
@@ -60,3 +60,12 @@ class GenAIRoutingPolicy:
             return True
         instance = log.resource.attributes.get(SERVICE_INSTANCE_ID)
         return self.emitter_instance_id is not None and instance == self.emitter_instance_id
+
+    def is_own_span(self, span: Span) -> bool:
+        """A server span of agentevals' API (``agentevals.telemetry``). Matched on the instrumentation
+        scope and the method, not on ``service.instance.id``, which a producer may share."""
+        return (
+            span.kind == SPAN_KIND_SERVER
+            and span.scope.name == GRPC_INSTRUMENTATION_SCOPE
+            and span.name.startswith(API_SPAN_PREFIX)
+        )

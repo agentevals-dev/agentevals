@@ -296,6 +296,11 @@ def _value(obj: Any, what: str, gaps: list[Gap]) -> struct_pb2.Value:
     return value
 
 
+def json_safe(obj: Any) -> Any:
+    """``obj`` with JSON values only, as a ``google.protobuf.Struct`` or ``Value`` holds them."""
+    return _json_safe(obj, 0, [])
+
+
 def _json_safe(obj: Any, depth: int, changed: list[str]) -> Any:
     if obj is None or isinstance(obj, (bool, str)):
         return obj
