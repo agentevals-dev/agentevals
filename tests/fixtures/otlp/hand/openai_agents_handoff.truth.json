@@ -1,7 +1,7 @@
 {
  "schema": "otel_core.truth/v1",
  "fixture": "hand/openai_agents_handoff",
- "source": "hand authored from reports/E_landscape.md (genai-openai-agents 1.2b0 handoff = invoke_workflow > 2x invoke_agent)",
+ "source": "hand authored (genai-openai-agents 1.2b0 handoff = invoke_workflow > 2x invoke_agent)",
  "turns": [
   {
    "user_text": "I need a refund for order 42.",

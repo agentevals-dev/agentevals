@@ -1,7 +1,7 @@
 {
  "schema": "otel_core.truth/v1",
  "fixture": "hand/adk_go_main",
- "source": "hand authored from reports/C_adk_kagent_telemetry.md section 2.1 (adk-go main 967bfab, SPAN_ONLY)",
+ "source": "hand authored (adk-go main 967bfab, SPAN_ONLY)",
  "turns": [
   {
    "user_text": "What is the weather in Paris?",

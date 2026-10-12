@@ -1,7 +1,7 @@
 {
  "schema": "otel_core.truth/v1",
  "fixture": "hand/adk_cycle_poisons_batch",
- "source": "hand authored from verify_20261006/s4.py case 'adk 2-cycle' (RecursionError at 94785bb)",
+ "source": "hand authored; an ADK 2-cycle crash shape (RecursionError at 94785bb)",
  "extra_turns_allowed": true,
  "turns": [
   {
@@ -20,7 +20,7 @@
  ],
  "notes": [
   "the healthy trace must survive; turns of the broken trace carry no content and are not compared",
-  "spec gap D-03: inference under a non agentic root in a trace that also has agentic anchors"
+  "spec gap: inference under a non agentic root in a trace that also has agentic anchors"
  ],
  "content_captured": true,
  "tokens": {

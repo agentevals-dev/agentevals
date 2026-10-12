@@ -16,8 +16,8 @@ if False:  # for type checking only — avoids circular import at runtime
 class SessionRepository(Protocol):
     """Tracks streaming TraceSession metadata.
 
-    Spans and logs themselves stay in-process on the StreamingTraceManager in
-    this OSS slice; only the session lifecycle row is persisted.
+    Spans and logs themselves stay in process in the live manager; only the
+    session lifecycle row is persisted.
     """
 
     async def get(self, session_id: str) -> "TraceSession | None": ...

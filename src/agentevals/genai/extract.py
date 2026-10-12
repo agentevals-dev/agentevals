@@ -1,6 +1,6 @@
 """Turn extraction from GenAI telemetry.
 
-Rules, in brief (``otel_native_core_202610.md`` sections 4.5 and 16):
+Rules, in brief:
 
 * Spans are classified from the overlay's operation name, never from span names.
 * A turn is anchored on a workflow or agent span with no workflow, agent or tool ancestor. An

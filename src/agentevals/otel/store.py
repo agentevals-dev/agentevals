@@ -6,8 +6,8 @@ check. The caller (``streaming.manager``) owns the event loop, timers and recomp
 only records what happened in :attr:`TelemetryStore.events`.
 
 What the telemetry means is the :class:`RoutingPolicy`'s business (``genai.routing`` for GenAI);
-this module holds only the mechanics. Routing (``otel_native_core_202610.md`` 16.2), for spans of
-trace T with session key K from the policy:
+this module holds only the mechanics. Routing, for spans of trace T with session key K from the
+policy:
 
 * R1, membership first: a trace already in a session stays there, with two exceptions. A session
   that learns a stronger key from its own trace (any key, for a provisional session) is promoted

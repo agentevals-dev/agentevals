@@ -39,6 +39,6 @@
   "output": 129
  },
  "notes": [
-  "Tempo batches export; three nested inference levels (call_llm > generate_content > openai.chat) with equal usage; the controller side client invoke_agent (helm-agent) is under a different root (the export lacks the linking spans) and has nothing inside it, so it yields no turn (D-17)"
+  "Tempo batches export; three nested inference levels (call_llm > generate_content > openai.chat) with equal usage; the controller side client invoke_agent (helm-agent) is under a different root (the export lacks the linking spans) and has nothing inside it, so it yields no turn"
  ]
 }

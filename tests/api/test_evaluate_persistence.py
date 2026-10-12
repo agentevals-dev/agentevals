@@ -1,4 +1,4 @@
-"""Option A: /api/evaluate variants persist when run_service is configured.
+"""/api/evaluate variants persist when run_service is configured.
 
 These tests stub a memory-backed RunService onto app.state so we can drive
 the persistence path without standing up a real Postgres. The lifespan
@@ -98,7 +98,7 @@ class TestEvaluateMultipartSync:
 
     def test_each_call_creates_distinct_run(self, app_with_runs):
         """Multiple UI uploads accumulate in run history; each gets its own
-        Run row. This is the core OSS user value of Option A."""
+        Run row."""
         app, repos = app_with_runs
         with TestClient(app) as client:
             for _ in range(3):
