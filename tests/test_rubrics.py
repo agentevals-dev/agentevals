@@ -29,6 +29,7 @@ from agentevals.custom_evaluators import evaluate_custom_evaluator
 from agentevals.eval_config_loader import load_eval_config
 from agentevals.genai.extract import extract_conversation
 from agentevals.runner import EvalRunConfig, run_evaluation
+from otel.builders import request, span
 from test_runner import _make_eval_set_json, _make_tool_trace
 
 METRIC = "rubric_based_final_response_quality_v1"
@@ -221,6 +222,109 @@ class TestCaseRubrics:
 
 
 class TestPublicPath:
+    @pytest.mark.parametrize("ends_at_clarification", [False, True])
+    def test_clarification_and_completion_properties_keep_their_authored_turn(
+        self, tmp_path, monkeypatch, ends_at_clarification
+    ):
+        turns = [
+            ("Draft a booking.", "Which destination?", "asks-destination"),
+            ("Paris.", "What date?", "asks-date"),
+            ("Friday; actually Lyon.", "Draft booking for Lyon on Friday.", "uses-latest-destination"),
+        ]
+        if ends_at_clarification:
+            turns = turns[:1]
+        spans = [
+            span(
+                span_id=f"{index + 1:016x}",
+                start=(index + 1) * 1000,
+                end=(index + 1) * 1000 + 100,
+                attrs={
+                    "gen_ai.operation.name": "invoke_agent",
+                    "gen_ai.agent.name": "booking-assistant",
+                    "gen_ai.conversation.id": "booking-conversation",
+                    "gen_ai.input.messages": json.dumps(
+                        [{"role": "user", "parts": [{"type": "text", "content": question}]}]
+                    ),
+                    "gen_ai.output.messages": json.dumps(
+                        [{"role": "assistant", "parts": [{"type": "text", "content": answer}]}]
+                    ),
+                },
+            )
+            for index, (question, answer, _) in enumerate(turns)
+        ]
+        trace_path = tmp_path / "trace.json"
+        trace_path.write_text(json.dumps(request(spans)))
+        golden = {
+            "eval_set_id": "booking",
+            "eval_cases": [
+                {
+                    "eval_id": "booking-case",
+                    "rubrics": [
+                        _rubric(
+                            "every-turn",
+                            "Keeps a clear distinction between a question and a completed draft.",
+                            "FINAL_RESPONSE_QUALITY",
+                        ).model_dump()
+                    ],
+                    "conversation": [
+                        {
+                            "invocation_id": f"expected-{index}",
+                            "user_content": {"role": "user", "parts": [{"text": question}]},
+                            "final_response": {"role": "model", "parts": [{"text": answer}]},
+                            "rubrics": [_rubric(key, answer, "FINAL_RESPONSE_QUALITY").model_dump()],
+                        }
+                        for index, (question, answer, key) in enumerate(turns)
+                    ],
+                }
+            ],
+        }
+        golden_path = tmp_path / "golden.json"
+        golden_path.write_text(json.dumps(golden))
+
+        class Evaluator:
+            async def evaluate_invocations(self, actual_invocations, expected_invocations):
+                assert len(actual_invocations) == len(turns)
+                results = []
+                for index, (actual, expected) in enumerate(zip(actual_invocations, expected_invocations, strict=True)):
+                    key = turns[index][2]
+                    assert [r.rubric_id for r in actual.rubrics] == ["every-turn", key]
+                    assert expected.final_response.parts[0].text == turns[index][1]
+                    results.append(
+                        PerInvocationResult(
+                            actual_invocation=actual,
+                            score=1.0,
+                            eval_status=EvalStatus.PASSED,
+                            rubric_scores=[
+                                RubricScore(rubric_id=property_id, score=1.0, rationale="Synthetic observed property.")
+                                for property_id in ("every-turn", key)
+                            ],
+                        )
+                    )
+                return EvaluationResult(
+                    overall_score=1.0, overall_eval_status=EvalStatus.PASSED, per_invocation_results=results
+                )
+
+        monkeypatch.setattr(builtin_metrics, "get_evaluator", lambda metric: Evaluator())
+        result = asyncio.run(
+            run_evaluation(
+                EvalRunConfig(
+                    trace_files=[str(trace_path)],
+                    eval_set_file=str(golden_path),
+                    group_by="conversation",
+                    evaluators=[BuiltinMetricDef(name=METRIC)],
+                )
+            )
+        )
+        payload = json.loads(result.model_dump_json(by_alias=True))
+        (trace,) = payload["traceResults"]
+        assert trace["numInvocations"] == len(turns)
+        assert trace["evalCaseId"] == "booking-case"
+        details = trace["metricResults"][0]["details"]["per_invocation"]
+        assert [item["invocation_id"] for item in details] == [ref["spanId"] for ref in trace["turnRefs"]]
+        assert [[prop["rubric_id"] for prop in item["rubric_scores"]] for item in details] == [
+            ["every-turn", key] for _, _, key in turns
+        ]
+
     @pytest.mark.parametrize(
         ("metric_name", "rubric_type"),
         [(METRIC, "FINAL_RESPONSE_QUALITY"), ("rubric_based_tool_use_quality_v1", "TOOL_USE_QUALITY")],

@@ -184,13 +184,44 @@ The `rubric_based_*` metrics grade each invocation on its own, with that invocat
 
 ```json
 {
-  "eval_id": "resume-correction",
+  "eval_id": "booking-clarification-and-completion",
   "rubrics": [
-    {"rubric_id": "corrected_value_wins", "type": "FINAL_RESPONSE_QUALITY", "rubric_content": {"text_property": "The response uses the operator's latest correction."}}
+    {
+      "rubric_id": "clear-outcome",
+      "type": "FINAL_RESPONSE_QUALITY",
+      "rubric_content": {"text_property": "Clearly distinguishes a clarification question from a completed draft."}
+    }
   ],
-  "conversation": [ ... ]
+  "conversation": [
+    {
+      "invocation_id": "clarification",
+      "user_content": {"role": "user", "parts": [{"text": "Draft a booking for Paris."}]},
+      "final_response": {"role": "model", "parts": [{"text": "What date should the booking use?"}]},
+      "rubrics": [
+        {
+          "rubric_id": "asks-date",
+          "type": "FINAL_RESPONSE_QUALITY",
+          "rubric_content": {"text_property": "Asks for the missing date without claiming a completed booking."}
+        }
+      ]
+    },
+    {
+      "invocation_id": "completion",
+      "user_content": {"role": "user", "parts": [{"text": "Friday; actually use Lyon."}]},
+      "final_response": {"role": "model", "parts": [{"text": "Draft booking for Lyon on Friday."}]},
+      "rubrics": [
+        {
+          "rubric_id": "uses-latest-destination",
+          "type": "FINAL_RESPONSE_QUALITY",
+          "rubric_content": {"text_property": "Uses Lyon and Friday in the completed draft."}
+        }
+      ]
+    }
+  ]
 }
 ```
+
+Here `clear-outcome` applies to both invocations, `asks-date` only to the clarification, and `uses-latest-destination` only to the completed draft. A case intended to stop at clarification can contain just the first invocation and its properties; it does not need to require a completed answer. This uses the existing invocation rubric field without adding a new scope option or changing ADK semantics.
 
 ### Content
 
