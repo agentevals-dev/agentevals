@@ -174,3 +174,10 @@ proto-check: proto-lint proto-generate
 		git status --short -- $(PROTO_GENERATED_PATHS); \
 		exit 1; \
 	fi
+	@# git status skips ignored files, so a .gitignore rule could keep a generated file out of the repo unnoticed.
+	@ignored="$$(git ls-files --others --ignored --exclude-standard -- $(PROTO_GENERATED_PATHS) | grep -v /__pycache__/)"; \
+	if test -n "$$ignored"; then \
+		echo "Generated protobuf files are ignored by a .gitignore rule:"; \
+		echo "$$ignored"; \
+		exit 1; \
+	fi
