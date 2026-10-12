@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -192,3 +192,78 @@ class TestCancelRun:
         with TestClient(app) as client:
             r = client.get(f"/api/runs/{uuid4()}/results")
         assert r.status_code == 404
+
+
+MARK = "qxmark"
+
+
+def _secret_payload(**spec):
+    return {
+        "spec": {
+            "approach": "trace_replay",
+            "target": {
+                "kind": "http",
+                "baseUrl": f"https://reader:{MARK}@traces.example.com/api?key={MARK}",
+                "traceId": "1dbd779ff94bf24c7b84678a5dc0346c",
+            },
+            "context": {"headers": {"Authorization": f"Bearer {MARK}"}},
+            "sinks": [
+                {
+                    "kind": "http_webhook",
+                    "url": f"https://hooks.example.com/services/{MARK}",
+                    "headers": {"X-Api-Key": MARK, "X-Signature": {"from_env": "HOOK_SIGNATURE"}},
+                }
+            ],
+            **spec,
+        }
+    }
+
+
+class TestSecretsStayOutOfResponses:
+    def test_every_read_is_redacted(self, stubbed_app):
+        app, repos = stubbed_app
+        with TestClient(app) as client:
+            submitted = client.post("/api/runs", json=_secret_payload())
+            run_id = submitted.json()["data"]["runId"]
+            responses = [
+                submitted,
+                client.get(f"/api/runs/{run_id}"),
+                client.get("/api/runs"),
+                client.post(f"/api/runs/{run_id}/cancel"),
+            ]
+        for response in responses:
+            assert response.status_code in (200, 202)
+            assert MARK not in response.text
+        spec = responses[1].json()["data"]["spec"]
+        assert spec["target"]["baseUrl"] == "https://traces.example.com/api"
+        assert spec["context"]["headers"]["Authorization"] == "REDACTED"
+        assert spec["sinks"][0]["url"] == "https://hooks.example.com/REDACTED"
+        assert spec["sinks"][0]["headers"]["X-Signature"] == {"from_env": "HOOK_SIGNATURE"}
+
+    async def test_the_stored_run_keeps_the_real_values(self, stubbed_app):
+        app, repos = stubbed_app
+        with TestClient(app) as client:
+            run_id = client.post("/api/runs", json=_secret_payload()).json()["data"]["runId"]
+        stored = await repos.runs.get(UUID(run_id))
+        assert stored.spec.context["headers"]["Authorization"] == f"Bearer {MARK}"
+        assert stored.spec.sinks[0]["url"] == f"https://hooks.example.com/services/{MARK}"
+
+    def test_conflict_body_is_redacted(self, stubbed_app):
+        app, _ = stubbed_app
+        run_id = "44444444-4444-4444-4444-444444444444"
+        with TestClient(app) as client:
+            client.post("/api/runs", json={**_secret_payload(), "runId": run_id})
+            r = client.post("/api/runs", json={**_secret_payload(eval_set={"eval_set_id": "x"}), "runId": run_id})
+        assert r.status_code == 409
+        assert MARK not in r.text
+        assert r.json()["detail"]["persisted"]["runId"] == run_id
+
+    @pytest.mark.parametrize("trace_id", ["../../admin", "1dbd779ff94bf24c/x", "1dbd779ff94bf24"])
+    def test_http_target_needs_a_hex_trace_id(self, stubbed_app, trace_id):
+        app, _ = stubbed_app
+        payload = _secret_payload()
+        payload["spec"]["target"]["traceId"] = trace_id
+        with TestClient(app) as client:
+            r = client.post("/api/runs", json=payload)
+        assert r.status_code == 422
+        assert "trace_id" in r.json()["detail"]

@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from agentevals.run.fetcher import HttpTraceFetcher, InlineTraceFetcher, resolve_fetcher
+from agentevals.run.fetcher import HttpTraceFetcher, InlineTraceFetcher, resolve_fetcher, validate_trace_id
 from agentevals.storage.models import TraceTarget
 
 
@@ -77,3 +77,38 @@ class TestHttpTraceFetcher:
         fetcher = HttpTraceFetcher()
         with pytest.raises(ValueError, match="base_url"):
             await fetcher.fetch(TraceTarget(kind="http"), context={})
+
+
+class TestValidateTraceId:
+    @pytest.mark.parametrize("trace_id", ["1dbd779ff94bf24c", "1dbd779ff94bf24c7b84678a5dc0346c", "1DBD779FF94BF24C"])
+    def test_accepts_8_and_16_byte_hex_ids(self, trace_id):
+        assert validate_trace_id(trace_id) == trace_id
+
+    @pytest.mark.parametrize(
+        "trace_id",
+        [
+            "",
+            "1dbd779ff94bf24",
+            "1dbd779ff94bf24c7",
+            "1dbd779ff94bf24c7b84678a5dc0346c0",
+            "../../admin/export",
+            "1dbd779ff94bf24c/../x",
+            "1dbd779ff94bf24c%2F",
+            "1dbd779ff94bf24c\n",
+            "1dbd779ff94bf24g",
+        ],
+    )
+    def test_rejects_anything_else(self, trace_id):
+        with pytest.raises(ValueError, match="trace_id"):
+            validate_trace_id(trace_id)
+
+    async def test_fetcher_refuses_before_any_request(self, monkeypatch):
+        import agentevals.run.fetcher as fetcher_module
+
+        def no_client(*args, **kwargs):
+            raise AssertionError("no request may be made")
+
+        monkeypatch.setattr(fetcher_module.httpx, "AsyncClient", no_client)
+        target = TraceTarget(kind="http", base_url="https://traces.example.com/api", trace_id="../admin")
+        with pytest.raises(ValueError, match="trace_id"):
+            await HttpTraceFetcher().fetch(target, context={})
