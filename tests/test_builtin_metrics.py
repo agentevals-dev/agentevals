@@ -287,7 +287,14 @@ async def test_every_prebuilt_metric_receives_invocation_events(monkeypatch, met
     actual = _invocation([("a", "1")], [("a", "1", "A")])
     expected = _invocation([("a", "1")], [])
 
-    result = await evaluate_builtin_metric(metric_name, [actual], [expected], None, 0.5)
+    result = await evaluate_builtin_metric(
+        metric_name,
+        [actual],
+        [expected],
+        None,
+        0.5,
+        rubrics=["Uses captured evidence."] if metric_name in builtin_metrics.METRICS_NEEDING_RUBRICS else None,
+    )
 
     assert result.error is None
     for inv in [*recorder.actual, *recorder.expected]:

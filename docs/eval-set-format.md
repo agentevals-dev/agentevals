@@ -178,15 +178,15 @@ An eval case can have multiple invocations to represent a conversation. Each inv
 
 ### Rubrics
 
-`rubrics` on an eval case apply to every invocation of that case; `rubrics` on an invocation apply to that invocation alone. Each rubric is an ADK `Rubric`: `rubric_id`, `rubric_content.text_property`, and an optional `type`. When a `rubric_based_*` metric runs, the runner adds the matched case's rubrics and each invocation's rubrics to the rubrics the metric's config declares, the way ADK's own eval service does, and a rubric without a `type` is given the metric's (`FINAL_RESPONSE_QUALITY` or `TOOL_USE_QUALITY`), since ADK applies invocation-level rubrics by type. Rubric ids must be distinct across the metric, the case and the invocation; a clash is reported as an error. With no rubric from any of the three, the metric reports an error.
+`rubrics` on an eval case apply to every invocation of that case; `rubrics` on an invocation apply to that invocation alone. Each rubric is an ADK `Rubric`: `rubric_id`, `rubric_content.text_property`, and `type`. Response-quality rubrics use `FINAL_RESPONSE_QUALITY`; tool-use rubrics use `TOOL_USE_QUALITY`. As in ADK, each metric ignores properties of another type. Untyped case/invocation properties are ignored with their ids and locations listed in `details.warnings`. The runner preserves authored types. Config-level `{id, text}` rubrics are not filtered by type. Effective rubric ids must be distinct across the metric, case and invocation. A clash or an invocation with no applicable rubrics reports an error before any judge call.
 
-The `rubric_based_*` metrics grade each invocation on its own, with that invocation's prompt, steps and final response, so a case-level rubric is judged once per turn. In a multi-turn case a rubric that describes the end state ("produces the completed draft") is therefore judged against the intermediate turns as well, where it fails, and lowers the case's mean. Write such a rubric on the final invocation instead, and keep case-level rubrics for properties every turn must have.
+The `rubric_based_*` metrics grade each invocation on its own, with that invocation's prompt, steps and final response, so a case-level rubric is judged once per turn. In a multi-turn case a rubric that describes the end state ("produces the completed draft") is therefore judged against the intermediate turns as well, where it fails, and lowers the case's mean. Write such a rubric on the final invocation instead, and keep config/case-level rubrics for properties every turn must have. Every evaluated turn still needs an applicable property. A terminal response may be a clarification request when that is the expected outcome of the case. Earlier conversational context and a dedicated final-turn expectations format are separate from this per-invocation behavior.
 
 ```json
 {
   "eval_id": "resume-correction",
   "rubrics": [
-    {"rubric_id": "corrected_value_wins", "rubric_content": {"text_property": "The response uses the operator's latest correction."}}
+    {"rubric_id": "corrected_value_wins", "type": "FINAL_RESPONSE_QUALITY", "rubric_content": {"text_property": "The response uses the operator's latest correction."}}
   ],
   "conversation": [ ... ]
 }

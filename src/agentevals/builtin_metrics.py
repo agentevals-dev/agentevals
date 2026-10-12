@@ -193,8 +193,7 @@ def rubric_strings_to_objects(rubric_texts: list[str]) -> list[Rubric]:
 def to_rubric_objects(rubrics: list[str | Rubric] | None) -> list[Rubric]:
     """Plain strings become positional rubrics; ADK ``Rubric`` objects pass through."""
     return [
-        Rubric(rubric_id=f"rubric_{index}", rubric_content=RubricContent(text_property=r))
-        if isinstance(r, str) else r
+        Rubric(rubric_id=f"rubric_{index}", rubric_content=RubricContent(text_property=r)) if isinstance(r, str) else r
         for index, r in enumerate(rubrics or [])
     ]
 
@@ -224,9 +223,11 @@ def attach_case_rubrics(
         combined = [r for _, rubrics in sources for r in rubrics]
         for source, rubrics in sources:
             for rubric in rubrics:
-                if rubric.type != metric_type:
-                    warning = (f"{source} rubric '{rubric.rubric_id}' ignored: type {rubric.type!r}; "
-                               f"metric requires {metric_type!r}")
+                if rubric.type is None:
+                    warning = (
+                        f"{source} rubric '{rubric.rubric_id}' ignored: type {rubric.type!r}; "
+                        f"metric requires {metric_type!r}"
+                    )
                     if warning not in warnings:
                         warnings.append(warning)
         effective = [*(criterion_rubrics or []), *(r for r in combined if r.type == metric_type)]
@@ -492,7 +493,8 @@ async def evaluate_builtin_metric(
         except ValueError as exc:
             return MetricResult(metric_name=metric_name, error=str(exc), error_type="ValueError")
         missing = [
-            index for index, inv in enumerate(actual_invocations)
+            index
+            for index, inv in enumerate(actual_invocations)
             if not rubric_objects and not any(r.type == _METRIC_RUBRIC_TYPES[metric_name] for r in inv.rubrics or [])
         ]
         if missing or not actual_invocations:

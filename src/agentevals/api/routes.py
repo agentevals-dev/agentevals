@@ -353,7 +353,7 @@ async def list_metrics():
                 requires_llm=True,
                 requires_gcp=False,
                 requires_rubrics=True,
-                working=False,
+                working=True,
                 description="Rubric-based quality assessment of responses (requires rubrics config)",
             ),
             MetricInfo(
@@ -363,7 +363,7 @@ async def list_metrics():
                 requires_llm=True,
                 requires_gcp=False,
                 requires_rubrics=True,
-                working=False,
+                working=True,
                 description="Rubric-based assessment of tool usage quality (requires rubrics config)",
             ),
             MetricInfo(

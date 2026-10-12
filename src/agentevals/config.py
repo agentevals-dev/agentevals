@@ -82,8 +82,10 @@ class BuiltinMetricDef(BaseModel):
             return None
         if not isinstance(value, list):
             raise ValueError("'rubrics' must be a list of strings or {id, text} mappings")
-        return [{"id": f"rubric_{index}", "text": entry} if isinstance(entry, str) else entry
-                for index, entry in enumerate(value)]
+        return [
+            {"id": f"rubric_{index}", "text": entry} if isinstance(entry, str) else entry
+            for index, entry in enumerate(value)
+        ]
 
     @field_validator("rubrics")
     @classmethod
