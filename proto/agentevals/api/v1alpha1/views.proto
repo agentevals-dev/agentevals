@@ -1,0 +1,212 @@
+syntax = "proto3";
+
+package agentevals.api.v1alpha1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "opentelemetry/proto/resource/v1/resource.proto";
+import "opentelemetry/proto/trace/v1/trace.proto";
+
+option go_package = "github.com/agentevals-dev/agentevals/gen/go/agentevals/api/v1alpha1;apiv1alpha1";
+
+// Views are built by the server from GenAI telemetry, so every client renders the same
+// conversation without deriving it. Field comments name the semantic convention attribute a
+// field comes from; GenAI attributes are at development stability.
+//
+// Ids are lowercase hex: 32 characters for trace ids, 16 for span ids. Texts and tool
+// arguments or results longer than 64 KiB are cut, with a "truncated" gap.
+
+// Token counts. Unset means not recorded; 0 means zero.
+message Usage {
+  // gen_ai.usage.input_tokens, which includes cached input tokens.
+  optional int64 input_tokens = 1;
+  // gen_ai.usage.output_tokens.
+  optional int64 output_tokens = 2;
+  // gen_ai.usage.cache_read.input_tokens.
+  optional int64 cache_read_input_tokens = 3;
+  // gen_ai.usage.cache_write.input_tokens.
+  optional int64 cache_write_input_tokens = 4;
+  // gen_ai.usage.reasoning.output_tokens.
+  optional int64 reasoning_output_tokens = 5;
+}
+
+// Why something is missing or approximate. Codes are stable; reasons are for people and never
+// carry message content or attribute values.
+message Gap {
+  string code = 1;
+  string reason = 2;
+}
+
+// An evaluation result with the fields of the gen_ai.evaluation.result event.
+message EvaluationResult {
+  // gen_ai.evaluation.name.
+  string name = 1;
+  // gen_ai.evaluation.score.value.
+  optional double score_value = 2;
+  // gen_ai.evaluation.score.label.
+  optional string score_label = 3;
+  // gen_ai.evaluation.explanation.
+  optional string explanation = 4;
+  // error.type, when the evaluation itself failed.
+  optional string error_type = 5;
+  // The judged span.
+  string trace_id = 6;
+  string span_id = 7;
+  // gen_ai.response.id of the judged response.
+  string response_id = 8;
+  // service.name of the producer, for results found in telemetry.
+  string source_service = 9;
+}
+
+message ToolCallView {
+  // The outermost span of the call. Empty when the call is only known from message parts.
+  string span_id = 1;
+  // gen_ai.tool.name.
+  string name = 2;
+  // gen_ai.tool.call.id.
+  optional string call_id = 3;
+  // gen_ai.tool.call.arguments, parsed. Unset when not recorded.
+  google.protobuf.Value arguments = 4;
+  // gen_ai.tool.call.result, parsed, paired with the call by call id and then by order. Unset
+  // when not recorded.
+  google.protobuf.Value result = 5;
+  bool is_error = 6;
+  // error.type.
+  string error_type = 7;
+  google.protobuf.Timestamp started_at = 8;
+  google.protobuf.Duration duration = 9;
+}
+
+// One logical model call: a leaf inference span with its single leaf wrappers.
+message ModelCallView {
+  string span_id = 1;
+  // gen_ai.operation.name.
+  string operation = 2;
+  // gen_ai.provider.name.
+  string provider = 3;
+  // gen_ai.request.model.
+  string request_model = 4;
+  // gen_ai.response.model.
+  string response_model = 5;
+  // gen_ai.response.id.
+  string response_id = 6;
+  Usage usage = 7;
+  // gen_ai.response.finish_reasons.
+  repeated string finish_reasons = 8;
+  // The span status.
+  opentelemetry.proto.trace.v1.Status.StatusCode status = 9;
+  // error.type.
+  string error_type = 10;
+  google.protobuf.Timestamp started_at = 11;
+  google.protobuf.Duration duration = 12;
+  // gen_ai.agent.name of the agent that made the call.
+  string agent_name = 13;
+}
+
+message TurnView {
+  // Position in the session or conversation, from 0.
+  int32 index = 1;
+  // The turn's anchor: an agent or workflow span, or the trace root.
+  string trace_id = 2;
+  string span_id = 3;
+  // The anchor's span status.
+  opentelemetry.proto.trace.v1.Status.StatusCode status = 4;
+  // error.type.
+  string error_type = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Duration duration = 7;
+  // gen_ai.agent.name of the anchor.
+  string agent_name = 8;
+  // The user message that started the turn (gen_ai.input.messages). Unset when not recorded.
+  optional string user_text = 9;
+  // The final answer (gen_ai.output.messages). Unset when not recorded.
+  optional string answer_text = 10;
+  // Whether message content was recorded for this turn.
+  bool content_captured = 11;
+  repeated ToolCallView tool_calls = 12;
+  repeated ModelCallView model_calls = 13;
+  // Sum over model_calls.
+  Usage usage = 14;
+  // gen_ai.evaluation.result events other producers attached to this turn's spans.
+  repeated EvaluationResult external_evaluations = 15;
+  repeated Gap gaps = 16;
+}
+
+enum SessionState {
+  SESSION_STATE_UNSPECIFIED = 0;
+  // Spans may still arrive.
+  SESSION_STATE_LIVE = 1;
+  // The completion grace or the idle timeout has passed. New spans reopen the session.
+  SESSION_STATE_COMPLETE = 2;
+}
+
+enum ContentCapture {
+  // No turns yet.
+  CONTENT_CAPTURE_UNSPECIFIED = 0;
+  CONTENT_CAPTURE_ON = 1;
+  CONTENT_CAPTURE_OFF = 2;
+  // Some turns have content, others do not.
+  CONTENT_CAPTURE_PARTIAL = 3;
+}
+
+message SessionTotals {
+  int32 turns = 1;
+  // Turns whose status is ERROR.
+  int32 failed_turns = 2;
+  int32 model_calls = 3;
+  int32 tool_calls = 4;
+  // Sum over all model calls.
+  Usage usage = 5;
+  // Model calls that recorded token usage, for "measured in N of M".
+  int32 model_calls_with_usage = 6;
+  // Tool calls that recorded arguments.
+  int32 tool_calls_with_arguments = 7;
+}
+
+message SessionSummary {
+  string id = 1;
+  // The last 6 characters of id. Session ids are often time ordered, so their first
+  // characters collide.
+  string short_id = 2;
+  // gen_ai.agent.name of the first turn, else the resource's service.name.
+  string agent = 3;
+  // gen_ai.agent.version, else service.version.
+  string agent_version = 4;
+  SessionState state = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp ended_at = 7;
+  google.protobuf.Duration duration = 8;
+  // The first turn's user text. Unset when not recorded.
+  optional string first_user_text = 9;
+  ContentCapture content_capture = 10;
+  SessionTotals totals = 11;
+  // gen_ai.response.model of each call, else gen_ai.request.model, distinct, in first use
+  // order.
+  repeated string models = 12;
+  // The resource of the service that produced the session.
+  opentelemetry.proto.resource.v1.Resource resource = 13;
+  // gen_ai.conversation.id.
+  string conversation_id = 14;
+  repeated string trace_ids = 15;
+  // The eval set the session was recorded for, when the producer named one.
+  string eval_set_id = 16;
+  int32 span_count = 17;
+  repeated Gap gaps = 18;
+}
+
+message Session {
+  SessionSummary summary = 1;
+  repeated TurnView turns = 2;
+}
+
+// Traces that form one evaluation unit, as conversation turns.
+message ConversationView {
+  // The unit's key: its earliest trace id, or its conversation key.
+  string key = 1;
+  // gen_ai.conversation.id.
+  string conversation_id = 2;
+  repeated string trace_ids = 3;
+  repeated TurnView turns = 4;
+  repeated Gap gaps = 5;
+}

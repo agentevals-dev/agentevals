@@ -143,3 +143,34 @@ helm-package: helm-cleanup
 .PHONY: helm-publish
 helm-publish: helm-package
 	helm push "$(HELM_DIST_FOLDER)/agentevals-$(HELM_CHART_VERSION).tgz" "$(HELM_CHART_OCI_URL)"
+
+# Protobuf contract. buf runs through npx so no Go toolchain is needed; regenerating spends
+# Buf Schema Registry remote plugin requests, which are rate limited.
+BUF ?= npx --yes @bufbuild/buf@1.72.0
+PROTO_BREAKING_BRANCH ?= main
+PROTO_GENERATED_PATHS := gen/go/agentevals src/agentevals/api/v1alpha1 ui/src/generated
+
+.PHONY: proto-lint
+proto-lint:
+	cd proto && $(BUF) lint
+
+.PHONY: proto-generate
+proto-generate:
+	rm -rf $(PROTO_GENERATED_PATHS)
+	cd proto && $(BUF) generate
+
+.PHONY: proto-breaking
+proto-breaking:
+	@if git cat-file -e "$(PROTO_BREAKING_BRANCH):proto/buf.yaml" 2>/dev/null; then \
+		$(BUF) breaking proto --against ".git#branch=$(PROTO_BREAKING_BRANCH),subdir=proto"; \
+	else \
+		echo "No protobuf module on $(PROTO_BREAKING_BRANCH); skipping the breaking check"; \
+	fi
+
+.PHONY: proto-check
+proto-check: proto-lint proto-generate
+	@if test -n "$$(git status --porcelain -- $(PROTO_GENERATED_PATHS))"; then \
+		echo "Generated protobuf files are out of date:"; \
+		git status --short -- $(PROTO_GENERATED_PATHS); \
+		exit 1; \
+	fi

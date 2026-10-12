@@ -59,6 +59,37 @@ jobs:
       - name: Build UI
         run: make build-ui
 
+  proto:
+    name: Protobuf Contract Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: gen/go/go.mod
+          cache-dependency-path: gen/go/go.sum
+
+      # proto-breaking compares against the local main branch.
+      - name: Fetch main
+        run: git fetch --no-tags --depth=1 origin main:main || true
+
+      - name: Lint, regenerate and check for drift
+        run: make proto-check
+
+      - name: Breaking changes
+        run: make proto-breaking
+
+      - name: Build the Go module
+        working-directory: gen/go
+        run: |
+          go build ./...
+          go vet ./...
+
   docker:
     runs-on: ubuntu-latest
     permissions:
