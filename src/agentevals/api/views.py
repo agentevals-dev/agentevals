@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import json
 import math
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -34,6 +35,10 @@ MAX_VALUE_DEPTH = 32
 # A JSON number is a double, exact for integers up to 2^53.
 MAX_SAFE_INTEGER = 2**53
 SHORT_ID_LENGTH = 6
+# Generated ids (UUIDs, trace ids) are often time ordered, so only their tails tell them apart.
+_GENERATED_ID = re.compile(
+    r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}|[0-9a-fA-F]{16,}"
+)
 
 GAP_TRUNCATED = "truncated"
 GAP_NO_TURNS = "no_turns"
@@ -130,7 +135,7 @@ def _summary(
 
     summary = views_pb2.SessionSummary(
         id=facts.session_id,
-        short_id=facts.session_id[-SHORT_ID_LENGTH:],
+        short_id=_short_id(facts.session_id),
         agent=_str(resource_attrs.get(AGENT_NAME))
         or next((t.agent_name for t in source if t.agent_name), None)
         or _str(resource_attrs.get(SERVICE_NAME)),
@@ -165,6 +170,10 @@ def _summary(
     if facts.is_complete and facts.span_count and not source:
         summary.gaps.append(views_pb2.Gap(code=GAP_NO_TURNS, reason="no span forms a GenAI turn"))
     return summary
+
+
+def _short_id(session_id: str) -> str:
+    return session_id[-SHORT_ID_LENGTH:] if _GENERATED_ID.fullmatch(session_id) else session_id
 
 
 def _anchor_span(turns: list[Turn], spans: SpanIndex) -> Span | None:

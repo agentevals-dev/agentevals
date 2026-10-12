@@ -42,9 +42,9 @@ function serializeAppState(state: TraceState): Record<string, unknown> {
       Array.from(state.streamingSessions.entries()).map(([id, s]) => [
         id,
         {
-          status: s.status,
-          spanCount: s.spans.length,
-          invocationCount: s.invocations?.length ?? 0,
+          state: s.summary?.state,
+          spanCount: s.summary?.spanCount ?? 0,
+          turnCount: s.turns.length,
         },
       ]),
     ),

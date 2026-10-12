@@ -212,7 +212,6 @@ class LiveSession:
     log_count: int = 0
     nbytes: int = 0
     last_activity: float = 0.0
-    invocations: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def provisional(self) -> bool:
@@ -684,7 +683,6 @@ class TelemetryStore:
             trace.complete = False
             session.last_activity = now
             self._schedule_trace(trace)
-            self.events.append(("spans", session.session_id, added))
             self._dirty(session)
         return result
 

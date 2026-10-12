@@ -305,7 +305,7 @@ async def wait_for_session_complete(
     session_id: str,
     timeout: float = 5.0,
 ) -> None:
-    """Poll until the session is complete and its ``session_complete`` was sent, or raise TimeoutError."""
+    """Poll until the session is complete and its complete view was published, or raise TimeoutError."""
     deadline = asyncio.get_event_loop().time() + timeout
     while asyncio.get_event_loop().time() < deadline:
         session = mgr.sessions.get(session_id)

@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 
 from agentevals import __version__
 
@@ -33,6 +33,9 @@ if TYPE_CHECKING:
     from .rpc.server import ApiGrpcSettings
 
 logger = logging.getLogger(__name__)
+
+# Proxies close idle connections; a comment frame keeps the UI stream open between changes.
+SSE_HEARTBEAT_SECONDS = 15
 
 _TRUE_VALUES = {"true", "1", "yes", "on"}
 _FALSE_VALUES = {"false", "0", "no", "off"}
@@ -218,28 +221,35 @@ def create_app(
 
         @app.get("/stream/ui-updates")
         async def ui_updates_stream(request: Request):
-            mgr = request.app.state.trace_manager
+            """Live sessions as protojson ``agentevals.api.v1alpha1.WatchSessionsResponse`` frames, with
+            turns: every current session, then ``synced``, then each change, as ``WatchSessions``."""
+            from ..streaming.manager import TooManyWatchers
 
-            async def event_generator():
-                client = mgr.register_sse_client()
+            mgr = request.app.state.trace_manager
+            try:
+                watcher = mgr.subscribe(include_turns=True)
+            except TooManyWatchers as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+            async def frames():
                 try:
                     while True:
-                        event = await client.queue.get()
+                        try:
+                            event = await asyncio.wait_for(watcher.next(), SSE_HEARTBEAT_SECONDS)
+                        except TimeoutError:
+                            yield ": keepalive\n\n"
+                            continue
                         if event is None:
-                            break
-                        yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.CancelledError:
-                    pass
+                            return
+                        yield f"data: {event.json}\n\n"
                 finally:
-                    mgr.unregister_sse_client(client)
+                    mgr.unsubscribe(watcher)
 
             return StreamingResponse(
-                event_generator(),
+                frames(),
                 media_type="text/event-stream",
-                headers={
-                    "Cache-Control": "no-cache",
-                    "Connection": "keep-alive",
-                },
+                headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+                background=BackgroundTask(mgr.unsubscribe, watcher),
             )
 
     if static_dir is None:

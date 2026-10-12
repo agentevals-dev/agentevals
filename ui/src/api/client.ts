@@ -63,52 +63,6 @@ export async function convertTraces(
   return unwrap<ConvertTracesResponse>(response);
 }
 
-export async function evaluateTracesAPI(
-  traceFiles: File[],
-  evalSetFile: File | null,
-  evalConfig: EvalConfig
-): Promise<RunResult> {
-  const formData = new FormData();
-
-  traceFiles.forEach(file => {
-    formData.append('trace_files', file);
-  });
-
-  if (evalSetFile) {
-    formData.append('eval_set_file', evalSetFile);
-  }
-
-  formData.append('config', JSON.stringify(evalConfig));
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/evaluate`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      let errorMessage = `API error: ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        if (errorData.detail) {
-          errorMessage = errorData.detail;
-        }
-      } catch {
-        // Fallback to statusText if JSON parsing fails
-      }
-      throw new Error(errorMessage);
-    }
-
-    return unwrap<RunResult>(response);
-
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Unknown error occurred while evaluating traces');
-  }
-}
-
 export async function evaluateTracesStreaming(
   traceFiles: File[],
   evalSetFile: File | null,
@@ -253,27 +207,6 @@ export async function listMetrics(): Promise<MetricMetadata[]> {
     return unwrap<MetricMetadata[]>(response);
   } catch (error) {
     console.error('Failed to list metrics:', error);
-    throw error;
-  }
-}
-
-export async function validateEvalSet(evalSetFile: File): Promise<{ valid: boolean; evalSetId?: string; numCases?: number; errors?: string[] }> {
-  const formData = new FormData();
-  formData.append('eval_set_file', evalSetFile);
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/validate/eval-set`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to validate eval set: ${response.statusText}`);
-    }
-
-    return unwrap<{ valid: boolean; evalSetId?: string; numCases?: number; errors?: string[] }>(response);
-  } catch (error) {
-    console.error('Failed to validate eval set:', error);
     throw error;
   }
 }

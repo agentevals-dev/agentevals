@@ -166,8 +166,8 @@ message SessionTotals {
 
 message SessionSummary {
   string id = 1;
-  // The last 6 characters of id. Session ids are often time ordered, so their first
-  // characters collide.
+  // The last 6 characters of a UUID or hex id, which are often time ordered so their first
+  // characters collide; any other id, such as a session name, as it is.
   string short_id = 2;
   // The resource's gen_ai.agent.name, else the first turn's agent, else the resource's
   // service.name.

@@ -499,8 +499,8 @@ export declare type SessionSummary = Message<"agentevals.api.v1alpha1.SessionSum
   id: string;
 
   /**
-   * The last 6 characters of id. Session ids are often time ordered, so their first
-   * characters collide.
+   * The last 6 characters of a UUID or hex id, which are often time ordered so their first
+   * characters collide; any other id, such as a session name, as it is.
    *
    * @generated from field: string short_id = 2;
    */

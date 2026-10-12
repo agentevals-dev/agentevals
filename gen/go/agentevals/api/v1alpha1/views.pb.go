@@ -922,8 +922,8 @@ func (x *SessionTotals) GetToolCallsWithArguments() int32 {
 type SessionSummary struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// The last 6 characters of id. Session ids are often time ordered, so their first
-	// characters collide.
+	// The last 6 characters of a UUID or hex id, which are often time ordered so their first
+	// characters collide; any other id, such as a session name, as it is.
 	ShortId string `protobuf:"bytes,2,opt,name=short_id,json=shortId,proto3" json:"short_id,omitempty"`
 	// The resource's gen_ai.agent.name, else the first turn's agent, else the resource's
 	// service.name.

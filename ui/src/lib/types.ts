@@ -1,3 +1,5 @@
+import type { Session } from './liveSessions';
+
 // API envelope
 export interface StandardResponse<T> {
   data: T;
@@ -476,57 +478,6 @@ export const AVAILABLE_METRICS: MetricMetadata[] = [
   }
 ];
 
-// Streaming / Live session types
-export interface ConversationElement {
-  type: 'user_input' | 'tool_call' | 'tool_result' | 'agent_response' | 'turn_error';
-  timestamp: number;
-  invocationId: string;
-  data: any;
-}
-
-export interface ExternalEvaluation {
-  name: string;
-  scoreValue?: number | null;
-  scoreLabel?: string | null;
-  explanation?: string | null;
-  spanId: string;
-  sourceService?: string | null;
-}
-
-export interface StreamingInvocation {
-  /** Span id of the turn's anchor span. */
-  invocationId: string;
-  traceId?: string;
-  userText: string;
-  agentText: string;
-  toolCalls: Array<{ name: string; args: any; id?: string }>;
-  toolResponses?: Array<{ name: string; response: any; id?: string }>;
-  modelInfo?: Record<string, any>;
-  status?: 'unset' | 'ok' | 'error';
-  errorType?: string | null;
-  contentCaptured?: boolean;
-  warnings?: string[];
-  /** ``gen_ai.evaluation.result`` events found in the telemetry (from other evaluators). */
-  externalEvaluations?: ExternalEvaluation[];
-}
-
-export interface LiveSession {
-  sessionId: string;
-  traceId: string;
-  evalSetId: string | null;
-  spans: any[];
-  status: 'active' | 'complete';
-  metadata: Record<string, any>;
-  invocations?: StreamingInvocation[];
-  liveElements: ConversationElement[];
-  liveStats: {
-    totalInputTokens: number;
-    totalOutputTokens: number;
-    model?: string;
-  };
-  startedAt: string;
-}
-
 // Inspector-specific types
 export type ExtractionType = 'user_input' | 'tool_use' | 'tool_response' | 'final_response';
 
@@ -594,10 +545,8 @@ export interface AnnotationQueueItem {
   model?: string;
   totalTokens?: number;
   annotation?: Annotation;
-  invocations?: StreamingInvocation[];
-  liveElements?: ConversationElement[];
-  liveStats?: { totalInputTokens: number; totalOutputTokens: number; model?: string };
-  metadata?: Record<string, any>;
+  /** The live session as it was when queued. */
+  session: Session;
 }
 
 export interface AnnotationQueue {

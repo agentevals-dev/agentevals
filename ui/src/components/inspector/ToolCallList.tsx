@@ -2,6 +2,7 @@ import React from 'react';
 import { css } from '@emotion/react';
 import { Wrench, CheckCircle, AlertCircle } from 'lucide-react';
 import type { ToolCall, ToolResponse } from '../../lib/types';
+import { pairToolResponses } from '../../lib/toolPairing';
 
 interface ToolCallListProps {
   toolUses: ToolCall[];
@@ -23,10 +24,12 @@ export const ToolCallList: React.FC<ToolCallListProps> = ({
     );
   }
 
+  const paired = pairToolResponses(toolUses, toolResponses);
+
   return (
     <div css={listContainerStyles}>
       {toolUses.map((toolUse, index) => {
-        const toolResponse = toolResponses.find(r => r.id === toolUse.id || r.name === toolUse.name);
+        const toolResponse = paired[index];
         const hasError = toolResponse?.response?.isError;
 
         return (
