@@ -643,6 +643,8 @@ async def _run_servers(
     "--api-grpc-port",
     type=click.IntRange(min=0),
     default=8002,
+    envvar="AGENTEVALS_API_GRPC_PORT",
+    show_envvar=True,
     help="Port for the gRPC API (default: 8002; 0 turns it off). Expose it only to trusted callers.",
 )
 @click.option(

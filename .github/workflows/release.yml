@@ -93,6 +93,33 @@ jobs:
           files: dist/**/*.whl
           generate_release_notes: true
 
+  # Go resolves github.com/agentevals-dev/agentevals/gen/go@vX.Y.Z from the tag gen/go/vX.Y.Z.
+  tag-go-module:
+    needs: github-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Tag the generated Go module
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Not a semantic version tag: $TAG"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/gen/go/$TAG" >/dev/null; then
+            echo "gen/go/$TAG already exists"
+            exit 0
+          fi
+          git tag "gen/go/$TAG" "$TAG^{commit}"
+          git push origin "gen/go/$TAG"
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
   push-docker:
     needs: github-release
     runs-on: ubuntu-latest

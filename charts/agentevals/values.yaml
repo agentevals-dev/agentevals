@@ -141,6 +141,24 @@ service:
   mcp:
     port: 8080
     containerPort: 8080
+  # -- gRPC API port (agentevals.api.v1alpha1)
+  grpcApi:
+    port: 8002
+    containerPort: 8002
+
+# ==============================================================================
+# gRPC API
+# ==============================================================================
+
+grpcApi:
+  # -- Serve the gRPC API next to the HTTP API. Every caller that can reach the port is
+  # trusted, so expose it only to trusted callers.
+  enabled: true
+  # -- Turn on gRPC server reflection, for tools such as grpcurl
+  reflection: false
+  # -- Check readiness with the gRPC health service on the gRPC API port instead of HTTP
+  # /api/health
+  grpcReadinessProbe: false
 
 # ==============================================================================
 # Resources

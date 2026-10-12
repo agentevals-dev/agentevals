@@ -64,6 +64,12 @@ spec:
           env:
             - name: AGENTEVALS_SERVER_URL
               value: "http://127.0.0.1:{{ .Values.service.http.containerPort }}"
+            - name: AGENTEVALS_API_GRPC_PORT
+              value: {{ ternary .Values.service.grpcApi.containerPort 0 .Values.grpcApi.enabled | quote }}
+            {{- if and .Values.grpcApi.enabled .Values.grpcApi.reflection }}
+            - name: AGENTEVALS_GRPC_REFLECTION
+              value: "true"
+            {{- end }}
             {{- if .Values.ephemeralVolume.enabled }}
             - name: TMPDIR
               value: "/tmp"
@@ -117,6 +123,11 @@ spec:
             - name: mcp
               containerPort: {{ .Values.service.mcp.containerPort }}
               protocol: TCP
+            {{- if .Values.grpcApi.enabled }}
+            - name: grpc-api
+              containerPort: {{ .Values.service.grpcApi.containerPort }}
+              protocol: TCP
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
@@ -133,9 +144,14 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
           readinessProbe:
+            {{- if and .Values.grpcApi.enabled .Values.grpcApi.grpcReadinessProbe }}
+            grpc:
+              port: {{ .Values.service.grpcApi.containerPort }}
+            {{- else }}
             httpGet:
               path: /api/health
               port: http
+            {{- end }}
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:

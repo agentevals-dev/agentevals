@@ -65,6 +65,19 @@ make build-ui          # build React app only → ui/dist/
 
 Both `build` and `build-bundle` produce `dist/agentevals-*.whl` with the same package name and version. The difference is that `build-bundle` embeds `ui/dist/` as `agentevals/_static/` inside the wheel. The hatchling `artifacts` config ensures the gitignored `_static/` directory is included.
 
+### API contract
+
+The gRPC API is defined in `proto/`. The generated Go, Python and TypeScript code is committed, so only changes to `.proto` files need these:
+
+```bash
+make proto-lint        # buf lint
+make proto-generate    # regenerate gen/go, src/agentevals/api/v1alpha1 and ui/src/generated
+make proto-check       # lint, regenerate and fail when committed code is out of date (CI)
+make proto-breaking    # compare with main for breaking changes (CI)
+```
+
+`buf` runs through `npx`, so Node is enough. Building the Go module (`cd gen/go && go build ./...`) needs Go, which the Nix dev shell provides.
+
 ### Testing
 
 ```bash
@@ -150,6 +163,8 @@ To release a new Nix derivation, update `flake.nix` with the new version and reb
    git push origin v0.1.0
    ```
 4. Alternatively, trigger manually from **GitHub → Actions → Release → Run workflow** and enter the tag
+
+The workflow also tags the same commit `gen/go/vX.Y.Z`, the version Go clients get with `go get github.com/agentevals-dev/agentevals/gen/go@vX.Y.Z`.
 
 The workflow (`.github/workflows/release.yml`) runs `make release`, which builds the wheel twice (once without UI, once with embedded UI) into separate subdirectories:
 

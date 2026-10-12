@@ -24,5 +24,12 @@ spec:
       port: {{ .Values.service.mcp.port }}
       targetPort: mcp
       protocol: TCP
+    {{- if .Values.grpcApi.enabled }}
+    - name: grpc-api
+      port: {{ .Values.service.grpcApi.port }}
+      targetPort: grpc-api
+      protocol: TCP
+      appProtocol: grpc
+    {{- end }}
   selector:
     {{- include "agentevals.app.selectorLabels" . | nindent 4 }}
