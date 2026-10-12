@@ -153,8 +153,8 @@ export const TraceCard: React.FC<TraceCardProps> = ({ traceResult, threshold, on
     passedMetrics === 0 ? 'FAILED' :
     'PARTIAL';
 
-  const statusColor = getStatusColor(overallStatus as any);
-  const statusGlow = getStatusGlow(overallStatus as any);
+  const statusColor = getStatusColor(overallStatus);
+  const statusGlow = getStatusGlow(overallStatus);
 
   const handleCopyTraceId = (e: React.MouseEvent) => {
     e.stopPropagation();

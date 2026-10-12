@@ -59,6 +59,10 @@ jobs:
       - name: Build UI
         run: make build-ui
 
+      - name: Lint UI
+        working-directory: ui
+        run: npm run lint
+
   proto:
     name: Protobuf Contract Check
     runs-on: ubuntu-latest

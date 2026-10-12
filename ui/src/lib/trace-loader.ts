@@ -1,9 +1,10 @@
+import type { JsonObject, JsonValue } from '@bufbuild/protobuf';
 import type { Trace, Span, Log } from './types';
 
 interface JaegerTag {
   key: string;
   type: string;
-  value: any;
+  value: JsonValue;
 }
 
 interface JaegerLog {
@@ -47,6 +48,42 @@ interface OtlpAttribute {
   };
 }
 
+interface OtlpSpan {
+  traceId: string;
+  spanId: string;
+  parentSpanId?: string;
+  name: string;
+  startTimeUnixNano?: string | number;
+  endTimeUnixNano?: string | number;
+  attributes?: OtlpAttribute[];
+}
+
+interface OtlpScope {
+  name?: string;
+  version?: string;
+}
+
+interface OtlpScopeSpans {
+  scope?: OtlpScope;
+  instrumentationLibrary?: OtlpScope;
+  spans?: OtlpSpan[];
+}
+
+interface OtlpResourceSpans {
+  resource?: { attributes?: OtlpAttribute[] };
+  scopeSpans?: OtlpScopeSpans[];
+  instrumentationLibrarySpans?: OtlpScopeSpans[];
+}
+
+interface OtlpDocument {
+  resourceSpans?: OtlpResourceSpans[];
+  batches?: OtlpResourceSpans[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 // OTLP/JSON encodes int64 values as strings to preserve precision past
 // Number.MAX_SAFE_INTEGER (2^53 - 1). Convert only when the value still
 // fits a JavaScript safe integer; otherwise keep the original string so
@@ -58,8 +95,8 @@ function parseOtlpIntValue(value: number | string): number | string {
   return Number.isSafeInteger(parsed) ? parsed : value;
 }
 
-function extractOtlpAttributes(attrs: OtlpAttribute[] | undefined): Record<string, any> {
-  const tags: Record<string, any> = {};
+function extractOtlpAttributes(attrs: OtlpAttribute[] | undefined): JsonObject {
+  const tags: JsonObject = {};
   for (const attr of attrs || []) {
     const v = attr.value;
     if (!v) continue;
@@ -71,11 +108,11 @@ function extractOtlpAttributes(attrs: OtlpAttribute[] | undefined): Record<strin
   return tags;
 }
 
-function buildOtlpSpan(otlpSpan: any, extraTags: Record<string, any> = {}): Span {
+function buildOtlpSpan(otlpSpan: OtlpSpan, extraTags: JsonObject = {}): Span {
   const tags = { ...extraTags, ...extractOtlpAttributes(otlpSpan.attributes) };
 
-  const startTimeNs = parseInt(otlpSpan.startTimeUnixNano || '0');
-  const endTimeNs = parseInt(otlpSpan.endTimeUnixNano || '0');
+  const startTimeNs = parseInt(String(otlpSpan.startTimeUnixNano || '0'));
+  const endTimeNs = parseInt(String(otlpSpan.endTimeUnixNano || '0'));
   const startTimeUs = Math.floor(startTimeNs / 1000);
   const durationUs = Math.floor((endTimeNs - startTimeNs) / 1000);
 
@@ -141,7 +178,7 @@ function loadOtlpJsonlTraces(fileContent: string): Trace[] {
   const spans: Span[] = [];
   for (const line of lines) {
     if (!line.trim()) continue;
-    spans.push(buildOtlpSpan(JSON.parse(line)));
+    spans.push(buildOtlpSpan(JSON.parse(line) as OtlpSpan));
   }
   return buildTracesFromSpans(spans);
 }
@@ -151,16 +188,16 @@ function loadOtlpJsonlTraces(fileContent: string): Trace[] {
  * batches, or Tempo v2 ``trace`` wrapper). The object should already be
  * unwrapped from any ``trace`` envelope.
  */
-function loadOtlpDocTraces(doc: any): Trace[] {
-  const resourceSpans: any[] = doc.resourceSpans || doc.batches || [];
+function loadOtlpDocTraces(doc: OtlpDocument): Trace[] {
+  const resourceSpans = doc.resourceSpans || doc.batches || [];
   const spans: Span[] = [];
 
   for (const rs of resourceSpans) {
     const resourceTags = extractOtlpAttributes(rs.resource?.attributes);
-    const scopeSpans: any[] = rs.scopeSpans || rs.instrumentationLibrarySpans || [];
+    const scopeSpans = rs.scopeSpans || rs.instrumentationLibrarySpans || [];
     for (const ss of scopeSpans) {
       const scope = ss.scope || ss.instrumentationLibrary || {};
-      const scopeTags: Record<string, any> = { ...resourceTags };
+      const scopeTags: JsonObject = { ...resourceTags };
       if (scope.name) scopeTags['otel.scope.name'] = scope.name;
       if (scope.version) scopeTags['otel.scope.version'] = scope.version;
       for (const otlpSpan of ss.spans || []) {
@@ -229,7 +266,7 @@ export async function loadTraces(fileContent: string): Promise<Trace[]> {
   const trimmed = fileContent.trim();
   if (!trimmed) return [];
 
-  let singleDoc: any = null;
+  let singleDoc: unknown;
   try {
     singleDoc = JSON.parse(trimmed);
   } catch {
@@ -239,18 +276,17 @@ export async function loadTraces(fileContent: string): Promise<Trace[]> {
     throw new Error('Invalid trace file: not valid JSON or JSONL.');
   }
 
-  if (singleDoc && typeof singleDoc === 'object' && !Array.isArray(singleDoc)) {
+  if (isRecord(singleDoc)) {
     let doc = singleDoc;
-    if (doc.trace && typeof doc.trace === 'object' &&
-        ('resourceSpans' in doc.trace || 'batches' in doc.trace)) {
+    if (isRecord(doc.trace) && ('resourceSpans' in doc.trace || 'batches' in doc.trace)) {
       doc = doc.trace;
     }
 
     if ('resourceSpans' in doc || 'batches' in doc) {
-      return loadOtlpDocTraces(doc);
+      return loadOtlpDocTraces(doc as OtlpDocument);
     }
     if (Array.isArray(doc.data)) {
-      return parseJaegerData(doc as JaegerData);
+      return parseJaegerData(doc as unknown as JaegerData);
     }
   }
 
@@ -274,8 +310,8 @@ function extractParentSpanId(references?: JaegerReference[]): string | null {
 /**
  * Flatten Jaeger tags array to a key-value object
  */
-function flattenTags(tags: JaegerTag[]): Record<string, any> {
-  const result: Record<string, any> = {};
+function flattenTags(tags: JaegerTag[]): JsonObject {
+  const result: JsonObject = {};
 
   for (const tag of tags) {
     result[tag.key] = tag.value;
@@ -292,29 +328,4 @@ function flattenLogs(logs: JaegerLog[]): Log[] {
     timestamp: log.timestamp,
     fields: flattenTags(log.fields),
   }));
-}
-
-/**
- * Find spans by operation name
- */
-export function findSpansByOperation(trace: Trace, operationName: string): Span[] {
-  return trace.allSpans.filter((span) => span.operationName.includes(operationName));
-}
-
-/**
- * Find spans by tag key-value
- */
-export function findSpansByTag(trace: Trace, tagKey: string, tagValue?: any): Span[] {
-  return trace.allSpans.filter((span) => {
-    if (!(tagKey in span.tags)) return false;
-    if (tagValue === undefined) return true;
-    return span.tags[tagKey] === tagValue;
-  });
-}
-
-/**
- * Get span by ID
- */
-export function getSpanById(trace: Trace, spanId: string): Span | undefined {
-  return trace.allSpans.find((span) => span.spanId === spanId);
 }

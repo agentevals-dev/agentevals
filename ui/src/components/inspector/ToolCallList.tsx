@@ -30,7 +30,7 @@ export const ToolCallList: React.FC<ToolCallListProps> = ({
     <div css={listContainerStyles}>
       {toolUses.map((toolUse, index) => {
         const toolResponse = paired[index];
-        const hasError = toolResponse?.response?.isError;
+        const hasError = toolResponse?.response?.isError === true;
 
         return (
           <div key={toolUse.id || index} css={toolItemStyles}>

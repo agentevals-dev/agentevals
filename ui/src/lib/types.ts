@@ -1,3 +1,4 @@
+import type { JsonObject } from '@bufbuild/protobuf';
 import type { Session } from './liveSessions';
 
 // API envelope
@@ -9,7 +10,7 @@ export interface StandardResponse<T> {
 // Core trace data structures
 export interface Log {
   timestamp: number;
-  fields: Record<string, any>;
+  fields: JsonObject;
 }
 
 export interface Span {
@@ -19,7 +20,7 @@ export interface Span {
   operationName: string;
   startTime: number; // microseconds
   duration: number; // microseconds
-  tags: Record<string, any>;
+  tags: JsonObject;
   logs: Log[];
   children: Span[];
 }
@@ -44,25 +45,25 @@ export interface Part {
 
 export interface FunctionCall {
   name: string;
-  args: Record<string, any>;
+  args: JsonObject;
   id?: string;
 }
 
 export interface FunctionResponse {
   name: string;
-  response: Record<string, any>;
+  response: JsonObject;
   id?: string;
 }
 
 export interface ToolCall {
   name: string;
-  args: Record<string, any>;
+  args: JsonObject;
   id?: string;
 }
 
 export interface ToolResponse {
   name: string;
-  response: Record<string, any>;
+  response: JsonObject;
   id?: string;
 }
 
@@ -107,7 +108,7 @@ export type EvalStatus = 'PASSED' | 'FAILED' | 'NOT_EVALUATED' | 'ERROR';
 
 export interface ToolCallComparison {
   name: string;
-  args: Record<string, any>;
+  args: JsonObject;
 }
 
 export interface TrajectoryComparison {
@@ -511,13 +512,14 @@ export type TraceFileFormat = 'jaeger' | 'otlp-json' | 'otlp-jsonl';
 
 export interface SpanLocationRef {
   /** The span object inside the parsed file; patches edit it in place. */
-  raw: any;
+  raw: object;
 }
 
 export interface ParsedTraceFile {
   format: TraceFileFormat;
   fileName: string;
-  rawData: any;
+  /** The parsed document; one entry per line for ``otlp-jsonl``. */
+  rawData: unknown;
   spanIndex: Map<string, SpanLocationRef>;
 }
 
