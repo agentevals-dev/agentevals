@@ -97,7 +97,7 @@ def extract_performance_metrics(conversation: Conversation, traces: Sequence[Tra
     ]
 
     with_usage = [c.usage for c in calls if c.usage is not None]
-    per_call_totals = [u.input_tokens + u.output_tokens for u in with_usage]
+    per_call_totals = [(u.input_tokens or 0) + (u.output_tokens or 0) for u in with_usage]
     models = sorted({c.request_model or c.response_model for c in calls if c.request_model or c.response_model})
 
     if not turn_latencies:
@@ -110,12 +110,12 @@ def extract_performance_metrics(conversation: Conversation, traces: Sequence[Tra
             "tool_executions": _calc_summary_stats(tool_latencies),
         },
         "tokens": {
-            "total_prompt": sum(u.input_tokens for u in with_usage),
-            "total_output": sum(u.output_tokens for u in with_usage),
+            "total_prompt": sum(u.input_tokens or 0 for u in with_usage),
+            "total_output": sum(u.output_tokens or 0 for u in with_usage),
             "total": sum(per_call_totals),
             "per_llm_call": _calc_summary_stats([float(x) for x in per_call_totals]),
-            "cache_creation_tokens": sum(u.cache_write_input_tokens for u in with_usage),
-            "cache_read_tokens": sum(u.cache_read_input_tokens for u in with_usage),
+            "cache_creation_tokens": sum(u.cache_write_input_tokens or 0 for u in with_usage),
+            "cache_read_tokens": sum(u.cache_read_input_tokens or 0 for u in with_usage),
         },
         "counts": {
             "llm_calls": len(calls),

@@ -63,7 +63,7 @@ export declare const UsageSchema: GenMessage<Usage>;
 
 /**
  * Why something is missing or approximate. Codes are stable; reasons are for people and never
- * carry message content or attribute values.
+ * carry message content.
  *
  * @generated from message agentevals.api.v1alpha1.Gap
  */
@@ -507,14 +507,15 @@ export declare type SessionSummary = Message<"agentevals.api.v1alpha1.SessionSum
   shortId: string;
 
   /**
-   * gen_ai.agent.name of the first turn, else the resource's service.name.
+   * The resource's gen_ai.agent.name, else the first turn's agent, else the resource's
+   * service.name.
    *
    * @generated from field: string agent = 3;
    */
   agent: string;
 
   /**
-   * gen_ai.agent.version, else service.version.
+   * The resource's gen_ai.agent.version, else the first turn's, else service.version.
    *
    * @generated from field: string agent_version = 4;
    */

@@ -57,7 +57,20 @@ from .messages import (
     tool_responses_of,
     user_turn_messages,
 )
-from .model import Conversation, ExternalEvaluation, LlmCall, ToolCall, Turn, Usage
+from .model import (
+    GAP_POSSIBLE_CONTINUATION,
+    GAP_TOOL_DATA_BY_NAME,
+    GAP_TOOL_FROM_PARTS_ONLY,
+    GAP_TOOL_NAME_MISSING,
+    GAP_TOOL_RESULT_BY_ORDER,
+    Conversation,
+    ExternalEvaluation,
+    Gap,
+    LlmCall,
+    ToolCall,
+    Turn,
+    Usage,
+)
 from .overlay import SpanView, overlay
 
 INFERENCE = "inference"
@@ -214,7 +227,7 @@ def _usage(view: SpanView) -> Usage | None:
     }
     if values["input_tokens"] is None and values["output_tokens"] is None:
         return None
-    return Usage(**{k: max(0, v or 0) for k, v in values.items()})
+    return Usage(**{k: None if v is None else max(0, v) for k, v in values.items()})
 
 
 def _status(span: Span) -> str:
@@ -375,7 +388,7 @@ def _present(views: Sequence[SpanView], key: str) -> Any:
     return next((v.attrs[key] for v in views if v.attrs.get(key) is not None), None)
 
 
-def _tool_calls_from_spans(analysis: TraceAnalysis, chains: list[list[str]], warnings: list[str]) -> list[ToolCall]:
+def _tool_calls_from_spans(analysis: TraceAnalysis, chains: list[list[str]], warnings: list[Gap]) -> list[ToolCall]:
     out = []
     for chain in chains:
         views = [analysis.info[s].view for s in chain]
@@ -384,7 +397,12 @@ def _tool_calls_from_spans(analysis: TraceAnalysis, chains: list[list[str]], war
         if not name:
             tokens = span.name.split()
             name = tokens[1] if len(tokens) >= 2 and tokens[0] == sc.OP_EXECUTE_TOOL else span.name
-            warnings.append(f"tool span {chain[0]} has no gen_ai.tool.name; used span name token {name!r}")
+            warnings.append(
+                Gap(
+                    code=GAP_TOOL_NAME_MISSING,
+                    reason=f"tool span {chain[0]} has no gen_ai.tool.name; used span name token {name!r}",
+                )
+            )
         status = _first(views, lambda v: _status(v.span) if _status(v.span) != "unset" else None)
         error_type = _first(views, lambda v: attr_str(v.attrs, sc.ERROR_TYPE))
         is_error = status == "error" or error_type is not None
@@ -405,7 +423,7 @@ def _tool_calls_from_spans(analysis: TraceAnalysis, chains: list[list[str]], war
     return out
 
 
-def _tool_calls_from_parts(calls: list[LlmCall], warnings: list[str] | None = None) -> list[ToolCall]:
+def _tool_calls_from_parts(calls: list[LlmCall], warnings: list[Gap] | None = None) -> list[ToolCall]:
     """Tool calls from ``tool_call`` parts, results from later ``tool_call_response`` parts.
 
     A response pairs with its call by id. A response whose id matches no call in the turn (some
@@ -436,8 +454,11 @@ def _tool_calls_from_parts(calls: list[LlmCall], warnings: list[str] | None = No
             )
             if match is not None and responses[match][1]["id"] and warnings is not None:
                 warnings.append(
-                    f"tool {tc['name']} result joined by order"
-                    f" (response id {responses[match][1]['id']!r} matches no call)"
+                    Gap(
+                        code=GAP_TOOL_RESULT_BY_ORDER,
+                        reason=f"tool {tc['name']} result joined by order"
+                        f" (response id {responses[match][1]['id']!r} matches no call)",
+                    )
                 )
         if match is not None:
             claimed.add(match)
@@ -459,7 +480,7 @@ def _is_empty(value: Any) -> bool:
     return value is None or value == {} or value == "" or value == []
 
 
-def _fill_from_parts(span_tools: list[ToolCall], calls: list[LlmCall], warnings: list[str]) -> list[ToolCall]:
+def _fill_from_parts(span_tools: list[ToolCall], calls: list[LlmCall], warnings: list[Gap]) -> list[ToolCall]:
     """Complete tool spans that carry no arguments or result from the turn's message parts, and
     return them together with the part tool calls no span claimed (a client side tool without a
     span, say). An unclaimed call goes right after the call requested before it, so the trajectory
@@ -496,7 +517,11 @@ def _fill_from_parts(span_tools: list[ToolCall], calls: list[LlmCall], warnings:
             filled.append("result")
         if filled and by_name:
             warnings.append(
-                f"tool {tool.name} {' and '.join(filled)} joined from message parts by name (call ids differ)"
+                Gap(
+                    code=GAP_TOOL_DATA_BY_NAME,
+                    reason=f"tool {tool.name} {' and '.join(filled)} joined from message parts by name"
+                    " (call ids differ)",
+                )
             )
     out = list(span_tools)
     previous: ToolCall | None = None
@@ -504,7 +529,12 @@ def _fill_from_parts(span_tools: list[ToolCall], calls: list[LlmCall], warnings:
         if index in claimed:
             previous = claimed[index]
             continue
-        warnings.append(f"tool {part.name} appears only in message parts, without a tool span")
+        warnings.append(
+            Gap(
+                code=GAP_TOOL_FROM_PARTS_ONLY,
+                reason=f"tool {part.name} appears only in message parts, without a tool span",
+            )
+        )
         position = next(i for i, t in enumerate(out) if t is previous) + 1 if previous is not None else 0
         out.insert(position, part)
         previous = part
@@ -550,7 +580,7 @@ def _turn(analysis: TraceAnalysis, anchor: str) -> Turn:
     member_set = set(member_ids)
     ordered = [s.span_id for s in trace.walk(anchor) if s.span_id in member_set]
     anchor_view = info[anchor].view
-    warnings: list[str] = []
+    warnings: list[Gap] = []
 
     calls = _llm_calls(analysis, ordered)
     tool_chains = _tool_chains(analysis, ordered)
@@ -581,7 +611,7 @@ def _turn(analysis: TraceAnalysis, anchor: str) -> Turn:
 
     usage = Usage()
     for call in calls:
-        if call.usage:
+        if call.usage is not None:
             usage = usage + call.usage
 
     agents: set[str] = set()
@@ -729,9 +759,10 @@ def _join_continuations(turns: list[Turn]) -> list[Turn]:
             out[-1] = _merge(out[-1], turn)
             continue
         if out and _maybe_continues(out[-1], turn):
-            warning = (
-                f"turn {turn.ref.span_id} may continue turn {out[-1].ref.span_id} after a tool call, "
-                "but message content was not captured; kept as its own turn"
+            warning = Gap(
+                code=GAP_POSSIBLE_CONTINUATION,
+                reason=f"turn {turn.ref.span_id} may continue turn {out[-1].ref.span_id} after a tool call, "
+                "but message content was not captured; kept as its own turn",
             )
             turn = turn.model_copy(update={"warnings": [*turn.warnings, warning]})
         out.append(turn)

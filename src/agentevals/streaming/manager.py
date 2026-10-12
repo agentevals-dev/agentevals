@@ -117,7 +117,7 @@ def invocation_dict(turn: Turn, spans: dict[tuple[str, str], Span]) -> dict[str,
         "status": turn.status,
         "errorType": turn.error_type,
         "contentCaptured": turn.content_captured,
-        "warnings": turn.warnings,
+        "warnings": [w.reason for w in turn.warnings],
         "externalEvaluations": [
             {
                 "name": e.name,
@@ -241,8 +241,8 @@ def live_events(session_id: str, conversation: Conversation, state: LiveState, i
                     }
                 )
 
-    total_in = sum(t.usage.input_tokens for t in conversation.turns)
-    total_out = sum(t.usage.output_tokens for t in conversation.turns)
+    total_in = sum(t.usage.input_tokens or 0 for t in conversation.turns)
+    total_out = sum(t.usage.output_tokens or 0 for t in conversation.turns)
     if total_in != state.input_tokens or total_out != state.output_tokens:
         model = next(
             (c.response_model or c.request_model for t in reversed(conversation.turns) for c in reversed(t.llm_calls)),

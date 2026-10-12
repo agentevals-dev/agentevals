@@ -516,7 +516,9 @@ async def convert_trace_files(
             first = members[0]
             conversation = extract_conversation(members, key)
             invocations = [_serialize_invocation(inv) for inv in to_adk_invocations(conversation.turns)]
-            warnings = [w for t in members for w in t.warnings] + [w for t in conversation.turns for w in t.warnings]
+            warnings = [w for t in members for w in t.warnings] + [
+                w.reason for t in conversation.turns for w in t.warnings
+            ]
             meta_dict = extract_trace_metadata(members, conversation)
             meta = TraceConversionMetadata(
                 agent_name=meta_dict.get("agent_name"),

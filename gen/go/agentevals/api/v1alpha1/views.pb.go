@@ -214,7 +214,7 @@ func (x *Usage) GetReasoningOutputTokens() int64 {
 }
 
 // Why something is missing or approximate. Codes are stable; reasons are for people and never
-// carry message content or attribute values.
+// carry message content.
 type Gap struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
@@ -925,9 +925,10 @@ type SessionSummary struct {
 	// The last 6 characters of id. Session ids are often time ordered, so their first
 	// characters collide.
 	ShortId string `protobuf:"bytes,2,opt,name=short_id,json=shortId,proto3" json:"short_id,omitempty"`
-	// gen_ai.agent.name of the first turn, else the resource's service.name.
+	// The resource's gen_ai.agent.name, else the first turn's agent, else the resource's
+	// service.name.
 	Agent string `protobuf:"bytes,3,opt,name=agent,proto3" json:"agent,omitempty"`
-	// gen_ai.agent.version, else service.version.
+	// The resource's gen_ai.agent.version, else the first turn's, else service.version.
 	AgentVersion string                 `protobuf:"bytes,4,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
 	State        SessionState           `protobuf:"varint,5,opt,name=state,proto3,enum=agentevals.api.v1alpha1.SessionState" json:"state,omitempty"`
 	StartedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`

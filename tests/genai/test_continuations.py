@@ -56,8 +56,8 @@ def test_tool_round_across_traces_is_one_turn():
 def test_without_content_the_turns_stay_apart_with_a_warning():
     conversation = extract_conversation(_traces(*_tool_round(content=False)), "s")
     assert len(conversation.turns) == 2
-    assert any("may continue" in w for w in conversation.turns[1].warnings)
-    assert not any("may continue" in w for w in conversation.turns[0].warnings)
+    assert any("may continue" in w.reason for w in conversation.turns[1].warnings)
+    assert not any("may continue" in w.reason for w in conversation.turns[0].warnings)
 
 
 def test_a_new_question_is_not_joined():

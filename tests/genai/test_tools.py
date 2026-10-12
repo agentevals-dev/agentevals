@@ -100,7 +100,7 @@ class TestMessageParts:
             ("second", {"n": 2}),
             ("third", {"n": 3}),
         ]
-        assert any("second appears only in message parts" in w for w in turn.warnings)
+        assert any("second appears only in message parts" in w.reason for w in turn.warnings)
 
     def test_a_result_already_in_a_calls_input_does_not_answer_its_new_request(self):
         call = chat(
@@ -114,7 +114,7 @@ class TestMessageParts:
         )
         turn = _turn(call)
         assert [(t.call_id, t.result) for t in turn.tool_calls] == [("call_2", None)]
-        assert not [w for w in turn.warnings if "by order" in w]
+        assert not [w for w in turn.warnings if "by order" in w.reason]
 
     def test_results_still_pair_by_order_across_calls(self):
         first = chat(

@@ -65,7 +65,7 @@ def _turns(conversation):
             "intermediate": [_text(x) for x in (text_of([m]) for m in t.intermediate_outputs) if x],
             "agents": sorted(t.agents),
             "tools": [(c.name, _json(c.arguments), _json(c.result), bool(c.is_error)) for c in t.tool_calls],
-            "tokens": (t.usage.input_tokens, t.usage.output_tokens),
+            "tokens": (t.usage.input_tokens or 0, t.usage.output_tokens or 0),
             "llm_calls": len(t.llm_calls),
             "evaluations": len(t.external_evaluations),
         }
@@ -105,8 +105,8 @@ def test_file_extraction_matches_truth(truth_path):
                 g = {**g, optional: None}
         assert g == w, f"turn {i + 1}"
     total = (
-        sum(t.usage.input_tokens for t in conversation.turns),
-        sum(t.usage.output_tokens for t in conversation.turns),
+        sum(t.usage.input_tokens or 0 for t in conversation.turns),
+        sum(t.usage.output_tokens or 0 for t in conversation.turns),
     )
     assert total == (truth["tokens"]["input"], truth["tokens"]["output"])
 
