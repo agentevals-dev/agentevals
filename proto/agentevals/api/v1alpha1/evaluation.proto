@@ -27,7 +27,7 @@ message Metric {
   bool requires_llm = 5;
   // Needs Google Cloud credentials.
   bool requires_gcp = 6;
-  // Needs rubrics in the eval set.
+  // Needs rubrics, from the evaluator or the eval set.
   bool requires_rubrics = 7;
   // Usable with recorded traces.
   bool working = 8;
@@ -56,6 +56,14 @@ message BuiltinEvaluator {
   string credential_ref = 5;
   // Base URL of an OpenAI compatible judge endpoint.
   string judge_base_url = 6;
+  // Rubrics for the rubric_based_* metrics that take them. Ids are unique.
+  repeated Rubric rubrics = 7;
+}
+
+// One property a rubric metric's judge checks.
+message Rubric {
+  string id = 1;
+  string text = 2;
 }
 
 // An evaluator file on the server, run as a subprocess.

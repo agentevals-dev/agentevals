@@ -28,6 +28,7 @@ from google.adk.evaluation.eval_metrics import (
 from google.adk.evaluation.eval_rubrics import Rubric, RubricContent
 from google.adk.evaluation.evaluator import EvaluationResult, Evaluator
 
+from .config import RUBRIC_METRIC_TYPES
 from .resolvers import get_resolved_credential
 
 logger = logging.getLogger(__name__)
@@ -106,7 +107,7 @@ def metric_catalog() -> list[MetricDescription]:
                 requires_llm=name in METRICS_NEEDING_LLM,
                 requires_gcp=name in METRICS_NEEDING_GCP,
                 requires_rubrics=rubrics,
-                working=not rubrics,
+                working=not rubrics or name in RUBRIC_METRIC_TYPES,
             )
         )
     return out
@@ -224,18 +225,6 @@ def _enrich_app_details(invocations: list[Invocation]) -> list[Invocation]:
     return [inv.model_copy(update={"app_details": app_details}) for inv in invocations]
 
 
-METRICS_NEEDING_RUBRICS = {
-    "rubric_based_final_response_quality_v1",
-    "rubric_based_tool_use_quality_v1",
-}
-
-# ADK filters case and invocation rubrics by type, but not criterion rubrics.
-_METRIC_RUBRIC_TYPES = {
-    "rubric_based_final_response_quality_v1": "FINAL_RESPONSE_QUALITY",
-    "rubric_based_tool_use_quality_v1": "TOOL_USE_QUALITY",
-}
-
-
 def rubric_strings_to_objects(rubric_texts: list[str]) -> list[Rubric]:
     """Convert plain-text rubric strings into ADK Rubric objects."""
     return [
@@ -267,7 +256,7 @@ def attach_case_rubrics(
     Check effective properties before the first judge call, and report dropped
     properties by id and source instead of silently defaulting their type.
     """
-    metric_type = _METRIC_RUBRIC_TYPES.get(metric_name)
+    metric_type = RUBRIC_METRIC_TYPES.get(metric_name)
     attached = []
     warnings = []
     for index, actual in enumerate(actual_invocations):
@@ -357,10 +346,7 @@ def build_eval_metric(
             threshold=effective_threshold,
             judge_model_options=judge_opts,
         )
-    elif metric_name in (
-        "rubric_based_final_response_quality_v1",
-        "rubric_based_tool_use_quality_v1",
-    ):
+    elif metric_name in RUBRIC_METRIC_TYPES:
         judge_opts = JudgeModelOptions()
         if judge_model:
             judge_opts.judge_model = judge_model
@@ -541,7 +527,7 @@ async def evaluate_builtin_metric(
         )
 
     rubric_warnings: list[str] = []
-    if metric_name in METRICS_NEEDING_RUBRICS:
+    if metric_name in RUBRIC_METRIC_TYPES:
         rubric_objects = to_rubric_objects(rubrics)
         try:
             actual_invocations, rubric_warnings = attach_case_rubrics(
@@ -552,7 +538,7 @@ async def evaluate_builtin_metric(
         missing = [
             index
             for index, inv in enumerate(actual_invocations)
-            if not rubric_objects and not any(r.type == _METRIC_RUBRIC_TYPES[metric_name] for r in inv.rubrics or [])
+            if not rubric_objects and not any(r.type == RUBRIC_METRIC_TYPES[metric_name] for r in inv.rubrics or [])
         ]
         if missing or not actual_invocations:
             return MetricResult(
@@ -604,7 +590,7 @@ async def evaluate_builtin_metric(
         details = None
         if metric_name == "tool_trajectory_avg_score":
             details = extract_trajectory_details(eval_result)
-        elif metric_name in METRICS_NEEDING_RUBRICS:
+        elif metric_name in RUBRIC_METRIC_TYPES:
             details = extract_rubric_details(eval_result)
             if rubric_warnings:
                 details["warnings"] = rubric_warnings

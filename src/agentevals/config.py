@@ -22,6 +22,13 @@ UNSUPPORTED_BUILTIN_METRICS = {
     "per_turn_user_simulator_quality_v1": "it scores a simulated user, and agentevals evaluates recorded traces",
 }
 
+# Rubric metrics that take rubrics, with the ADK rubric type each one keeps from eval case and
+# invocation rubrics. ADK never filters config rubrics by type.
+RUBRIC_METRIC_TYPES = {
+    "rubric_based_final_response_quality_v1": "FINAL_RESPONSE_QUALITY",
+    "rubric_based_tool_use_quality_v1": "TOOL_USE_QUALITY",
+}
+
 GroupBy = Literal["auto", "trace", "conversation"]
 
 
@@ -94,6 +101,15 @@ class BuiltinMetricDef(BaseModel):
         if duplicates:
             raise ValueError("Rubric ids must be unique within a metric. Duplicate ids: " + ", ".join(duplicates))
         return value
+
+    @model_validator(mode="after")
+    def _rubrics_only_on_rubric_metrics(self) -> BuiltinMetricDef:
+        if self.rubrics and self.name not in RUBRIC_METRIC_TYPES:
+            raise ValueError(
+                f"Built-in metric '{self.name}' does not take rubrics. "
+                f"Metrics that do: {', '.join(sorted(RUBRIC_METRIC_TYPES))}"
+            )
+        return self
 
 
 class BaseEvaluatorDef(BaseModel):

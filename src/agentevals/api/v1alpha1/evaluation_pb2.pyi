@@ -62,20 +62,30 @@ class ListMetricsResponse(_message.Message):
     def __init__(self, metrics: _Optional[_Iterable[_Union[Metric, _Mapping]]] = ...) -> None: ...
 
 class BuiltinEvaluator(_message.Message):
-    __slots__ = ("name", "threshold", "judge_model", "trajectory_match_type", "credential_ref", "judge_base_url")
+    __slots__ = ("name", "threshold", "judge_model", "trajectory_match_type", "credential_ref", "judge_base_url", "rubrics")
     NAME_FIELD_NUMBER: _ClassVar[int]
     THRESHOLD_FIELD_NUMBER: _ClassVar[int]
     JUDGE_MODEL_FIELD_NUMBER: _ClassVar[int]
     TRAJECTORY_MATCH_TYPE_FIELD_NUMBER: _ClassVar[int]
     CREDENTIAL_REF_FIELD_NUMBER: _ClassVar[int]
     JUDGE_BASE_URL_FIELD_NUMBER: _ClassVar[int]
+    RUBRICS_FIELD_NUMBER: _ClassVar[int]
     name: str
     threshold: float
     judge_model: str
     trajectory_match_type: TrajectoryMatchType
     credential_ref: str
     judge_base_url: str
-    def __init__(self, name: _Optional[str] = ..., threshold: _Optional[float] = ..., judge_model: _Optional[str] = ..., trajectory_match_type: _Optional[_Union[TrajectoryMatchType, str]] = ..., credential_ref: _Optional[str] = ..., judge_base_url: _Optional[str] = ...) -> None: ...
+    rubrics: _containers.RepeatedCompositeFieldContainer[Rubric]
+    def __init__(self, name: _Optional[str] = ..., threshold: _Optional[float] = ..., judge_model: _Optional[str] = ..., trajectory_match_type: _Optional[_Union[TrajectoryMatchType, str]] = ..., credential_ref: _Optional[str] = ..., judge_base_url: _Optional[str] = ..., rubrics: _Optional[_Iterable[_Union[Rubric, _Mapping]]] = ...) -> None: ...
+
+class Rubric(_message.Message):
+    __slots__ = ("id", "text")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    text: str
+    def __init__(self, id: _Optional[str] = ..., text: _Optional[str] = ...) -> None: ...
 
 class CodeEvaluator(_message.Message):
     __slots__ = ("name", "threshold", "timeout", "config", "executor", "path")

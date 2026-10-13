@@ -64,7 +64,7 @@ export declare type Metric = Message<"agentevals.api.v1alpha1.Metric"> & {
   requiresGcp: boolean;
 
   /**
-   * Needs rubrics in the eval set.
+   * Needs rubrics, from the evaluator or the eval set.
    *
    * @generated from field: bool requires_rubrics = 7;
    */
@@ -141,6 +141,13 @@ export declare type BuiltinEvaluator = Message<"agentevals.api.v1alpha1.BuiltinE
    * @generated from field: string judge_base_url = 6;
    */
   judgeBaseUrl: string;
+
+  /**
+   * Rubrics for the rubric_based_* metrics that take them. Ids are unique.
+   *
+   * @generated from field: repeated agentevals.api.v1alpha1.Rubric rubrics = 7;
+   */
+  rubrics: Rubric[];
 };
 
 /**
@@ -148,6 +155,29 @@ export declare type BuiltinEvaluator = Message<"agentevals.api.v1alpha1.BuiltinE
  * Use `create(BuiltinEvaluatorSchema)` to create a new message.
  */
 export declare const BuiltinEvaluatorSchema: GenMessage<BuiltinEvaluator>;
+
+/**
+ * One property a rubric metric's judge checks.
+ *
+ * @generated from message agentevals.api.v1alpha1.Rubric
+ */
+export declare type Rubric = Message<"agentevals.api.v1alpha1.Rubric"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string text = 2;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message agentevals.api.v1alpha1.Rubric.
+ * Use `create(RubricSchema)` to create a new message.
+ */
+export declare const RubricSchema: GenMessage<Rubric>;
 
 /**
  * An evaluator file on the server, run as a subprocess.
