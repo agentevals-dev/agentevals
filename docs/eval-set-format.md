@@ -176,6 +176,53 @@ An eval case can have multiple invocations to represent a conversation. Each inv
 | `rubrics` | list[Rubric] | no | Scoring rubrics for this specific invocation |
 | `creation_timestamp` | float | no | Unix timestamp |
 
+### Rubrics
+
+`rubrics` on an eval case apply to every invocation of that case; `rubrics` on an invocation apply to that invocation alone. Each rubric is an ADK `Rubric`: `rubric_id`, `rubric_content.text_property`, and `type`. Response-quality rubrics use `FINAL_RESPONSE_QUALITY`; tool-use rubrics use `TOOL_USE_QUALITY`. As in ADK, each metric ignores properties of another type. Untyped case/invocation properties are ignored with their ids and locations listed in `details.warnings`. The runner preserves authored types. Config-level `{id, text}` rubrics are not filtered by type. Effective rubric ids must be distinct across the metric, case and invocation. A clash or an invocation with no applicable rubrics reports an error before any judge call.
+
+The `rubric_based_*` metrics grade each invocation on its own, with that invocation's prompt, steps and final response, so a case-level rubric is judged once per turn. In a multi-turn case a rubric that describes the end state ("produces the completed draft") is therefore judged against the intermediate turns as well, where it fails, and lowers the case's mean. Write such a rubric on the final invocation instead, and keep config/case-level rubrics for properties every turn must have. Every evaluated turn still needs an applicable property. A terminal response may be a clarification request when that is the expected outcome of the case. Earlier conversational context and a dedicated final-turn expectations format are separate from this per-invocation behavior.
+
+```json
+{
+  "eval_id": "booking-clarification-and-completion",
+  "rubrics": [
+    {
+      "rubric_id": "clear-outcome",
+      "type": "FINAL_RESPONSE_QUALITY",
+      "rubric_content": {"text_property": "Clearly distinguishes a clarification question from a completed draft."}
+    }
+  ],
+  "conversation": [
+    {
+      "invocation_id": "clarification",
+      "user_content": {"role": "user", "parts": [{"text": "Draft a booking for Paris."}]},
+      "final_response": {"role": "model", "parts": [{"text": "What date should the booking use?"}]},
+      "rubrics": [
+        {
+          "rubric_id": "asks-date",
+          "type": "FINAL_RESPONSE_QUALITY",
+          "rubric_content": {"text_property": "Asks for the missing date without claiming a completed booking."}
+        }
+      ]
+    },
+    {
+      "invocation_id": "completion",
+      "user_content": {"role": "user", "parts": [{"text": "Friday; actually use Lyon."}]},
+      "final_response": {"role": "model", "parts": [{"text": "Draft booking for Lyon on Friday."}]},
+      "rubrics": [
+        {
+          "rubric_id": "uses-latest-destination",
+          "type": "FINAL_RESPONSE_QUALITY",
+          "rubric_content": {"text_property": "Uses Lyon and Friday in the completed draft."}
+        }
+      ]
+    }
+  ]
+}
+```
+
+Here `clear-outcome` applies to both invocations, `asks-date` only to the clarification, and `uses-latest-destination` only to the completed draft. A case intended to stop at clarification can contain just the first invocation and its properties; it does not need to require a completed answer. This uses the existing invocation rubric field without adding a new scope option or changing ADK semantics.
+
 ### Content
 
 Uses the Google GenAI `Content` format:

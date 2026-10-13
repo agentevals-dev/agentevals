@@ -29,6 +29,7 @@ from google.genai import types as genai_types
 from agentevals import builtin_metrics
 from agentevals.adk_bridge import to_adk_invocations
 from agentevals.builtin_metrics import _to_invocation_events, evaluate_builtin_metric
+from agentevals.config import RUBRIC_METRIC_TYPES
 from agentevals.genai.extract import extract_conversation
 from agentevals.loader import load_traces
 
@@ -287,7 +288,14 @@ async def test_every_prebuilt_metric_receives_invocation_events(monkeypatch, met
     actual = _invocation([("a", "1")], [("a", "1", "A")])
     expected = _invocation([("a", "1")], [])
 
-    result = await evaluate_builtin_metric(metric_name, [actual], [expected], None, 0.5)
+    result = await evaluate_builtin_metric(
+        metric_name,
+        [actual],
+        [expected],
+        None,
+        0.5,
+        rubrics=["Uses captured evidence."] if metric_name in RUBRIC_METRIC_TYPES else None,
+    )
 
     assert result.error is None
     for inv in [*recorder.actual, *recorder.expected]:

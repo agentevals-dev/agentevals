@@ -179,6 +179,8 @@ def _evaluator_dict(evaluator: evaluation_pb2.Evaluator) -> dict[str, Any]:
                 out[field] = getattr(message, field)
         if message.trajectory_match_type in TRAJECTORY_MATCH_FROM_PB:
             out["trajectory_match_type"] = TRAJECTORY_MATCH_FROM_PB[message.trajectory_match_type]
+        if message.rubrics:
+            out["rubrics"] = [{"id": r.id, "text": r.text} for r in message.rubrics]
         return out
     if message.HasField("timeout"):
         out["timeout"] = message.timeout
@@ -223,6 +225,7 @@ def _evaluator_to_pb(evaluator: Any) -> evaluation_pb2.Evaluator:
             trajectory_match_type=TRAJECTORY_MATCH.get(evaluator.trajectory_match_type or "", 0),
             credential_ref=evaluator.credential_ref or "",
             judge_base_url=evaluator.judge_base_url or "",
+            rubrics=[evaluation_pb2.Rubric(id=r.id, text=r.text) for r in evaluator.rubrics or []],
         )
         if evaluator.threshold is not None:
             builtin.threshold = evaluator.threshold

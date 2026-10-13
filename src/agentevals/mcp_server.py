@@ -465,7 +465,7 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
                 "golden_session_id": golden_session_id,
                 "eval_set_id": eval_set_id or f"eval-{golden_session_id[:12]}",
                 "evaluators": [
-                    e.model_dump(mode="json", by_alias=True)
+                    e.model_dump(mode="json", by_alias=True, exclude={"rubrics"} if e.rubrics is None else set())
                     for e in make_builtin_evaluator_entries(
                         metrics,
                         judge_model=judge_model,

@@ -89,6 +89,21 @@ agentevals run traces/my_trace.json \
 
 Each evaluator entry in the `evaluators` list uses the following fields. The `type` field determines which other fields are valid.
 
+### `type: builtin` (ADK metrics)
+
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `name` | yes | | The metric, for example `tool_trajectory_avg_score` or `rubric_based_final_response_quality_v1` |
+| `type` | yes | | `builtin` |
+| `threshold` | no | `0.5` | Score at or above this value means PASSED |
+| `judge_model` | no | ADK default | Judge model for LLM-backed metrics |
+| `trajectory_match_type` | no | `EXACT` | `EXACT`, `IN_ORDER` or `ANY_ORDER`, for `tool_trajectory_avg_score` |
+| `rubrics` | for `rubric_based_final_response_quality_v1` and `rubric_based_tool_use_quality_v1` | | A list of `{id, text}` mappings, or plain strings (given positional ids `rubric_0`, `rubric_1`, ...). Ids must be unique. Config rubrics have no `type` field. Other metrics reject `rubrics` |
+| `credential_ref` | no | | Name of a credential the judge key is resolved from (API runs) |
+| `judge_base_url` | no | | Base URL of an OpenAI-compatible judge endpoint |
+
+Each of these metrics requires an applicable rubric for each evaluated invocation, from the config, the matched eval case or that invocation. Its result carries `details.per_invocation[].rubric_scores` and `details.overall_rubric_scores`, one entry per rubric id with its score and the judge's rationale. Untyped case/invocation rubrics are listed in `details.warnings`; other types are ignored as in ADK, so response and tool-use properties can share one eval set. Config rubrics are not filtered by type. Invalid or empty effective rubric sets report an error before any judge call. Scores, aggregation and explanations follow ADK.
+
 ### `type: code` (local scripts)
 
 | Field | Required | Default | Description |

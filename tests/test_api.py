@@ -452,6 +452,13 @@ class TestMetricsEndpoint:
         assert isinstance(body["data"], list)
         assert body["error"] is None
 
+    def test_only_supported_rubric_metrics_are_available(self):
+        body = _assert_envelope(self.client.get("/api/metrics"))
+        metrics = {metric["name"]: metric for metric in body["data"]}
+        assert metrics["rubric_based_final_response_quality_v1"]["working"] is True
+        assert metrics["rubric_based_tool_use_quality_v1"]["working"] is True
+        assert metrics["rubric_based_multi_turn_trajectory_quality_v1"]["working"] is False
+
     def test_metrics_all_camel(self):
         body = self.client.get("/api/metrics").json()
         _assert_all_keys_camel(body)

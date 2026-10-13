@@ -412,7 +412,7 @@ export const AVAILABLE_METRICS: MetricMetadata[] = [
     requiresLLM: true,
     requiresGCP: false,
     requiresRubrics: true,
-    working: false,
+    working: true,
     description: 'Rubric-based quality assessment of responses (requires rubrics config)'
   },
   {
@@ -422,7 +422,7 @@ export const AVAILABLE_METRICS: MetricMetadata[] = [
     requiresLLM: true,
     requiresGCP: false,
     requiresRubrics: true,
-    working: false,
+    working: true,
     description: 'Rubric-based assessment of tool usage quality (requires rubrics config)'
   },
   // Safety metrics

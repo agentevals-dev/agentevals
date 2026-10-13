@@ -174,7 +174,7 @@ type Metric struct {
 	RequiresLlm bool `protobuf:"varint,5,opt,name=requires_llm,json=requiresLlm,proto3" json:"requires_llm,omitempty"`
 	// Needs Google Cloud credentials.
 	RequiresGcp bool `protobuf:"varint,6,opt,name=requires_gcp,json=requiresGcp,proto3" json:"requires_gcp,omitempty"`
-	// Needs rubrics in the eval set.
+	// Needs rubrics, from the evaluator or the eval set.
 	RequiresRubrics bool `protobuf:"varint,7,opt,name=requires_rubrics,json=requiresRubrics,proto3" json:"requires_rubrics,omitempty"`
 	// Usable with recorded traces.
 	Working       bool `protobuf:"varint,8,opt,name=working,proto3" json:"working,omitempty"`
@@ -323,7 +323,9 @@ type BuiltinEvaluator struct {
 	// Name of a credential_refs entry whose value is the judge API key.
 	CredentialRef string `protobuf:"bytes,5,opt,name=credential_ref,json=credentialRef,proto3" json:"credential_ref,omitempty"`
 	// Base URL of an OpenAI compatible judge endpoint.
-	JudgeBaseUrl  string `protobuf:"bytes,6,opt,name=judge_base_url,json=judgeBaseUrl,proto3" json:"judge_base_url,omitempty"`
+	JudgeBaseUrl string `protobuf:"bytes,6,opt,name=judge_base_url,json=judgeBaseUrl,proto3" json:"judge_base_url,omitempty"`
+	// Rubrics for the rubric_based_* metrics that take them. Ids are unique.
+	Rubrics       []*Rubric `protobuf:"bytes,7,rep,name=rubrics,proto3" json:"rubrics,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -400,6 +402,66 @@ func (x *BuiltinEvaluator) GetJudgeBaseUrl() string {
 	return ""
 }
 
+func (x *BuiltinEvaluator) GetRubrics() []*Rubric {
+	if x != nil {
+		return x.Rubrics
+	}
+	return nil
+}
+
+// One property a rubric metric's judge checks.
+type Rubric struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Rubric) Reset() {
+	*x = Rubric{}
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Rubric) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Rubric) ProtoMessage() {}
+
+func (x *Rubric) ProtoReflect() protoreflect.Message {
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Rubric.ProtoReflect.Descriptor instead.
+func (*Rubric) Descriptor() ([]byte, []int) {
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Rubric) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Rubric) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
 // An evaluator file on the server, run as a subprocess.
 type CodeEvaluator struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -419,7 +481,7 @@ type CodeEvaluator struct {
 
 func (x *CodeEvaluator) Reset() {
 	*x = CodeEvaluator{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[4]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -431,7 +493,7 @@ func (x *CodeEvaluator) String() string {
 func (*CodeEvaluator) ProtoMessage() {}
 
 func (x *CodeEvaluator) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[4]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -444,7 +506,7 @@ func (x *CodeEvaluator) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CodeEvaluator.ProtoReflect.Descriptor instead.
 func (*CodeEvaluator) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{4}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CodeEvaluator) GetName() string {
@@ -510,7 +572,7 @@ type RemoteEvaluator struct {
 
 func (x *RemoteEvaluator) Reset() {
 	*x = RemoteEvaluator{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[5]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -522,7 +584,7 @@ func (x *RemoteEvaluator) String() string {
 func (*RemoteEvaluator) ProtoMessage() {}
 
 func (x *RemoteEvaluator) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[5]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -535,7 +597,7 @@ func (x *RemoteEvaluator) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoteEvaluator.ProtoReflect.Descriptor instead.
 func (*RemoteEvaluator) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{5}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RemoteEvaluator) GetName() string {
@@ -601,7 +663,7 @@ type Evaluator struct {
 
 func (x *Evaluator) Reset() {
 	*x = Evaluator{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[6]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -613,7 +675,7 @@ func (x *Evaluator) String() string {
 func (*Evaluator) ProtoMessage() {}
 
 func (x *Evaluator) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[6]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -626,7 +688,7 @@ func (x *Evaluator) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Evaluator.ProtoReflect.Descriptor instead.
 func (*Evaluator) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{6}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Evaluator) GetKind() isEvaluator_Kind {
@@ -701,7 +763,7 @@ type EvalParams struct {
 
 func (x *EvalParams) Reset() {
 	*x = EvalParams{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[7]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -713,7 +775,7 @@ func (x *EvalParams) String() string {
 func (*EvalParams) ProtoMessage() {}
 
 func (x *EvalParams) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[7]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -726,7 +788,7 @@ func (x *EvalParams) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvalParams.ProtoReflect.Descriptor instead.
 func (*EvalParams) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{7}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *EvalParams) GetEvaluators() []*Evaluator {
@@ -769,7 +831,7 @@ type InvocationResult struct {
 
 func (x *InvocationResult) Reset() {
 	*x = InvocationResult{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[8]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -781,7 +843,7 @@ func (x *InvocationResult) String() string {
 func (*InvocationResult) ProtoMessage() {}
 
 func (x *InvocationResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[8]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -794,7 +856,7 @@ func (x *InvocationResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvocationResult.ProtoReflect.Descriptor instead.
 func (*InvocationResult) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{8}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *InvocationResult) GetScore() float64 {
@@ -830,7 +892,7 @@ type MetricResult struct {
 
 func (x *MetricResult) Reset() {
 	*x = MetricResult{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[9]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -842,7 +904,7 @@ func (x *MetricResult) String() string {
 func (*MetricResult) ProtoMessage() {}
 
 func (x *MetricResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[9]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -855,7 +917,7 @@ func (x *MetricResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricResult.ProtoReflect.Descriptor instead.
 func (*MetricResult) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{9}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *MetricResult) GetMetricName() string {
@@ -924,7 +986,7 @@ type TurnRef struct {
 
 func (x *TurnRef) Reset() {
 	*x = TurnRef{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[10]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -936,7 +998,7 @@ func (x *TurnRef) String() string {
 func (*TurnRef) ProtoMessage() {}
 
 func (x *TurnRef) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[10]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -949,7 +1011,7 @@ func (x *TurnRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TurnRef.ProtoReflect.Descriptor instead.
 func (*TurnRef) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{10}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *TurnRef) GetTraceId() string {
@@ -995,7 +1057,7 @@ type TraceResult struct {
 
 func (x *TraceResult) Reset() {
 	*x = TraceResult{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[11]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1007,7 +1069,7 @@ func (x *TraceResult) String() string {
 func (*TraceResult) ProtoMessage() {}
 
 func (x *TraceResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[11]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1020,7 +1082,7 @@ func (x *TraceResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TraceResult.ProtoReflect.Descriptor instead.
 func (*TraceResult) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{11}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *TraceResult) GetTraceId() string {
@@ -1127,7 +1189,7 @@ type RunResult struct {
 
 func (x *RunResult) Reset() {
 	*x = RunResult{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[12]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1139,7 +1201,7 @@ func (x *RunResult) String() string {
 func (*RunResult) ProtoMessage() {}
 
 func (x *RunResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[12]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1152,7 +1214,7 @@ func (x *RunResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunResult.ProtoReflect.Descriptor instead.
 func (*RunResult) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{12}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RunResult) GetTraceResults() []*TraceResult {
@@ -1203,7 +1265,7 @@ type EvaluateTracesRequest struct {
 
 func (x *EvaluateTracesRequest) Reset() {
 	*x = EvaluateTracesRequest{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[13]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1215,7 +1277,7 @@ func (x *EvaluateTracesRequest) String() string {
 func (*EvaluateTracesRequest) ProtoMessage() {}
 
 func (x *EvaluateTracesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[13]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1228,7 +1290,7 @@ func (x *EvaluateTracesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluateTracesRequest.ProtoReflect.Descriptor instead.
 func (*EvaluateTracesRequest) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{13}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *EvaluateTracesRequest) GetTraces() *TraceInput {
@@ -1288,7 +1350,7 @@ type EvaluationProgress struct {
 
 func (x *EvaluationProgress) Reset() {
 	*x = EvaluationProgress{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[14]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1300,7 +1362,7 @@ func (x *EvaluationProgress) String() string {
 func (*EvaluationProgress) ProtoMessage() {}
 
 func (x *EvaluationProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[14]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1313,7 +1375,7 @@ func (x *EvaluationProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationProgress.ProtoReflect.Descriptor instead.
 func (*EvaluationProgress) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{14}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *EvaluationProgress) GetMessage() string {
@@ -1336,7 +1398,7 @@ type GroupPerformance struct {
 
 func (x *GroupPerformance) Reset() {
 	*x = GroupPerformance{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[15]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1348,7 +1410,7 @@ func (x *GroupPerformance) String() string {
 func (*GroupPerformance) ProtoMessage() {}
 
 func (x *GroupPerformance) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[15]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1361,7 +1423,7 @@ func (x *GroupPerformance) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GroupPerformance.ProtoReflect.Descriptor instead.
 func (*GroupPerformance) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{15}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GroupPerformance) GetTraceId() string {
@@ -1400,7 +1462,7 @@ type EvaluateTracesResponse struct {
 
 func (x *EvaluateTracesResponse) Reset() {
 	*x = EvaluateTracesResponse{}
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[16]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1412,7 +1474,7 @@ func (x *EvaluateTracesResponse) String() string {
 func (*EvaluateTracesResponse) ProtoMessage() {}
 
 func (x *EvaluateTracesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[16]
+	mi := &file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1425,7 +1487,7 @@ func (x *EvaluateTracesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluateTracesResponse.ProtoReflect.Descriptor instead.
 func (*EvaluateTracesResponse) Descriptor() ([]byte, []int) {
-	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{16}
+	return file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *EvaluateTracesResponse) GetEvent() isEvaluateTracesResponse_Event {
@@ -1517,7 +1579,7 @@ const file_agentevals_api_v1alpha1_evaluation_proto_rawDesc = "" +
 	"\x10requires_rubrics\x18\a \x01(\bR\x0frequiresRubrics\x12\x18\n" +
 	"\aworking\x18\b \x01(\bR\aworking\"P\n" +
 	"\x13ListMetricsResponse\x129\n" +
-	"\ametrics\x18\x01 \x03(\v2\x1f.agentevals.api.v1alpha1.MetricR\ametrics\"\xa7\x02\n" +
+	"\ametrics\x18\x01 \x03(\v2\x1f.agentevals.api.v1alpha1.MetricR\ametrics\"\xe2\x02\n" +
 	"\x10BuiltinEvaluator\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\tthreshold\x18\x02 \x01(\x01H\x00R\tthreshold\x88\x01\x01\x12\x1f\n" +
@@ -1525,9 +1587,13 @@ const file_agentevals_api_v1alpha1_evaluation_proto_rawDesc = "" +
 	"judgeModel\x12`\n" +
 	"\x15trajectory_match_type\x18\x04 \x01(\x0e2,.agentevals.api.v1alpha1.TrajectoryMatchTypeR\x13trajectoryMatchType\x12%\n" +
 	"\x0ecredential_ref\x18\x05 \x01(\tR\rcredentialRef\x12$\n" +
-	"\x0ejudge_base_url\x18\x06 \x01(\tR\fjudgeBaseUrlB\f\n" +
+	"\x0ejudge_base_url\x18\x06 \x01(\tR\fjudgeBaseUrl\x129\n" +
+	"\arubrics\x18\a \x03(\v2\x1f.agentevals.api.v1alpha1.RubricR\arubricsB\f\n" +
 	"\n" +
-	"_threshold\"\xe0\x01\n" +
+	"_threshold\",\n" +
+	"\x06Rubric\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\"\xe0\x01\n" +
 	"\rCodeEvaluator\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\tthreshold\x18\x02 \x01(\x01H\x00R\tthreshold\x88\x01\x01\x12\x1d\n" +
@@ -1663,7 +1729,7 @@ func file_agentevals_api_v1alpha1_evaluation_proto_rawDescGZIP() []byte {
 }
 
 var file_agentevals_api_v1alpha1_evaluation_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_agentevals_api_v1alpha1_evaluation_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_agentevals_api_v1alpha1_evaluation_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_agentevals_api_v1alpha1_evaluation_proto_goTypes = []any{
 	(TrajectoryMatchType)(0),       // 0: agentevals.api.v1alpha1.TrajectoryMatchType
 	(EvalStatus)(0),                // 1: agentevals.api.v1alpha1.EvalStatus
@@ -1671,63 +1737,65 @@ var file_agentevals_api_v1alpha1_evaluation_proto_goTypes = []any{
 	(*Metric)(nil),                 // 3: agentevals.api.v1alpha1.Metric
 	(*ListMetricsResponse)(nil),    // 4: agentevals.api.v1alpha1.ListMetricsResponse
 	(*BuiltinEvaluator)(nil),       // 5: agentevals.api.v1alpha1.BuiltinEvaluator
-	(*CodeEvaluator)(nil),          // 6: agentevals.api.v1alpha1.CodeEvaluator
-	(*RemoteEvaluator)(nil),        // 7: agentevals.api.v1alpha1.RemoteEvaluator
-	(*Evaluator)(nil),              // 8: agentevals.api.v1alpha1.Evaluator
-	(*EvalParams)(nil),             // 9: agentevals.api.v1alpha1.EvalParams
-	(*InvocationResult)(nil),       // 10: agentevals.api.v1alpha1.InvocationResult
-	(*MetricResult)(nil),           // 11: agentevals.api.v1alpha1.MetricResult
-	(*TurnRef)(nil),                // 12: agentevals.api.v1alpha1.TurnRef
-	(*TraceResult)(nil),            // 13: agentevals.api.v1alpha1.TraceResult
-	(*RunResult)(nil),              // 14: agentevals.api.v1alpha1.RunResult
-	(*EvaluateTracesRequest)(nil),  // 15: agentevals.api.v1alpha1.EvaluateTracesRequest
-	(*EvaluationProgress)(nil),     // 16: agentevals.api.v1alpha1.EvaluationProgress
-	(*GroupPerformance)(nil),       // 17: agentevals.api.v1alpha1.GroupPerformance
-	(*EvaluateTracesResponse)(nil), // 18: agentevals.api.v1alpha1.EvaluateTracesResponse
-	nil,                            // 19: agentevals.api.v1alpha1.EvaluateTracesRequest.CredentialRefsEntry
-	(*structpb.Struct)(nil),        // 20: google.protobuf.Struct
-	(GroupBy)(0),                   // 21: agentevals.api.v1alpha1.GroupBy
-	(*TraceInput)(nil),             // 22: agentevals.api.v1alpha1.TraceInput
+	(*Rubric)(nil),                 // 6: agentevals.api.v1alpha1.Rubric
+	(*CodeEvaluator)(nil),          // 7: agentevals.api.v1alpha1.CodeEvaluator
+	(*RemoteEvaluator)(nil),        // 8: agentevals.api.v1alpha1.RemoteEvaluator
+	(*Evaluator)(nil),              // 9: agentevals.api.v1alpha1.Evaluator
+	(*EvalParams)(nil),             // 10: agentevals.api.v1alpha1.EvalParams
+	(*InvocationResult)(nil),       // 11: agentevals.api.v1alpha1.InvocationResult
+	(*MetricResult)(nil),           // 12: agentevals.api.v1alpha1.MetricResult
+	(*TurnRef)(nil),                // 13: agentevals.api.v1alpha1.TurnRef
+	(*TraceResult)(nil),            // 14: agentevals.api.v1alpha1.TraceResult
+	(*RunResult)(nil),              // 15: agentevals.api.v1alpha1.RunResult
+	(*EvaluateTracesRequest)(nil),  // 16: agentevals.api.v1alpha1.EvaluateTracesRequest
+	(*EvaluationProgress)(nil),     // 17: agentevals.api.v1alpha1.EvaluationProgress
+	(*GroupPerformance)(nil),       // 18: agentevals.api.v1alpha1.GroupPerformance
+	(*EvaluateTracesResponse)(nil), // 19: agentevals.api.v1alpha1.EvaluateTracesResponse
+	nil,                            // 20: agentevals.api.v1alpha1.EvaluateTracesRequest.CredentialRefsEntry
+	(*structpb.Struct)(nil),        // 21: google.protobuf.Struct
+	(GroupBy)(0),                   // 22: agentevals.api.v1alpha1.GroupBy
+	(*TraceInput)(nil),             // 23: agentevals.api.v1alpha1.TraceInput
 }
 var file_agentevals_api_v1alpha1_evaluation_proto_depIdxs = []int32{
 	3,  // 0: agentevals.api.v1alpha1.ListMetricsResponse.metrics:type_name -> agentevals.api.v1alpha1.Metric
 	0,  // 1: agentevals.api.v1alpha1.BuiltinEvaluator.trajectory_match_type:type_name -> agentevals.api.v1alpha1.TrajectoryMatchType
-	20, // 2: agentevals.api.v1alpha1.CodeEvaluator.config:type_name -> google.protobuf.Struct
-	20, // 3: agentevals.api.v1alpha1.RemoteEvaluator.config:type_name -> google.protobuf.Struct
-	5,  // 4: agentevals.api.v1alpha1.Evaluator.builtin:type_name -> agentevals.api.v1alpha1.BuiltinEvaluator
-	6,  // 5: agentevals.api.v1alpha1.Evaluator.code:type_name -> agentevals.api.v1alpha1.CodeEvaluator
-	7,  // 6: agentevals.api.v1alpha1.Evaluator.remote:type_name -> agentevals.api.v1alpha1.RemoteEvaluator
-	8,  // 7: agentevals.api.v1alpha1.EvalParams.evaluators:type_name -> agentevals.api.v1alpha1.Evaluator
-	21, // 8: agentevals.api.v1alpha1.EvalParams.group_by:type_name -> agentevals.api.v1alpha1.GroupBy
-	1,  // 9: agentevals.api.v1alpha1.InvocationResult.status:type_name -> agentevals.api.v1alpha1.EvalStatus
-	1,  // 10: agentevals.api.v1alpha1.MetricResult.eval_status:type_name -> agentevals.api.v1alpha1.EvalStatus
-	10, // 11: agentevals.api.v1alpha1.MetricResult.per_invocation:type_name -> agentevals.api.v1alpha1.InvocationResult
-	20, // 12: agentevals.api.v1alpha1.MetricResult.details:type_name -> google.protobuf.Struct
-	11, // 13: agentevals.api.v1alpha1.TraceResult.metric_results:type_name -> agentevals.api.v1alpha1.MetricResult
-	20, // 14: agentevals.api.v1alpha1.TraceResult.performance_metrics:type_name -> google.protobuf.Struct
-	12, // 15: agentevals.api.v1alpha1.TraceResult.turn_refs:type_name -> agentevals.api.v1alpha1.TurnRef
-	13, // 16: agentevals.api.v1alpha1.RunResult.trace_results:type_name -> agentevals.api.v1alpha1.TraceResult
-	20, // 17: agentevals.api.v1alpha1.RunResult.performance_metrics:type_name -> google.protobuf.Struct
-	22, // 18: agentevals.api.v1alpha1.EvaluateTracesRequest.traces:type_name -> agentevals.api.v1alpha1.TraceInput
-	20, // 19: agentevals.api.v1alpha1.EvaluateTracesRequest.adk_eval_set:type_name -> google.protobuf.Struct
-	9,  // 20: agentevals.api.v1alpha1.EvaluateTracesRequest.params:type_name -> agentevals.api.v1alpha1.EvalParams
-	19, // 21: agentevals.api.v1alpha1.EvaluateTracesRequest.credential_refs:type_name -> agentevals.api.v1alpha1.EvaluateTracesRequest.CredentialRefsEntry
-	20, // 22: agentevals.api.v1alpha1.GroupPerformance.performance_metrics:type_name -> google.protobuf.Struct
-	20, // 23: agentevals.api.v1alpha1.GroupPerformance.trace_metadata:type_name -> google.protobuf.Struct
-	16, // 24: agentevals.api.v1alpha1.EvaluateTracesResponse.progress:type_name -> agentevals.api.v1alpha1.EvaluationProgress
-	17, // 25: agentevals.api.v1alpha1.EvaluateTracesResponse.performance:type_name -> agentevals.api.v1alpha1.GroupPerformance
-	13, // 26: agentevals.api.v1alpha1.EvaluateTracesResponse.trace_result:type_name -> agentevals.api.v1alpha1.TraceResult
-	14, // 27: agentevals.api.v1alpha1.EvaluateTracesResponse.done:type_name -> agentevals.api.v1alpha1.RunResult
-	20, // 28: agentevals.api.v1alpha1.EvaluateTracesRequest.CredentialRefsEntry.value:type_name -> google.protobuf.Struct
-	2,  // 29: agentevals.api.v1alpha1.EvaluationService.ListMetrics:input_type -> agentevals.api.v1alpha1.ListMetricsRequest
-	15, // 30: agentevals.api.v1alpha1.EvaluationService.EvaluateTraces:input_type -> agentevals.api.v1alpha1.EvaluateTracesRequest
-	4,  // 31: agentevals.api.v1alpha1.EvaluationService.ListMetrics:output_type -> agentevals.api.v1alpha1.ListMetricsResponse
-	18, // 32: agentevals.api.v1alpha1.EvaluationService.EvaluateTraces:output_type -> agentevals.api.v1alpha1.EvaluateTracesResponse
-	31, // [31:33] is the sub-list for method output_type
-	29, // [29:31] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	6,  // 2: agentevals.api.v1alpha1.BuiltinEvaluator.rubrics:type_name -> agentevals.api.v1alpha1.Rubric
+	21, // 3: agentevals.api.v1alpha1.CodeEvaluator.config:type_name -> google.protobuf.Struct
+	21, // 4: agentevals.api.v1alpha1.RemoteEvaluator.config:type_name -> google.protobuf.Struct
+	5,  // 5: agentevals.api.v1alpha1.Evaluator.builtin:type_name -> agentevals.api.v1alpha1.BuiltinEvaluator
+	7,  // 6: agentevals.api.v1alpha1.Evaluator.code:type_name -> agentevals.api.v1alpha1.CodeEvaluator
+	8,  // 7: agentevals.api.v1alpha1.Evaluator.remote:type_name -> agentevals.api.v1alpha1.RemoteEvaluator
+	9,  // 8: agentevals.api.v1alpha1.EvalParams.evaluators:type_name -> agentevals.api.v1alpha1.Evaluator
+	22, // 9: agentevals.api.v1alpha1.EvalParams.group_by:type_name -> agentevals.api.v1alpha1.GroupBy
+	1,  // 10: agentevals.api.v1alpha1.InvocationResult.status:type_name -> agentevals.api.v1alpha1.EvalStatus
+	1,  // 11: agentevals.api.v1alpha1.MetricResult.eval_status:type_name -> agentevals.api.v1alpha1.EvalStatus
+	11, // 12: agentevals.api.v1alpha1.MetricResult.per_invocation:type_name -> agentevals.api.v1alpha1.InvocationResult
+	21, // 13: agentevals.api.v1alpha1.MetricResult.details:type_name -> google.protobuf.Struct
+	12, // 14: agentevals.api.v1alpha1.TraceResult.metric_results:type_name -> agentevals.api.v1alpha1.MetricResult
+	21, // 15: agentevals.api.v1alpha1.TraceResult.performance_metrics:type_name -> google.protobuf.Struct
+	13, // 16: agentevals.api.v1alpha1.TraceResult.turn_refs:type_name -> agentevals.api.v1alpha1.TurnRef
+	14, // 17: agentevals.api.v1alpha1.RunResult.trace_results:type_name -> agentevals.api.v1alpha1.TraceResult
+	21, // 18: agentevals.api.v1alpha1.RunResult.performance_metrics:type_name -> google.protobuf.Struct
+	23, // 19: agentevals.api.v1alpha1.EvaluateTracesRequest.traces:type_name -> agentevals.api.v1alpha1.TraceInput
+	21, // 20: agentevals.api.v1alpha1.EvaluateTracesRequest.adk_eval_set:type_name -> google.protobuf.Struct
+	10, // 21: agentevals.api.v1alpha1.EvaluateTracesRequest.params:type_name -> agentevals.api.v1alpha1.EvalParams
+	20, // 22: agentevals.api.v1alpha1.EvaluateTracesRequest.credential_refs:type_name -> agentevals.api.v1alpha1.EvaluateTracesRequest.CredentialRefsEntry
+	21, // 23: agentevals.api.v1alpha1.GroupPerformance.performance_metrics:type_name -> google.protobuf.Struct
+	21, // 24: agentevals.api.v1alpha1.GroupPerformance.trace_metadata:type_name -> google.protobuf.Struct
+	17, // 25: agentevals.api.v1alpha1.EvaluateTracesResponse.progress:type_name -> agentevals.api.v1alpha1.EvaluationProgress
+	18, // 26: agentevals.api.v1alpha1.EvaluateTracesResponse.performance:type_name -> agentevals.api.v1alpha1.GroupPerformance
+	14, // 27: agentevals.api.v1alpha1.EvaluateTracesResponse.trace_result:type_name -> agentevals.api.v1alpha1.TraceResult
+	15, // 28: agentevals.api.v1alpha1.EvaluateTracesResponse.done:type_name -> agentevals.api.v1alpha1.RunResult
+	21, // 29: agentevals.api.v1alpha1.EvaluateTracesRequest.CredentialRefsEntry.value:type_name -> google.protobuf.Struct
+	2,  // 30: agentevals.api.v1alpha1.EvaluationService.ListMetrics:input_type -> agentevals.api.v1alpha1.ListMetricsRequest
+	16, // 31: agentevals.api.v1alpha1.EvaluationService.EvaluateTraces:input_type -> agentevals.api.v1alpha1.EvaluateTracesRequest
+	4,  // 32: agentevals.api.v1alpha1.EvaluationService.ListMetrics:output_type -> agentevals.api.v1alpha1.ListMetricsResponse
+	19, // 33: agentevals.api.v1alpha1.EvaluationService.EvaluateTraces:output_type -> agentevals.api.v1alpha1.EvaluateTracesResponse
+	32, // [32:34] is the sub-list for method output_type
+	30, // [30:32] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_agentevals_api_v1alpha1_evaluation_proto_init() }
@@ -1737,20 +1805,20 @@ func file_agentevals_api_v1alpha1_evaluation_proto_init() {
 	}
 	file_agentevals_api_v1alpha1_common_proto_init()
 	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[3].OneofWrappers = []any{}
-	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[4].OneofWrappers = []any{}
 	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[5].OneofWrappers = []any{}
-	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[6].OneofWrappers = []any{
+	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[6].OneofWrappers = []any{}
+	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[7].OneofWrappers = []any{
 		(*Evaluator_Builtin)(nil),
 		(*Evaluator_Code)(nil),
 		(*Evaluator_Remote)(nil),
 	}
-	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[7].OneofWrappers = []any{}
 	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[8].OneofWrappers = []any{}
 	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[9].OneofWrappers = []any{}
-	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[13].OneofWrappers = []any{
+	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[10].OneofWrappers = []any{}
+	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[14].OneofWrappers = []any{
 		(*EvaluateTracesRequest_AdkEvalSet)(nil),
 	}
-	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[16].OneofWrappers = []any{
+	file_agentevals_api_v1alpha1_evaluation_proto_msgTypes[17].OneofWrappers = []any{
 		(*EvaluateTracesResponse_Progress)(nil),
 		(*EvaluateTracesResponse_Performance)(nil),
 		(*EvaluateTracesResponse_TraceResult)(nil),
@@ -1762,7 +1830,7 @@ func file_agentevals_api_v1alpha1_evaluation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agentevals_api_v1alpha1_evaluation_proto_rawDesc), len(file_agentevals_api_v1alpha1_evaluation_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   18,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
