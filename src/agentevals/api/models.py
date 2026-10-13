@@ -80,7 +80,6 @@ class SessionInfo(CamelModel):
     is_complete: bool
     started_at: str
     metadata: dict[str, Any] = Field(default_factory=dict)
-    invocations: list[dict[str, Any]] | None = None
 
 
 class CreateEvalSetData(CamelModel):
@@ -209,25 +208,3 @@ class SSEDoneEvent(CamelModel):
 
 class SSEErrorEvent(CamelModel):
     error: str
-
-
-# ---------------------------------------------------------------------------
-# Live UI broadcast event models
-# ---------------------------------------------------------------------------
-
-
-class WSSessionStartedEvent(CamelModel):
-    type: str = "session_started"
-    session: SessionInfo
-
-
-class WSSessionCompleteEvent(CamelModel):
-    type: str = "session_complete"
-    session_id: str
-    invocations: list[dict[str, Any]]
-
-
-class WSSessionRemovedEvent(CamelModel):
-    type: str = "session_removed"
-    session_id: str
-    absorbed_by: str | None = None

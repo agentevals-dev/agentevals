@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package agentevals.api.v1alpha1;
+
+import "agentevals/api/v1alpha1/common.proto";
+import "agentevals/api/v1alpha1/views.proto";
+
+option go_package = "github.com/agentevals-dev/agentevals/gen/go/agentevals/api/v1alpha1;apiv1alpha1";
+
+// Live sessions built from the telemetry the OTLP receivers take in. Sessions are kept in
+// memory and expire.
+service SessionService {
+  // Sessions newest first, summaries only.
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  // Every current session, then synced, then each change as it happens.
+  rpc WatchSessions(WatchSessionsRequest) returns (stream WatchSessionsResponse);
+}
+
+message ListSessionsRequest {
+  PageRequest page = 1;
+}
+
+message ListSessionsResponse {
+  repeated SessionSummary sessions = 1;
+  PageResponse page = 2;
+}
+
+message GetSessionRequest {
+  string id = 1;
+}
+
+message GetSessionResponse {
+  Session session = 1;
+}
+
+message WatchSessionsRequest {
+  // Send each session with its turns. Otherwise upserts carry the summary only.
+  bool include_turns = 1;
+}
+
+message SessionRemoved {
+  string id = 1;
+  // The session that took over this session's traces, when the two were merged.
+  string absorbed_by = 2;
+}
+
+// The end of the initial snapshot.
+message Synced {}
+
+message WatchSessionsResponse {
+  oneof event {
+    // The session's current state. It replaces every earlier upsert with the same id. Upserts
+    // can be coalesced, so a client sees the latest state, not every intermediate one.
+    Session upsert = 1;
+    SessionRemoved removed = 2;
+    Synced synced = 3;
+  }
+}

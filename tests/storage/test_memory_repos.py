@@ -195,7 +195,7 @@ class TestResultRepository:
 
 
 class TestSessionRepository:
-    """SessionRepository is forward-compat scaffolding in this slice; cover
+    """SessionRepository is forward-compat scaffolding; cover
     the basic CRUD surface so regressions surface if the protocol drifts."""
 
     async def test_upsert_and_get(self, repos):

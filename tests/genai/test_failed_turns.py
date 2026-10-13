@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from opentelemetry.proto.trace.v1 import trace_pb2
+
+from agentevals.api.views import turn_view
 from agentevals.genai import semconv as sc
 from agentevals.genai.extract import analyze, extract_conversation
 from agentevals.otel.decode import decode_json_document
 from agentevals.otel.model import build_traces
-from agentevals.streaming.manager import invocation_dict
 from otel.builders import agent, chat, request, sid, span
 
 STATUS_ERROR = 2
@@ -63,11 +65,11 @@ def test_failed_agent_with_a_model_call_keeps_the_call():
     assert turn.status == "error" and len(turn.llm_calls) == 1
 
 
-def test_session_payload_reports_status_and_content_capture():
+def test_turn_view_reports_status_and_content_capture():
     [turn] = extract_conversation(_traces(_failed_agent(error_type="runtime_error"))).turns
-    payload = invocation_dict(turn, {})
+    view = turn_view(turn, {})
 
-    assert payload["status"] == "error"
-    assert payload["errorType"] == "runtime_error"
-    assert payload["contentCaptured"] is False
-    assert payload["warnings"] == []
+    assert view.status == trace_pb2.Status.STATUS_CODE_ERROR
+    assert view.error_type == "runtime_error"
+    assert view.content_captured is False
+    assert list(view.gaps) == []

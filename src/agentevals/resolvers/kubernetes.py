@@ -34,8 +34,7 @@ class KubernetesSecretResolver:
         secret = await asyncio.to_thread(self._core_v1.read_namespaced_secret, name, namespace)
         data = secret.data or {}
         if key not in data:
-            available = ", ".join(sorted(data)) or "(none)"
-            raise ValueError(f"key '{key}' not found in Secret {namespace}/{name}; available keys: {available}")
+            raise ValueError(f"key '{key}' not found in Secret {namespace}/{name}")
         return base64.b64decode(data[key]).decode("utf-8")
 
 

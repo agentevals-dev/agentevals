@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { css } from '@emotion/react';
 import { Clock, User, Cpu, MessageSquare, ChevronRight, ChevronDown } from 'lucide-react';
 import type { AnnotationQueueItem } from '../../lib/types';
+import { TurnMessages } from '../streaming/LiveConversationPanel';
 
 interface AnnotationTableProps {
   items: AnnotationQueueItem[];
@@ -162,14 +163,10 @@ export const AnnotationTable: React.FC<AnnotationTableProps> = ({
       title: 'Conversation',
       key: 'conversation',
       width: 280,
-      render: (_: any, record: AnnotationQueueItem) => {
-        const invocations = record.invocations || [];
-        const elements = record.liveElements || [];
-        const numTurns = invocations.length || (elements.filter(e => e.type === 'user_input').length) || 0;
+      render: (_: unknown, record: AnnotationQueueItem) => {
+        const numTurns = record.session.turns.length;
         const isExpanded = expandedRowKeys.includes(record.sessionId);
-
-        const firstUserInput = invocations[0]?.userText ||
-          elements.find(e => e.type === 'user_input')?.data?.text || '';
+        const firstUserInput = record.session.summary?.firstUserText ?? '';
 
         if (numTurns > 1) {
           return (
@@ -226,7 +223,7 @@ export const AnnotationTable: React.FC<AnnotationTableProps> = ({
       title: 'Annotated',
       key: 'annotated',
       width: 110,
-      render: (_: any, record: AnnotationQueueItem) => {
+      render: (_: unknown, record: AnnotationQueueItem) => {
         if (!record.annotation) {
           return (
             <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
@@ -243,10 +240,9 @@ export const AnnotationTable: React.FC<AnnotationTableProps> = ({
       title: 'EvalSet',
       key: 'evalset',
       width: 130,
-      render: (_: any, record: AnnotationQueueItem) => {
+      render: (_: unknown, record: AnnotationQueueItem) => {
         const isGolden = selectedGoldenId === record.sessionId;
-        const hasInvocations = record.invocations && record.invocations.length > 0;
-        if (!hasInvocations) return <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>;
+        if (record.session.turns.length === 0) return <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>;
         return (
           <button
             onClick={(e) => {
@@ -274,8 +270,8 @@ export const AnnotationTable: React.FC<AnnotationTableProps> = ({
   ];
 
   const expandedRowRender = (record: AnnotationQueueItem) => {
-    const invocations = record.invocations || [];
-    if (invocations.length === 0) return null;
+    const turns = record.session.turns;
+    if (turns.length === 0) return null;
 
     return (
       <div style={{
@@ -284,13 +280,13 @@ export const AnnotationTable: React.FC<AnnotationTableProps> = ({
         borderRadius: '8px',
         marginLeft: '40px',
       }}>
-        {invocations.map((inv, idx) => (
+        {turns.map((turn, idx) => (
           <div
-            key={inv.invocationId}
+            key={`${turn.traceId}:${turn.spanId}`}
             style={{
-              marginBottom: idx < invocations.length - 1 ? '20px' : '0',
-              paddingBottom: idx < invocations.length - 1 ? '20px' : '0',
-              borderBottom: idx < invocations.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+              marginBottom: idx < turns.length - 1 ? '20px' : '0',
+              paddingBottom: idx < turns.length - 1 ? '20px' : '0',
+              borderBottom: idx < turns.length - 1 ? '1px solid var(--border-subtle)' : 'none',
             }}
           >
             <div style={{
@@ -299,32 +295,7 @@ export const AnnotationTable: React.FC<AnnotationTableProps> = ({
             }}>
               Turn {idx + 1}
             </div>
-            <div style={{ marginBottom: '8px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>User</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.6', padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: '6px', borderLeft: '3px solid #7C3AED' }}>
-                {inv.userText || '(no text)'}
-              </div>
-            </div>
-            {inv.toolCalls.length > 0 && (
-              <div style={{ marginBottom: '8px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Tool Calls</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {inv.toolCalls.map((tc, i) => (
-                    <div key={i} style={{ fontSize: '12px', color: '#A855F7', fontFamily: 'monospace', background: 'rgba(168, 85, 247, 0.08)', padding: '6px 10px', borderRadius: '6px' }}>
-                      {tc.name}({Object.keys(tc.args || {}).length > 0 ? Object.keys(tc.args).map(k => `${k}=${JSON.stringify(tc.args[k])}`).join(', ') : ''})
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {inv.agentText && (
-              <div>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Agent</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.6', padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: '6px', borderLeft: '3px solid #10b981' }}>
-                  {inv.agentText}
-                </div>
-              </div>
-            )}
+            <TurnMessages turn={turn} />
           </div>
         ))}
       </div>
@@ -347,7 +318,7 @@ export const AnnotationTable: React.FC<AnnotationTableProps> = ({
               : expandedRowKeys.filter(k => k !== record.sessionId));
           },
           expandedRowRender,
-          rowExpandable: (record) => (record.invocations?.length || 0) > 1,
+          rowExpandable: (record) => record.session.turns.length > 1,
           expandIcon: () => null,
         }}
         onRow={(record) => ({

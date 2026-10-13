@@ -25,12 +25,15 @@ import logging
 import os
 import threading
 import time
-import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from .otel.identity import EMITTER_SCOPE
 from .otel.model import Span, attr_str
+from .telemetry import PROCESS_INSTANCE_ID, build_resource, otlp_protocol
+from .telemetry import env_flag as _env_flag
+from .telemetry import env_true as _env_true
+from .telemetry import package_version as _package_version
 
 if TYPE_CHECKING:
     from .config import EvaluatorDef
@@ -51,29 +54,6 @@ LABEL_FAIL = "fail"
 LABEL_NOT_EVALUATED = "not_evaluated"
 _LABELS = {"PASSED": LABEL_PASS, "FAILED": LABEL_FAIL, "NOT_EVALUATED": LABEL_NOT_EVALUATED}
 
-_TRUE = {"1", "true", "yes", "on"}
-_FALSE = {"0", "false", "no", "off"}
-
-_PROCESS_INSTANCE_ID = str(uuid.uuid4())
-
-
-def _env_true(name: str) -> bool:
-    """Lenient read for standard OTel switches, which other tools also set."""
-    return os.environ.get(name, "").strip().lower() in _TRUE
-
-
-def _env_flag(name: str) -> bool | None:
-    """Strict read for agentevals switches: ``None`` when unset, ``ValueError`` when unrecognized."""
-    raw = os.environ.get(name)
-    if raw is None or not raw.strip():
-        return None
-    value = raw.strip().lower()
-    if value in _TRUE:
-        return True
-    if value in _FALSE:
-        return False
-    raise ValueError(f"{name} must be one of true/false/1/0/yes/no/on/off (got: {raw!r})")
-
 
 def disabled_by_otel() -> bool:
     """The standard switches that silence telemetry for the whole process."""
@@ -92,46 +72,14 @@ def enabled() -> bool:
     return _requested or bool(_env_flag(ENABLE_ENV))
 
 
-def _package_version() -> str:
-    from . import __version__
-
-    return __version__
-
-
-def build_resource() -> Any:
-    """Service identity as one unit; ``OTEL_RESOURCE_ATTRIBUTES`` and ``OTEL_SERVICE_NAME`` win."""
-    from opentelemetry.sdk.resources import OTELResourceDetector, Resource
-
-    ours = Resource.create(
-        {
-            "service.name": os.environ.get("OTEL_SERVICE_NAME") or "agentevals",
-            "service.version": _package_version(),
-            "service.instance.id": _PROCESS_INSTANCE_ID,
-        }
-    )
-    return ours.merge(OTELResourceDetector().detect())
-
-
 def instance_id() -> str:
     """The ``service.instance.id`` this process emits with (used by the live feedback guard)."""
     value = build_resource().attributes.get("service.instance.id")
-    return str(value) if value else _PROCESS_INSTANCE_ID
-
-
-def _protocol() -> str:
-    raw = (
-        os.environ.get("OTEL_EXPORTER_OTLP_LOGS_PROTOCOL") or os.environ.get("OTEL_EXPORTER_OTLP_PROTOCOL") or ""
-    ).strip()
-    if raw in ("", "http/protobuf"):
-        return "http/protobuf"
-    if raw == "grpc":
-        return "grpc"
-    logger.warning("OTLP protocol %r is not supported for evaluation events; using http/protobuf", raw)
-    return "http/protobuf"
+    return str(value) if value else PROCESS_INSTANCE_ID
 
 
 def _exporter_from_env() -> Any:
-    if _protocol() == "grpc":
+    if otlp_protocol("LOGS") == "grpc":
         from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
     else:
         from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter

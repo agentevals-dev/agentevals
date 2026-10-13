@@ -1,7 +1,7 @@
 {
  "schema": "otel_core.truth/v1",
  "fixture": "hand/self_parent",
- "source": "hand authored; an inference span names itself as parent (crash shape from verify_20261006/s4.py)",
+ "source": "hand authored; an inference span names itself as parent (a crash shape)",
  "turns": [
   {
    "user_text": "Ping?",

@@ -228,7 +228,8 @@ function jaegerStore(rawSpan: RawSpan): AttrStore {
 function patchSpan(parsedFile: ParsedTraceFile, spanId: string, field: Field, newText: string): void {
   const locRef = parsedFile.spanIndex.get(spanId);
   if (!locRef) return;
-  const store = parsedFile.format === 'jaeger' ? jaegerStore(locRef.raw) : otlpStore(locRef.raw);
+  const raw = locRef.raw as RawSpan;
+  const store = parsedFile.format === 'jaeger' ? jaegerStore(raw) : otlpStore(raw);
 
   for (const key of MESSAGE_KEYS[field]) {
     const value = store.get(key);
@@ -262,7 +263,21 @@ function patchIndexed(store: AttrStore, field: Field, newText: string): void {
   if (target !== null) store.set(`${prefix}${target}.content`, newText);
 }
 
-function patchJson(jsonStr: string, patch: (data: any) => string): string | null {
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function textParts(parts: unknown): JsonRecord[] {
+  return Array.isArray(parts) ? parts.filter((p): p is JsonRecord => isRecord(p) && p.text !== undefined) : [];
+}
+
+function roleOf(msg: unknown): string {
+  return isRecord(msg) && typeof msg.role === 'string' ? msg.role : '';
+}
+
+function patchJson(jsonStr: string, patch: (data: unknown) => string): string | null {
   try {
     return patch(JSON.parse(jsonStr));
   } catch {
@@ -270,43 +285,43 @@ function patchJson(jsonStr: string, patch: (data: any) => string): string | null
   }
 }
 
-function patchAdkJsonValue(data: any, field: 'user' | 'response', newText: string): string {
+function patchAdkJsonValue(data: unknown, field: 'user' | 'response', newText: string): string {
+  if (!isRecord(data)) return JSON.stringify(data);
   if (field === 'user') {
     const contents = data.contents;
     if (Array.isArray(contents)) {
       for (let i = contents.length - 1; i >= 0; i--) {
-        if (contents[i].role === 'user') {
-          const textParts = contents[i].parts?.filter((p: any) => p.text !== undefined);
-          if (textParts && textParts.length > 0) {
-            textParts[0].text = newText;
+        const content = contents[i];
+        if (isRecord(content) && content.role === 'user') {
+          const parts = textParts(content.parts);
+          if (parts.length > 0) {
+            parts[0].text = newText;
             break;
           }
         }
       }
     }
   } else {
-    const parts = data.content?.parts;
-    if (Array.isArray(parts)) {
-      const textParts = parts.filter((p: any) => p.text !== undefined);
-      if (textParts.length > 0) {
-        textParts[0].text = newText;
-      }
+    const parts = isRecord(data.content) ? textParts(data.content.parts) : [];
+    if (parts.length > 0) {
+      parts[0].text = newText;
     }
   }
 
   return JSON.stringify(data);
 }
 
-function hasText(msg: any): boolean {
+function hasText(msg: unknown): boolean {
+  if (!isRecord(msg)) return false;
   if (typeof msg.content === 'string' && msg.content) return true;
-  if (Array.isArray(msg.content) && msg.content.some((item: any) => typeof item === 'object' && item.text)) return true;
-  return Array.isArray(msg.parts) && msg.parts.some((p: any) => typeof p === 'object' && p.type === 'text');
+  if (Array.isArray(msg.content) && msg.content.some(item => isRecord(item) && item.text)) return true;
+  return Array.isArray(msg.parts) && msg.parts.some(p => isRecord(p) && p.type === 'text');
 }
 
-function patchGenAIJsonValue(data: any, field: 'user' | 'response', newText: string): string {
+function patchGenAIJsonValue(data: unknown, field: 'user' | 'response', newText: string): string {
   if (!Array.isArray(data)) return JSON.stringify(data);
   // A tool request has no text to replace; leave it rather than invent an answer.
-  if (field === 'response' && !data.some((msg: any) => ASSISTANT_ROLES.includes(msg.role) && hasText(msg))) {
+  if (field === 'response' && !data.some(msg => ASSISTANT_ROLES.includes(roleOf(msg)) && hasText(msg))) {
     return JSON.stringify(data);
   }
 
@@ -314,22 +329,22 @@ function patchGenAIJsonValue(data: any, field: 'user' | 'response', newText: str
 
   for (let i = data.length - 1; i >= 0; i--) {
     const msg = data[i];
-    if (!targetRoles.includes(msg.role)) continue;
+    if (!isRecord(msg) || !targetRoles.includes(roleOf(msg))) continue;
 
     if (typeof msg.content === 'string') {
       msg.content = newText;
       break;
     }
     if (Array.isArray(msg.content)) {
-      const textItem = msg.content.find((item: any) => typeof item === 'object' && item.text);
-      if (textItem) {
+      const textItem = msg.content.find(item => isRecord(item) && item.text);
+      if (isRecord(textItem)) {
         textItem.text = newText;
         break;
       }
     }
     if (Array.isArray(msg.parts)) {
-      const textPart = msg.parts.find((p: any) => typeof p === 'object' && p.type === 'text');
-      if (textPart) {
+      const textPart = msg.parts.find(p => isRecord(p) && p.type === 'text');
+      if (isRecord(textPart)) {
         textPart.content = newText;
         break;
       }
@@ -343,7 +358,7 @@ function patchGenAIJsonValue(data: any, field: 'user' | 'response', newText: str
 
 function serialize(parsedFile: ParsedTraceFile): string {
   if (parsedFile.format === 'otlp-jsonl') {
-    return parsedFile.rawData.map((line: any) => JSON.stringify(line)).join('\n');
+    return (parsedFile.rawData as unknown[]).map(line => JSON.stringify(line)).join('\n');
   }
   if (parsedFile.format === 'otlp-json') {
     return JSON.stringify(parsedFile.rawData);

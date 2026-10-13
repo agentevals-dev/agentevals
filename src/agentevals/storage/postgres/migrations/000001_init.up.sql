@@ -25,8 +25,8 @@ CREATE INDEX IF NOT EXISTS session_expires_at_idx
     WHERE expires_at IS NOT NULL;
 
 -- Reserved for future per-span / per-log persistence. Spans and logs stay
--- in-process on StreamingTraceManager in this OSS slice; this table exists
--- so a future migration can populate it without an ALTER on session.
+-- in process in the live manager; this table exists so a future migration
+-- can populate it without an ALTER on session.
 CREATE TABLE IF NOT EXISTS {schema}.session_event (
     event_id    BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     session_id  TEXT        NOT NULL REFERENCES {schema}.session(session_id) ON DELETE CASCADE,
@@ -97,7 +97,7 @@ CREATE INDEX IF NOT EXISTS result_run_id_idx     ON {schema}.result (run_id);
 CREATE INDEX IF NOT EXISTS result_expires_at_idx ON {schema}.result (expires_at) WHERE expires_at IS NOT NULL;
 
 -- Reserved for cached evaluator code from external sources (GitHub today,
--- additional sources later). No read/write code in this slice; included here
+-- additional sources later). Nothing reads or writes it yet; included here
 -- so a future change does not require an ALTER on this table.
 CREATE TABLE IF NOT EXISTS {schema}.evaluator_cache (
     source_name     TEXT        NOT NULL,

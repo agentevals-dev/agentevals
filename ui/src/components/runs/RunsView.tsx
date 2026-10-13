@@ -34,26 +34,27 @@ export const RunsView: React.FC = () => {
     setSelectedGroup(ALL_GROUPS);
   };
 
-  const load = async () => {
+  const fetchRuns = () =>
+    listRuns({ limit: 200 })
+      .then(setRuns)
+      .catch((err) => {
+        if (err instanceof StorageUnavailableError) {
+          setStorageUnavailable(true);
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to load runs');
+        }
+      })
+      .finally(() => setLoading(false));
+
+  const load = () => {
     setLoading(true);
     setError(null);
     setStorageUnavailable(false);
-    try {
-      const fetched = await listRuns({ limit: 200 });
-      setRuns(fetched);
-    } catch (err) {
-      if (err instanceof StorageUnavailableError) {
-        setStorageUnavailable(true);
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to load runs');
-      }
-    } finally {
-      setLoading(false);
-    }
+    void fetchRuns();
   };
 
   useEffect(() => {
-    load();
+    void fetchRuns();
   }, []);
 
   const groups = useMemo(() => groupRuns(runs, groupBy), [runs, groupBy]);

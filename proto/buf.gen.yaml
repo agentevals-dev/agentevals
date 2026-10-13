@@ -1,0 +1,25 @@
+version: v2
+# Never set `clean`: the Python output root is ../src. `make proto-generate` removes the
+# generated directories instead.
+inputs:
+  - directory: .
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.11
+    out: ../gen/go
+    opt:
+      - paths=source_relative
+  - remote: buf.build/grpc/go:v1.6.2
+    out: ../gen/go
+    opt:
+      - paths=source_relative
+  - remote: buf.build/protocolbuffers/python:v33.5
+    out: ../src
+  - remote: buf.build/protocolbuffers/pyi:v33.5
+    out: ../src
+  # The stubs call grpcio APIs of this version (registered method handlers); keep it equal to the
+  # grpcio floor in pyproject.toml.
+  - remote: buf.build/grpc/python:v1.78.0
+    out: ../src
+  - remote: buf.build/bufbuild/es:v2.13.0
+    out: ../ui/src/generated
+    include_imports: true

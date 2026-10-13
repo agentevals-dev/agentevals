@@ -6,8 +6,8 @@ check. The caller (``streaming.manager``) owns the event loop, timers and recomp
 only records what happened in :attr:`TelemetryStore.events`.
 
 What the telemetry means is the :class:`RoutingPolicy`'s business (``genai.routing`` for GenAI);
-this module holds only the mechanics. Routing (``otel_native_core_202610.md`` 16.2), for spans of
-trace T with session key K from the policy:
+this module holds only the mechanics. Routing, for spans of trace T with session key K from the
+policy:
 
 * R1, membership first: a trace already in a session stays there, with two exceptions. A session
   that learns a stronger key from its own trace (any key, for a provisional session) is promoted
@@ -70,7 +70,12 @@ class RoutingPolicy(Protocol):
         """A record agentevals emitted itself, refused so a pipeline loop cannot feed it back."""
         ...
 
+    def is_own_span(self, span: Span) -> bool:
+        """A span of agentevals' own server, accepted and dropped so a pipeline loop cannot store it."""
+        ...
 
+
+DROPPED_OWN_SPANS = "span emitted by agentevals"
 REASON_TRACE_SPANS = "span(s) rejected: trace span limit reached"
 REASON_SESSION_SPANS = "span(s) rejected: session span limit reached"
 REASON_SESSION_TRACES = "span(s) rejected: session trace limit reached"
@@ -207,7 +212,6 @@ class LiveSession:
     log_count: int = 0
     nbytes: int = 0
     last_activity: float = 0.0
-    invocations: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def provisional(self) -> bool:
@@ -566,6 +570,12 @@ class TelemetryStore:
     def ingest_spans(self, spans: Sequence[Span]) -> IngestResult:
         """Apply spans of one trace sharing one resource (one routing unit)."""
         result = IngestResult()
+        own = sum(1 for s in spans if self.policy.is_own_span(s))
+        if own:
+            result.accepted += own
+            result.dropped[DROPPED_OWN_SPANS] += own
+            self.counters[DROPPED_OWN_SPANS] += own
+            spans = [s for s in spans if not self.policy.is_own_span(s)]
         if not spans:
             return result
         now = self.clock()
@@ -673,7 +683,6 @@ class TelemetryStore:
             trace.complete = False
             session.last_activity = now
             self._schedule_trace(trace)
-            self.events.append(("spans", session.session_id, added))
             self._dirty(session)
         return result
 

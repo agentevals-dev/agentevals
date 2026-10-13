@@ -1,7 +1,7 @@
 {
  "schema": "otel_core.truth/v1",
  "fixture": "hand/two_span_cycle",
- "source": "hand authored; two inference spans parent each other (crash shape from verify_20261006/s4.py)",
+ "source": "hand authored; two inference spans parent each other (a crash shape)",
  "turns": [
   {
    "user_text": "Ping?",
@@ -29,7 +29,7 @@
   }
  ],
  "notes": [
-  "the cycle is broken deterministically (M1 rule: earliest start becomes the root); the pair collapses to one logical call"
+  "the cycle is broken deterministically (earliest start becomes the root); the pair collapses to one logical call"
  ],
  "content_captured": true,
  "tokens": {

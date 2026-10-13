@@ -19,9 +19,9 @@ export function installConsoleCapture(): void {
 
   function capture(
     level: ConsoleEntry['level'],
-    original: (...args: any[]) => void,
+    original: (...args: unknown[]) => void,
   ) {
-    return (...args: any[]) => {
+    return (...args: unknown[]) => {
       original.apply(console, args);
       const entry: ConsoleEntry = {
         timestamp: new Date().toISOString(),

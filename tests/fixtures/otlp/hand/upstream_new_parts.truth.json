@@ -16,7 +16,7 @@
   }
  ],
  "notes": [
-  "server_tool_call parts run at the provider; they are kept in messages but are not client tool trajectory (decision D-02 in deviations.md)",
+  "server_tool_call parts run at the provider; they are kept in messages but are not client tool trajectory",
   "reasoning and compaction parts are not user or final text"
  ],
  "content_captured": true,

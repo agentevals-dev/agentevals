@@ -2,8 +2,11 @@
 2. OTLP HTTP receiver: port {{ .Values.service.otlpHttp.port }} (OTEL_EXPORTER_OTLP_ENDPOINT=http://<service>:{{ .Values.service.otlpHttp.port }}).
 3. OTLP gRPC receiver: port {{ .Values.service.otlpGrpc.port }} (OTEL_EXPORTER_OTLP_ENDPOINT=<service>:{{ .Values.service.otlpGrpc.port }}, OTEL_EXPORTER_OTLP_PROTOCOL=grpc).
 4. MCP (Streamable HTTP): port {{ .Values.service.mcp.port }}, path /mcp (e.g. http://<service>:{{ .Values.service.mcp.port }}/mcp).
+{{- if .Values.grpcApi.enabled }}
+5. gRPC API (agentevals.api.v1alpha1): port {{ .Values.service.grpcApi.port }} (Service port name: grpc-api). Expose it only to trusted callers.
+{{- end }}
 {{- if .Values.ephemeralVolume.enabled }}
-5. An emptyDir is mounted at /tmp with HOME=/tmp/agentevals-home (ephemeral; lost on pod restart). Set ephemeralVolume.enabled=false and readOnlyRootFilesystem=false if you need a writable root without this mount.
+{{ ternary 6 5 .Values.grpcApi.enabled }}. An emptyDir is mounted at /tmp with HOME=/tmp/agentevals-home (ephemeral; lost on pod restart). Set ephemeralVolume.enabled=false and readOnlyRootFilesystem=false if you need a writable root without this mount.
 {{- end }}
 
 Get the Service URL:

@@ -98,26 +98,31 @@ def load_telemetry(path: str, *, format: str | None = None) -> TelemetryFile:
     """Read a trace file into envelopes. Raises ``ValueError`` when the content is not recognized."""
     with open(path, encoding="utf-8") as f:
         content = f.read()
+    return load_telemetry_text(content, format=format, name=path)
+
+
+def load_telemetry_text(content: str, *, format: str | None = None, name: str = "document") -> TelemetryFile:
+    """Read trace file content into envelopes. ``name`` only appears in messages."""
     detected, data = _classify(content)
     fmt = format or detected
     if fmt not in _LOADERS:
         if format is not None:
             raise ValueError(f"Unknown trace format {format!r}. Supported: {sorted(_LOADERS)}")
         raise ValueError(
-            f"Could not detect trace format for {path!r}. "
+            f"Could not detect trace format for {name!r}. "
             'Expected Jaeger JSON ({"data": [...]}) or OTLP JSON '
             '({"resourceSpans": [...]} / {"batches": [...]}). '
             "Pass an explicit format= override if needed."
         )
     if data is _UNPARSED:
         if fmt == JAEGER_JSON:
-            raise ValueError(f"Invalid Jaeger JSON in {path!r}")
+            raise ValueError(f"Invalid Jaeger JSON in {name!r}")
         result = decode_otlp_text(content)
     else:
         result = _decode_obj(data, fmt)
     traces, unattributed = build_traces(result.spans, result.logs)
     if result.reasons:
-        logger.warning("Skipped items in %s: %s", path, result.error_message)
+        logger.warning("Skipped items in %s: %s", name, result.error_message)
     return TelemetryFile(format=fmt, traces=traces, unattributed_logs=unattributed, warnings=result.warnings)
 
 

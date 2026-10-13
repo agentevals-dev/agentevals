@@ -24,6 +24,7 @@ from collections.abc import Callable
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Protocol, cast
+from urllib.parse import urlsplit
 from uuid import UUID
 
 import httpx
@@ -91,6 +92,12 @@ class FileSink:
         await self._write({"phase": "error", "run_id": str(run_id), "error": error})
 
 
+def _origin(url: str) -> str:
+    """Scheme and host for logs: webhook URLs often carry their token in the path or query."""
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc.rpartition('@')[2]}" if parts.scheme and parts.netloc else "(url)"
+
+
 class HttpWebhookSink:
     """POST JSON to a URL with retries.
 
@@ -134,14 +141,13 @@ class HttpWebhookSink:
                 if resp.status_code < 500:
                     if resp.status_code >= 400:
                         logger.warning(
-                            "Webhook %s returned %d: %s (run_id=%s)",
-                            self._url,
+                            "Webhook %s returned %d (run_id=%s)",
+                            _origin(self._url),
                             resp.status_code,
-                            resp.text[:200],
                             payload.get("run_id"),
                         )
                     return
-                last_exc = RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+                last_exc = RuntimeError(f"HTTP {resp.status_code}")
             except (httpx.HTTPError, RuntimeError) as exc:
                 last_exc = exc
             if attempt < self._max_attempts:
@@ -149,9 +155,9 @@ class HttpWebhookSink:
                 delay = min(delay * 2, 10.0)
         logger.error(
             "Webhook %s failed after %d attempts: %s (run_id=%s)",
-            self._url,
+            _origin(self._url),
             self._max_attempts,
-            last_exc,
+            type(last_exc).__name__ if isinstance(last_exc, httpx.HTTPError) else last_exc,
             payload.get("run_id"),
         )
 

@@ -487,7 +487,7 @@ class TestFlatDictAttributes:
 
 
 class TestNestedDictAttributes:
-    """Tests for ClickHouse JSON column format (nested dicts auto-flattened)."""
+    """Tests for JSON column exports (nested dicts auto-flattened)."""
 
     def test_nested_dict_flattened_to_dot_notation(self):
         loader = OtlpJsonLoader()

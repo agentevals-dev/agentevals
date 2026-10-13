@@ -96,9 +96,7 @@ async def _do_create_eval_set(
 
 @streaming_router.get("/sessions", response_model=StandardResponse[list[SessionInfo]])
 async def list_sessions(manager: LiveManager = Depends(require_trace_manager)):
-    return StandardResponse(
-        data=[manager.session_info(session, with_invocations=True) for session in manager.sessions.values()]
-    )
+    return StandardResponse(data=[manager.session_info(session) for session in manager.sessions.values()])
 
 
 @streaming_router.post("/create-eval-set", response_model=StandardResponse[CreateEvalSetData])

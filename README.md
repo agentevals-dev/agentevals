@@ -188,18 +188,21 @@ Rubrics can also come from a matched eval case or its invocations; see [Rubrics]
 
 **Web UI.** `agentevals serve` on `http://localhost:8001`. Upload traces and eval sets, pick evaluators, inspect span trees, watch live sessions. API docs at `/docs`.
 
+**gRPC API.** `agentevals serve` also serves a gRPC API on port 8002 for programs: sessions, evaluation, runs and trace conversion, with generated clients for Go and Python. See [gRPC API](docs/grpc-api.md).
+
 **MCP server.** `agentevals mcp` exposes `list_metrics`, `evaluate_traces`, `list_sessions`, `summarize_session` and `evaluate_sessions` to MCP clients. A `.mcp.json` at the repo root lets Claude Code pick it up, and the `/eval` and `/inspect` skills in `.claude/skills/` build on it.
 
 **Docker.**
 
 ```bash
 docker build -t agentevals .
-docker run -p 8001:8001 -p 4317:4317 -p 4318:4318 agentevals
+docker run -p 8001:8001 -p 8002:8002 -p 4317:4317 -p 4318:4318 agentevals
 ```
 
 | Port | Purpose |
 |------|---------|
 | 8001 | Web UI and REST API |
+| 8002 | gRPC API |
 | 4317 | OTLP gRPC receiver (traces and logs) |
 | 4318 | OTLP HTTP receiver (traces and logs) |
 | 8080 | MCP (Streamable HTTP) |
@@ -234,6 +237,7 @@ The chart runs in memory by default. `--set storage.backend=postgres` with a bun
 | [Eval Set Format](docs/eval-set-format.md) | Schema and examples for golden eval sets |
 | [Custom Evaluators](docs/custom-evaluators.md) | Write scoring logic in any language |
 | [Run History](docs/run-history.md) | Persist evaluations to Postgres and trend them in the UI |
+| [gRPC API](docs/grpc-api.md) | Services, generated clients, configuration and security of the gRPC API |
 
 ## Development
 

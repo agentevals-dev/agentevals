@@ -1,0 +1,201 @@
+syntax = "proto3";
+
+package agentevals.api.v1alpha1;
+
+import "agentevals/api/v1alpha1/common.proto";
+import "agentevals/api/v1alpha1/evaluation.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/agentevals-dev/agentevals/gen/go/agentevals/api/v1alpha1;apiv1alpha1";
+
+// Asynchronous evaluation runs, executed by a worker. Needs run storage; without it every
+// method fails with FAILED_PRECONDITION and reason STORAGE_NOT_CONFIGURED.
+service RunService {
+  // Queues a run. Idempotent on run_id: the same id with the same spec returns the existing run;
+  // a different spec fails with ALREADY_EXISTS and reason RUN_SPEC_CONFLICT.
+  rpc SubmitRun(SubmitRunRequest) returns (SubmitRunResponse);
+  rpc GetRun(GetRunRequest) returns (GetRunResponse);
+  // Newest first.
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+  // Requests cancellation. Cancelling a finished run changes nothing.
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+  rpc ListRunResults(ListRunResultsRequest) returns (ListRunResultsResponse);
+  // The run and its results, then each change, until the run reaches a terminal status.
+  rpc WatchRun(WatchRunRequest) returns (stream WatchRunResponse);
+}
+
+enum RunStatus {
+  RUN_STATUS_UNSPECIFIED = 0;
+  RUN_STATUS_QUEUED = 1;
+  RUN_STATUS_RUNNING = 2;
+  RUN_STATUS_SUCCEEDED = 3;
+  RUN_STATUS_FAILED = 4;
+  RUN_STATUS_CANCELLED = 5;
+}
+
+enum ResultStatus {
+  RESULT_STATUS_UNSPECIFIED = 0;
+  RESULT_STATUS_PASSED = 1;
+  RESULT_STATUS_FAILED = 2;
+  RESULT_STATUS_ERRORED = 3;
+  RESULT_STATUS_SKIPPED = 4;
+}
+
+enum EvaluatorType {
+  EVALUATOR_TYPE_UNSPECIFIED = 0;
+  EVALUATOR_TYPE_BUILTIN = 1;
+  EVALUATOR_TYPE_CODE = 2;
+  EVALUATOR_TYPE_REMOTE = 3;
+}
+
+enum RunApproach {
+  // RUN_APPROACH_TRACE_REPLAY.
+  RUN_APPROACH_UNSPECIFIED = 0;
+  // Evaluate recorded traces.
+  RUN_APPROACH_TRACE_REPLAY = 1;
+}
+
+// A trace fetched with GET base_url/trace_id and the run's context headers.
+message HttpTraceTarget {
+  string base_url = 1;
+  // 16 or 32 hex characters.
+  string trace_id = 2;
+  // TRACE_FORMAT_OTLP_JSON or TRACE_FORMAT_JAEGER_JSON.
+  TraceFormat format = 3;
+}
+
+// A run recorded from a synchronous upload. The traces are not kept, so it cannot run again.
+message UploadedTraces {
+  int32 trace_count = 1;
+  repeated string trace_files = 2;
+}
+
+message TraceTarget {
+  oneof kind {
+    // A trace document in the spec, OTLP/JSON or Jaeger JSON.
+    TraceDocument inline = 1;
+    // OTLP protobuf. Stored, and returned, as an inline OTLP/JSON document.
+    OtlpTelemetry otlp = 2;
+    HttpTraceTarget http = 3;
+    // Output only.
+    UploadedTraces uploaded = 4;
+  }
+}
+
+message RunContext {
+  // Headers for fetching an http target. Values are returned redacted.
+  map<string, string> headers = 1;
+}
+
+message RunSpec {
+  RunApproach approach = 1;
+  TraceTarget target = 2;
+  // The golden.
+  oneof eval_set {
+    // An ADK EvalSet as JSON.
+    google.protobuf.Struct adk_eval_set = 3;
+  }
+  EvalParams eval_config = 4;
+  // Result sinks, for example {"kind": "http_webhook", "url": "...", "headers": {...}}. Header
+  // values are returned redacted.
+  repeated google.protobuf.Struct sinks = 5;
+  RunContext context = 6;
+  // Logical credential name to a secret reference, as in EvaluateTracesRequest.
+  map<string, google.protobuf.Struct> credential_refs = 7;
+}
+
+message Run {
+  // A UUID.
+  string run_id = 1;
+  RunStatus status = 2;
+  RunSpec spec = 3;
+  int32 attempt = 4;
+  string worker_id = 5;
+  string error = 6;
+  google.protobuf.Struct summary = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp finished_at = 10;
+  bool cancel_requested = 11;
+}
+
+// One evaluator's result for one eval set item.
+message Result {
+  // Stable: a SHA-256 of run id, item id and evaluator name.
+  string result_id = 1;
+  string run_id = 2;
+  string eval_set_item_id = 3;
+  string eval_set_item_name = 4;
+  string evaluator_name = 5;
+  EvaluatorType evaluator_type = 6;
+  ResultStatus status = 7;
+  optional double score = 8;
+  // One entry per turn, in turn order; status is not recorded.
+  repeated InvocationResult per_invocation = 9;
+  string trace_id = 10;
+  string span_id = 11;
+  google.protobuf.Struct details = 12;
+  string error_text = 13;
+  google.protobuf.Struct tokens_used = 14;
+  optional int64 latency_ms = 15;
+  google.protobuf.Timestamp created_at = 16;
+}
+
+message SubmitRunRequest {
+  // A UUID chosen by the caller, for idempotent retries. Empty means the server picks one.
+  string run_id = 1;
+  RunSpec spec = 2;
+}
+
+message SubmitRunResponse {
+  Run run = 1;
+}
+
+message GetRunRequest {
+  string run_id = 1;
+}
+
+message GetRunResponse {
+  Run run = 1;
+}
+
+message ListRunsRequest {
+  // Empty means every status.
+  repeated RunStatus statuses = 1;
+  PageRequest page = 2;
+}
+
+message ListRunsResponse {
+  repeated Run runs = 1;
+  PageResponse page = 2;
+}
+
+message CancelRunRequest {
+  string run_id = 1;
+}
+
+message CancelRunResponse {
+  Run run = 1;
+}
+
+message ListRunResultsRequest {
+  string run_id = 1;
+  PageRequest page = 2;
+}
+
+message ListRunResultsResponse {
+  repeated Result results = 1;
+  PageResponse page = 2;
+}
+
+message WatchRunRequest {
+  string run_id = 1;
+}
+
+message WatchRunResponse {
+  // The run, sent first and after every change.
+  Run run = 1;
+  // Results that are new or changed since the previous message.
+  repeated Result results = 2;
+}

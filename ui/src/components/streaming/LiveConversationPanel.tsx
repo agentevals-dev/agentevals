@@ -1,74 +1,82 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { UserMessage, ToolCallMessage, ToolResultMessage, AgentMessage, TurnErrorMessage } from './LiveMessage';
-import type { ConversationElement } from '../../lib/types';
-
-export type { ConversationElement };
+import { isFailed, jsonValue } from '../../lib/liveSessions';
+import type { TurnView } from '../../lib/liveSessions';
 
 interface LiveConversationPanelProps {
-  elements: ConversationElement[];
+  turns: TurnView[];
   isActive: boolean;
 }
 
-export function LiveConversationPanel({ elements, isActive }: LiveConversationPanelProps) {
+export function TurnMessages({ turn }: { turn: TurnView }) {
+  return (
+    <>
+      {turn.userText && <UserMessage text={turn.userText} />}
+      {turn.toolCalls.map((call, i) => (
+        <div key={call.spanId || call.callId || i}>
+          <ToolCallMessage name={call.name} args={jsonValue(call.arguments)} />
+          {call.result && <ToolResultMessage response={jsonValue(call.result)} isError={call.isError} />}
+        </div>
+      ))}
+      {turn.answerText && <AgentMessage text={turn.answerText} />}
+      {isFailed(turn) && <TurnErrorMessage errorType={turn.errorType} />}
+    </>
+  );
+}
+
+export function LiveConversationPanel({ turns, isActive }: LiveConversationPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
-
-  const sortedElements = useMemo(
-    () => [...elements].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)),
-    [elements],
-  );
 
   useEffect(() => {
     if (autoScroll && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [sortedElements, autoScroll]);
+  }, [turns, autoScroll]);
 
   return (
     <div>
-      {sortedElements.length > 0 && (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '8px',
+      }}>
         <div style={{
+          fontSize: '11px',
+          fontWeight: 600,
+          color: 'var(--text-tertiary)',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '8px',
+          gap: '6px',
         }}>
-          <div style={{
-            fontSize: '11px',
-            fontWeight: 600,
-            color: 'var(--text-tertiary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}>
-            {isActive && <span style={{
-              display: 'inline-block',
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: '#10b981',
-              animation: 'pulse 2s ease-in-out infinite',
-            }} />}
-            CONVERSATION
-          </div>
-
-          <label style={{
-            fontSize: '11px',
-            color: 'var(--text-tertiary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            cursor: 'pointer',
-          }}>
-            <input
-              type="checkbox"
-              checked={autoScroll}
-              onChange={(e) => setAutoScroll(e.target.checked)}
-            />
-            Auto-scroll
-          </label>
+          {isActive && <span style={{
+            display: 'inline-block',
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: '#10b981',
+            animation: 'pulse 2s ease-in-out infinite',
+          }} />}
+          CONVERSATION
         </div>
-      )}
+
+        <label style={{
+          fontSize: '11px',
+          color: 'var(--text-tertiary)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          cursor: 'pointer',
+        }}>
+          <input
+            type="checkbox"
+            checked={autoScroll}
+            onChange={(e) => setAutoScroll(e.target.checked)}
+          />
+          Auto-scroll
+        </label>
+      </div>
 
       <div
         ref={containerRef}
@@ -77,48 +85,7 @@ export function LiveConversationPanel({ elements, isActive }: LiveConversationPa
           overflowY: 'auto',
         }}
       >
-        {sortedElements.length === 0 && (
-          <div style={{
-            fontSize: '13px',
-            color: 'var(--text-tertiary)',
-            textAlign: 'center',
-            padding: '24px',
-          }}>
-            Waiting for agent activity...
-          </div>
-        )}
-
-        {sortedElements.map((element, idx) => {
-          switch (element.type) {
-            case 'user_input':
-              return <UserMessage key={idx} text={element.data.text} timestamp={element.timestamp} />;
-            case 'tool_call':
-              return <ToolCallMessage
-                key={idx}
-                name={element.data.toolCall.name}
-                args={element.data.toolCall.args}
-                timestamp={element.timestamp}
-              />;
-            case 'tool_result':
-              return <ToolResultMessage
-                key={idx}
-                response={element.data.response}
-                isError={element.data.isError}
-                timestamp={element.timestamp}
-              />;
-            case 'agent_response':
-              return <AgentMessage
-                key={idx}
-                text={element.data.text}
-                timestamp={element.timestamp}
-                isStreaming={false}
-              />;
-            case 'turn_error':
-              return <TurnErrorMessage key={idx} errorType={element.data.errorType} timestamp={element.timestamp} />;
-            default:
-              return null;
-          }
-        })}
+        {turns.map(turn => <TurnMessages key={`${turn.traceId}:${turn.spanId}`} turn={turn} />)}
       </div>
     </div>
   );

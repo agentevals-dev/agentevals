@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package agentevals.api.v1alpha1;
+
+import "agentevals/api/v1alpha1/common.proto";
+import "agentevals/api/v1alpha1/views.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/agentevals-dev/agentevals/gen/go/agentevals/api/v1alpha1;apiv1alpha1";
+
+service ConversionService {
+  // Reads traces into conversations without evaluating them.
+  rpc ConvertTraces(ConvertTracesRequest) returns (ConvertTracesResponse);
+}
+
+message ConvertTracesRequest {
+  TraceInput traces = 1;
+  // Unset means GROUP_BY_TRACE.
+  GroupBy group_by = 2;
+}
+
+message ConvertedConversation {
+  ConversationView conversation = 1;
+  // The conversation as an ADK EvalSet with one case, to use as a golden. Without captured
+  // content (see TurnView.content_captured) its user turns are empty.
+  google.protobuf.Struct golden_adk_eval_set = 2;
+}
+
+message ConvertTracesResponse {
+  repeated ConvertedConversation conversations = 1;
+  // Documents that could not be read.
+  repeated string warnings = 2;
+}

@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
-import type { TraceResult, ViewType, EvalSet, EvalSetMetadata, EvalCase, TraceTableRow, LiveSession, AnnotationQueue, Annotation } from '../lib/types';
+import type { TraceResult, ViewType, EvalSet, EvalSetMetadata, EvalCase, TraceTableRow, AnnotationQueue, Annotation } from '../lib/types';
+import type { Session } from '../lib/liveSessions';
 import type { TraceMetadata } from '../lib/trace-metadata';
 
 export interface ApiKeyStatus {
@@ -38,7 +39,7 @@ export interface TraceState {
   version: string | null;
 
   // Streaming state
-  streamingSessions: Map<string, LiveSession>;
+  streamingSessions: Map<string, Session>;
 
   // Annotation queue state
   annotationQueues: AnnotationQueue[];
@@ -62,7 +63,7 @@ export interface TraceContextType {
     runEvaluation: () => Promise<void>;
     setCurrentView: (view: ViewType) => void;
     setEvaluationOrigin: (view: ViewType | null) => void;
-    setStreamingSessions: (updater: (prev: Map<string, LiveSession>) => Map<string, LiveSession>) => void;
+    setStreamingSessions: (updater: (prev: Map<string, Session>) => Map<string, Session>) => void;
     removeSession: (sessionId: string) => void;
     clearAllSessions: () => void;
     selectTrace: (traceId: string | null) => void;
@@ -71,7 +72,7 @@ export interface TraceContextType {
 
     // Annotation queue actions
     createAnnotationQueue: (name: string) => string;
-    addToAnnotationQueue: (queueId: string, session: LiveSession) => void;
+    addToAnnotationQueue: (queueId: string, session: Session) => void;
     annotateQueueItem: (queueId: string, sessionId: string, annotation: Annotation) => void;
     setCurrentAnnotationQueueId: (id: string | null) => void;
     setPendingAnnotations: (annotations: Map<string, Annotation>) => void;

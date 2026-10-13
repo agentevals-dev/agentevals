@@ -16,6 +16,10 @@ METADATA_PREFIX = "agentevals.metadata."
 
 # Instrumentation scope of the evaluation result records agentevals emits.
 EMITTER_SCOPE = "agentevals"
+# agentevals' own API server spans: the upstream gRPC instrumentation's scope, and the span name
+# prefix of agentevals' methods.
+GRPC_INSTRUMENTATION_SCOPE = "opentelemetry.instrumentation.grpc"
+API_SPAN_PREFIX = "/agentevals.api."
 
 MAX_KEY_LENGTH = 256
 

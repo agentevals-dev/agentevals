@@ -15,6 +15,7 @@ from .auto import (
     detect_format,
     get_loader_for_format,
     load_telemetry,
+    load_telemetry_text,
     load_traces,
     load_traces_from_obj,
 )
@@ -24,6 +25,7 @@ from .otlp import OtlpJsonLoader
 __all__ = [
     "TelemetryFile",
     "load_telemetry",
+    "load_telemetry_text",
     "JAEGER_JSON",
     "OTLP_JSON",
     "JaegerJsonLoader",

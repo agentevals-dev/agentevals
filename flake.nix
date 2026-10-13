@@ -90,6 +90,9 @@
             # NodeJS
             pkgs.nodejs_22
 
+            # Go, to build and tidy the generated API module in gen/go
+            pkgs.go
+
             # C++ standard library for numpy
             pkgs.stdenv.cc.cc.lib
 

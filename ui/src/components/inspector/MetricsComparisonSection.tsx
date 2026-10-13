@@ -1,7 +1,7 @@
 import React from 'react';
 import { css } from '@emotion/react';
 import { CheckCircle, XCircle, AlertCircle, MinusCircle, Loader2 } from 'lucide-react';
-import type { MetricResult, Invocation } from '../../lib/types';
+import type { MetricResult, Invocation, Part } from '../../lib/types';
 import { getStatusColor } from '../../lib/utils';
 
 interface MetricsComparisonSectionProps {
@@ -26,7 +26,7 @@ export const MetricsComparisonSection: React.FC<MetricsComparisonSectionProps> =
   allExpectedInvocations,
 }) => {
   // Helper to extract text from content parts
-  const getTextFromParts = (parts: any[]) => {
+  const getTextFromParts = (parts: Part[]) => {
     return parts.filter(p => p.text).map(p => p.text).join('\n');
   };
 

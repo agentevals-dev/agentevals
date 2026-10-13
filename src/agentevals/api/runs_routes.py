@@ -25,6 +25,7 @@ from pydantic.alias_generators import to_camel
 from ..run.service import RunService, RunSubmitConflict
 from ..storage.models import Result, Run, RunSpec, RunStatus
 from .models import CamelModel, StandardResponse
+from .redact import redact_run
 
 logger = logging.getLogger(__name__)
 
@@ -83,10 +84,10 @@ async def submit_run(payload: RunRequest, request: Request):
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "message": "run_id already exists with a different spec",
-                "persisted": exc.persisted.model_dump(mode="json", by_alias=True),
+                "persisted": redact_run(exc.persisted).model_dump(mode="json", by_alias=True),
             },
         ) from exc
-    return StandardResponse(data=run)
+    return StandardResponse(data=redact_run(run))
 
 
 @runs_router.get("/runs/{run_id}", response_model=StandardResponse[Run])
@@ -95,7 +96,7 @@ async def get_run(run_id: UUID, request: Request):
     run = await service.get(run_id)
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"run {run_id} not found")
-    return StandardResponse(data=run)
+    return StandardResponse(data=redact_run(run))
 
 
 @runs_router.get("/runs", response_model=StandardResponse[list[Run]])
@@ -107,7 +108,7 @@ async def list_runs(
 ):
     service = _service(request)
     runs = await service.list(status=status_filter, limit=limit, before=before)
-    return StandardResponse(data=runs)
+    return StandardResponse(data=[redact_run(r) for r in runs])
 
 
 @runs_router.get("/runs/{run_id}/results", response_model=StandardResponse[list[Result]])
@@ -129,4 +130,4 @@ async def cancel_run(run_id: UUID, request: Request):
     run = await service.get(run_id)
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"run {run_id} not found")
-    return StandardResponse(data=run)
+    return StandardResponse(data=redact_run(run))

@@ -32,12 +32,19 @@ export const TraceEditorDrawer: React.FC<TraceEditorDrawerProps> = ({ file, file
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Opening the drawer, or another file, starts over (state adjusted during render, not in an effect).
+  const [shown, setShown] = useState({ open, file });
+  if (shown.open !== open || shown.file !== file) {
+    setShown({ open, file });
+    if (open) {
+      setLoading(true);
+      setError(null);
+      setDirty(false);
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
-
-    setLoading(true);
-    setError(null);
-    setDirty(false);
 
     Promise.all([
       readFileAsText(file).then(async (content) => {
@@ -111,16 +118,13 @@ export const TraceEditorDrawer: React.FC<TraceEditorDrawerProps> = ({ file, file
     return applyEditsAndSerialize(parsedFile, allInvocations, editMappings);
   }, [parsedFile, traceGroups, editMappings, dirty]);
 
-  const [initialContent, setInitialContent] = useState<string>('');
-  useEffect(() => {
-    if (open && parsedFile) {
-      if (parsedFile.format === 'otlp-jsonl') {
-        setInitialContent(parsedFile.rawData.map((line: any) => JSON.stringify(line)).join('\n'));
-      } else {
-        setInitialContent(JSON.stringify(parsedFile.rawData, null, 2));
-      }
+  const initialContent = useMemo(() => {
+    if (!parsedFile) return '';
+    if (parsedFile.format === 'otlp-jsonl') {
+      return (parsedFile.rawData as unknown[]).map(line => JSON.stringify(line)).join('\n');
     }
-  }, [open, parsedFile]);
+    return JSON.stringify(parsedFile.rawData, null, 2);
+  }, [parsedFile]);
 
   const totalInvocations = traceGroups.reduce((sum, g) => sum + g.invocations.length, 0);
 

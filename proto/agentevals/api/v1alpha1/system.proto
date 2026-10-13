@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package agentevals.api.v1alpha1;
+
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/agentevals-dev/agentevals/gen/go/agentevals/api/v1alpha1;apiv1alpha1";
+
+service SystemService {
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
+  rpc GetConfig(GetConfigRequest) returns (GetConfigResponse);
+}
+
+message GetVersionRequest {}
+
+message GetVersionResponse {
+  string version = 1;
+}
+
+message GetConfigRequest {}
+
+// Listener ports. 0 when a listener is off.
+message Ports {
+  int32 http = 1;
+  int32 otlp_http = 2;
+  int32 otlp_grpc = 3;
+  int32 api_grpc = 4;
+}
+
+// Bounds of the live session store. Telemetry over a bound is rejected or evicted.
+message LiveLimits {
+  int32 max_sessions = 1;
+  int32 spans_per_trace = 2;
+  int32 spans_per_session = 3;
+  int32 traces_per_session = 4;
+  int64 max_bytes = 5;
+  google.protobuf.Duration completion_grace = 6;
+  google.protobuf.Duration idle_timeout = 7;
+  google.protobuf.Duration session_ttl = 8;
+}
+
+// Which judge provider API keys the server has in its environment. Values are never returned.
+message JudgeKeys {
+  bool google = 1;
+  bool anthropic = 2;
+  bool openai = 3;
+}
+
+message GetConfigResponse {
+  Ports ports = 1;
+  LiveLimits live_limits = 2;
+  // Whether run storage is configured, so RunService works.
+  bool runs_enabled = 3;
+  // Whether evaluation results are emitted as gen_ai.evaluation.result events.
+  bool evaluation_events_enabled = 4;
+  JudgeKeys judge_keys = 5;
+}

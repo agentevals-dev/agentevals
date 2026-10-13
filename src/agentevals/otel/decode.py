@@ -5,7 +5,7 @@ Two inputs, one result shape:
 * OTLP/JSON documents (dicts), including legacy and vendor variants: protobuf field names
   (``resource_spans``, ``trace_id``), ``batches`` and
   ``instrumentationLibrarySpans`` (Tempo v1), the ``{"trace": {...}}`` wrapper (Tempo v2),
-  attributes given as flat or nested dicts (ClickHouse JSON columns), enum names instead of
+  attributes given as flat or nested dicts (JSON column exports), enum names instead of
   numbers, and bare spans with no resource envelope (one span per line).
 * Protobuf ``Export{Trace,Logs}ServiceRequest`` messages, read field by field. ``MessageToDict``
   is never used: it base64 encodes ids and costs a full extra copy.

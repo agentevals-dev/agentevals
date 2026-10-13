@@ -36,7 +36,13 @@ dependencies = [
     "opentelemetry-sdk>=1.38",
     "opentelemetry-exporter-otlp-proto-http>=1.38",
     "opentelemetry-exporter-otlp-proto-grpc>=1.38",
-    "grpcio>=1.66",
+    # Floors of the generated API code in agentevals.api.v1alpha1 (see proto/buf.gen.yaml).
+    "grpcio>=1.78",
+    "protobuf>=6.33.5,<7",
+    "grpcio-health-checking>=1.78",
+    "grpcio-reflection>=1.78",
+    "grpcio-status>=1.78",
+    "opentelemetry-instrumentation-grpc>=0.59b0",
 ]
 
 [project.optional-dependencies]
@@ -107,6 +113,7 @@ target-version = "py311"
 line-length = 120
 fix = true
 src = ["src", "packages", "tests"]
+extend-exclude = ["src/agentevals/api/v1alpha1"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["agentevals"]

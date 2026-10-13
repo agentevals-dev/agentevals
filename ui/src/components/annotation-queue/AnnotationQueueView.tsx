@@ -62,7 +62,7 @@ export function AnnotationQueueView() {
 
       const traceFiles = await Promise.all(
         currentQueue.items.map(async (item) => {
-          if (!item.invocations || item.invocations.length === 0) return null;
+          if (item.session.turns.length === 0) return null;
 
           const traceResponse = await fetch(config.api.endpoints.streamingGetTrace, {
             method: 'POST',
@@ -100,7 +100,7 @@ export function AnnotationQueueView() {
     }
   };
 
-  const completedItems = currentQueue?.items.filter(item => item.invocations && item.invocations.length > 0) || [];
+  const completedItems = currentQueue?.items.filter(item => item.session.turns.length > 0) || [];
 
   return (
     <div style={{

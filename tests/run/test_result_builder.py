@@ -65,7 +65,7 @@ class TestBuildResults:
         assert names == ["a", "a", "b", "c"]
 
     def test_eval_set_item_id_defaults_to_trace_id(self):
-        """OSS scope: no per-eval-case id extraction. Trace id is the stable
+        """No per-eval-case id extraction. Trace id is the stable
         identifier for both eval_set_item_id and eval_set_item_name. Test
         locks this so future changes are deliberate."""
         rr = RunResult(trace_results=[_trace_result(_mr())])

@@ -92,7 +92,7 @@ class TestLangchainZeroCode:
         assert session.span_count > 0, "Expected spans from LLM calls"
         assert session.log_count > 0, "LangChain uses logs for message content"
 
-    def test_invocations_extracted_with_content(self, live_servers):
+    def test_turns_extracted_with_content(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-langchain-inv"
 
@@ -106,10 +106,11 @@ class TestLangchainZeroCode:
         wait_for_session_complete_sync(mgr, session_name, timeout=30)
         session = mgr.sessions[session_name]
 
-        assert len(session.invocations) > 0, "Expected extracted invocations"
-        for inv in session.invocations:
-            has_content = inv.get("userText") or inv.get("agentResponse")
-            assert has_content, f"Invocation {inv.get('invocationId', '?')} has no content"
+        turns = mgr.view(session).with_turns.upsert.turns
+        assert len(turns) > 0, "Expected extracted turns"
+        for turn in turns:
+            has_content = turn.HasField("user_text") or turn.HasField("answer_text")
+            assert has_content, f"Turn {turn.span_id} has no content"
 
     def test_session_visible_via_api(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
@@ -154,7 +155,7 @@ class TestStrandsZeroCode:
         assert session.is_complete
         assert session.span_count > 0, "Expected spans from LLM calls"
 
-    def test_invocations_extracted(self, live_servers):
+    def test_turns_extracted(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-strands-inv"
 
@@ -171,7 +172,7 @@ class TestStrandsZeroCode:
         wait_for_session_complete_sync(mgr, session_name, timeout=30)
         session = mgr.sessions[session_name]
 
-        assert len(session.invocations) > 0, "Expected extracted invocations"
+        assert len(mgr.view(session).with_turns.upsert.turns) > 0, "Expected extracted turns"
 
     def test_session_visible_via_api(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
@@ -216,7 +217,7 @@ class TestAdkZeroCode:
         assert session.is_complete
         assert session.span_count > 0, "Expected spans from ADK agent"
 
-    def test_invocations_extracted(self, live_servers):
+    def test_turns_extracted(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-adk-inv"
 
@@ -230,7 +231,7 @@ class TestAdkZeroCode:
         wait_for_session_complete_sync(mgr, session_name, timeout=30)
         session = mgr.sessions[session_name]
 
-        assert len(session.invocations) > 0, "Expected extracted invocations"
+        assert len(mgr.view(session).with_turns.upsert.turns) > 0, "Expected extracted turns"
 
     def test_session_visible_via_api(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
@@ -272,7 +273,7 @@ class TestOpenAIAgentsZeroCode:
         assert session.is_complete
         assert session.span_count > 0, "Expected spans from LLM calls"
 
-    def test_invocations_extracted(self, live_servers):
+    def test_turns_extracted(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-openai-agents-inv"
 
@@ -286,7 +287,7 @@ class TestOpenAIAgentsZeroCode:
         wait_for_session_complete_sync(mgr, session_name, timeout=30)
         session = mgr.sessions[session_name]
 
-        assert len(session.invocations) > 0, "Expected extracted invocations"
+        assert len(mgr.view(session).with_turns.upsert.turns) > 0, "Expected extracted turns"
 
     def test_session_visible_via_api(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
@@ -329,7 +330,7 @@ class TestPydanticAIZeroCode:
         assert session.is_complete
         assert session.span_count > 0, "Expected spans from LLM calls"
 
-    def test_invocations_extracted_with_content(self, live_servers):
+    def test_turns_extracted_with_content(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
         session_name = "e2e-pydantic-ai-inv"
 
@@ -343,10 +344,11 @@ class TestPydanticAIZeroCode:
         wait_for_session_complete_sync(mgr, session_name, timeout=30)
         session = mgr.sessions[session_name]
 
-        assert len(session.invocations) > 0, "Expected extracted invocations"
-        for inv in session.invocations:
-            has_content = inv.get("userText") or inv.get("agentResponse")
-            assert has_content, f"Invocation {inv.get('invocationId', '?')} has no content"
+        turns = mgr.view(session).with_turns.upsert.turns
+        assert len(turns) > 0, "Expected extracted turns"
+        for turn in turns:
+            has_content = turn.HasField("user_text") or turn.HasField("answer_text")
+            assert has_content, f"Turn {turn.span_id} has no content"
 
     def test_session_visible_via_api(self, live_servers):
         main_port, otlp_http_port, mgr = live_servers
