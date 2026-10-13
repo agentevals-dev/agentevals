@@ -8,18 +8,25 @@ kagent agents --> OTel Collector --> agentevals (UI on :8001)
                         +---- scores -----+
 ```
 
-Tested with kagent `46fdd3d7` (`v1.0.0-alpha9` plus a UI only commit, `v1alpha3` agents on Substrate), Claude Code 2.1.285, Collector contrib 0.162.0, and `claude-haiku-4-5` for both agents.
+Tested with kagent `v1.0.0-alpha12` (installed with `kagent install`), Claude Code 2.1.285 (shipped in its Claude harness), agentevals 0.11.0, Collector contrib 0.162.0, and `claude-haiku-4-5` for both agents.
 
 What you get depends on the kagent version:
 
 | kagent | Go ADK | Claude Code harness | Codex harness |
 |---|---|---|---|
-| `v1.0.0-alpha9` (tested) | Model and tool calls with arguments, results and tokens | Native Claude Code spans only. The `transform/claude_code` recipe turns them into tool names and model calls with tokens | Not tested |
-| With runtime GenAI spans ([kagent#3121](https://github.com/kagent-dev/kagent/pull/3121), not released yet) | Same | The runtime writes `chat` and `execute_tool` spans with tool names, call ids and tokens, but no tool arguments. The recipe steps aside by itself | Runtime spans, not tested yet |
+| `v1.0.0-alpha12` or later (tested) | Model and tool calls with arguments, results and tokens | The runtime writes `chat` and `execute_tool` spans with tool names, arguments, results and tokens | Runtime spans, not tested |
+| Before `v1.0.0-alpha12` | Same | Native Claude Code spans only, see [Older kagent versions](#older-kagent-versions) | Not tested |
+
+The steps below need `v1.0.0-alpha12` or later, where each Agent points at a separate Harness.
 
 ## Set it up
 
-You need a cluster with kagent 1.0 already running.
+You need a cluster with kagent `v1.0.0-alpha12` or later, and a default model config on Anthropic, since the Claude harness only runs Claude models. For example:
+
+```bash
+export ANTHROPIC_API_KEY=<your key>
+KAGENT_DEFAULT_MODEL_PROVIDER=anthropic kagent install
+```
 
 Install agentevals and the Collector:
 
@@ -30,21 +37,28 @@ helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals 
   -n agentevals -f agentevals-values.yaml --wait
 ```
 
-Point kagent at the Collector:
+Point kagent at the Collector. `--version` keeps the kagent version you have, since Helm would otherwise pull the latest chart:
 
 ```bash
-helm upgrade kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent -n kagent --reuse-values \
+export KAGENT_VERSION=$(helm get metadata kagent -n kagent -o json | jq -r .version)
+helm upgrade kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent -n kagent \
+  --version "$KAGENT_VERSION" --reuse-values \
   --set otel.exporter.otlp.endpoint=http://otel-collector.agentevals.svc.cluster.local:4317 \
   --set otel.traces.enabled=true --set otel.logs.enabled=true \
   --set otel.capture.messageContent=true --wait
 ```
 
-Heads up: `messageContent` puts prompts and responses on spans. agentevals needs them, but they can be sensitive.
+Heads up: `messageContent` puts prompts, responses and tool arguments on spans. agentevals needs them, but they can be sensitive.
 
-Create the agents, using the images of your kagent release:
+Create the agents. `agents.yaml` has one Harness per runtime and one Agent on each. kagent only takes harness images pinned by digest, so look them up for your release:
 
 ```bash
-export KAGENT_ADK_GO_IMAGE=<golang-adk image> KAGENT_CLAUDE_IMAGE=<claude-harness image>
+digest() {
+  docker buildx imagetools inspect "ghcr.io/kagent-dev/kagent/$1:$KAGENT_VERSION" \
+    --format '{{json .Manifest}}' | jq -r .digest
+}
+export KAGENT_ADK_GO_IMAGE=ghcr.io/kagent-dev/kagent/golang-adk@$(digest golang-adk)
+export KAGENT_CLAUDE_IMAGE=ghcr.io/kagent-dev/kagent/claude-harness@$(digest claude-harness)
 envsubst < agents.yaml | kubectl apply -f -
 ```
 
@@ -122,10 +136,10 @@ What we got from one run:
 
 | Session | Trajectory | Response match |
 |---|---|---|
-| Another `adk-go-test` chat | 1.0 | 0.93 |
-| `claude-test` | 0.0 | 0.64 |
+| Another `adk-go-test` chat | 1.0 | 0.82 |
+| `claude-test` | 0.5 | 0.67 |
 
-The second Go ADK chat made the same calls, so its trajectory matches and the answers are close. Claude Code fails the trajectory because its tool calls come without arguments (see below) and it uses extra tools like `ToolSearch` and `Bash`. To track Claude Code, use a Claude Code session as its golden run.
+The second Go ADK chat made the same calls, so its trajectory matches and the answers are close. Claude Code matches the second turn, same tool and arguments. It misses the first, because it looks the tool up with `ToolSearch` and tries `kubectl` through `Bash` before it calls `k8s_get_resources`. To track Claude Code, use a Claude Code session as its golden run.
 
 ## Get the results as OTel events
 
@@ -144,23 +158,25 @@ env:
 The Collector prints them with its `debug` exporter. After a run, check:
 
 ```bash
-kubectl logs -n agentevals deploy/otel-collector | grep -A12 "EventName: gen_ai.evaluation.result"
+kubectl logs -n agentevals deploy/otel-collector | grep -A13 "EventName: gen_ai.evaluation.result"
 ```
 
 You get one event per turn and metric, like this one:
 
 ```
 EventName: gen_ai.evaluation.result
+Body: Empty()
 Attributes:
      -> gen_ai.evaluation.name: Str(tool_trajectory_avg_score)
+     -> agentevals.eval.case.id: Str(case_1)
+     -> agentevals.eval_set.id: Str(manual-1)
+     -> agentevals.evaluator.type: Str(deterministic)
      -> gen_ai.evaluation.score.value: Double(1)
      -> gen_ai.evaluation.score.label: Str(pass)
      -> gen_ai.agent.name: Str(adk_go_test)
-     -> gen_ai.conversation.id: Str(01a11b1c-41b6-794d-b0be-65a187d1fbcc)
-     -> agentevals.evaluator.type: Str(deterministic)
-     -> agentevals.eval_set.id: Str(manual-1)
-Trace ID: bf5aed954bb31b9234b2a29b14224354
-Span ID: 0b95fefded63d107
+     -> gen_ai.conversation.id: Str(01a13693-ce10-7dc8-9ded-3902632694cb)
+Trace ID: 6fd838238a01ba8367db0efc96d1abda
+Span ID: 5517696ddca054cf
 ```
 
 The trace and span id point at the turn's `invoke_agent` span, so your backend shows the score on the exact turn it belongs to. `gen_ai.conversation.id` is the kagent chat id, which is also the session id in agentevals.
@@ -171,22 +187,20 @@ Events carry no prompts or answers. Set `AGENTEVALS_EVALUATION_EVENTS_EXPLANATIO
 
 kagent writes a TaskStore gRPC span for every streamed chunk, so a long turn can have thousands of them. agentevals keeps the first 10,000 spans of a trace, and a turn that passes that loses its `invoke_agent` span. The `filter/kagent_taskstore` processor in `otel-collector.yaml` drops those RPC spans before they reach agentevals. Turns, tool calls and tokens come out the same.
 
-## Claude Code workaround
+## Claude Code answers
 
-Claude Code exports its own `claude_code.*` spans instead of GenAI ones. kagent wraps each turn in a GenAI `invoke_agent` span, so out of the box you only get the message and the answer.
+The answer agentevals shows for a Claude Code turn is everything the harness streamed in it, so it can start with a line like *I'll use the Kubernetes tools to check...* before the actual answer. This lowers `response_match_score` a bit when the golden run is not a Claude Code session.
 
-The `transform/claude_code` processor in `otel-collector.yaml` fills the gap for Claude Code 2.1.285:
+## Older kagent versions
+
+Before `v1.0.0-alpha12`, the Claude runtime exports only Claude Code's own `claude_code.*` spans, and you get just the message and the answer. The Agent API is different there too, so `agents.yaml` does not apply as is.
+
+The `transform/claude_code` processor in `otel-collector.yaml` fills part of the gap for Claude Code 2.1.285:
 
 * `claude_code.tool` becomes `execute_tool`, with `gen_ai.tool.name` taken from `tool_name` (minus the `mcp__<server>__` prefix)
 * `claude_code.llm_request` becomes `chat`, with the model and token usage, cache reads and writes included
 
-Recheck it when you upgrade the harness, since those names can change. The recipe is for kagent releases whose Claude runtime does not write its own GenAI spans, and it skips processes that do (their resource has `kagent.genai.producer`), so calls are never counted twice.
-
-Still missing with this version:
-
-* tool arguments, since Claude Code doesn't put them on spans
-* a clean answer: the response is everything the harness streamed in the turn, subagent chatter included
-* background calls, which aren't part of the turn's trace
+Tool arguments stay missing, since Claude Code doesn't put them on its spans. From `v1.0.0-alpha12` on, the runtime writes its own GenAI spans and marks its resource with `kagent.genai.producer`. The recipe skips those processes, so calls are never counted twice, and you can drop it from the Collector config.
 
 ## Clean up
 
