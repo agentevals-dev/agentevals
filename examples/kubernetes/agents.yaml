@@ -1,6 +1,37 @@
 # Two kagent agents with the same prompt and tools: one on the Go ADK runtime, one on the
-# Claude Code harness. Set the workload images to the ones shipped with your kagent release,
-# and the worker pool and snapshot location to the ones of your kagent install.
+# Claude Code harness. Each runtime is a Harness; set the workload images to the ones of
+# your kagent release, pinned by digest, and the worker pool and snapshot location to the
+# ones of your kagent install.
+apiVersion: api.kagent.dev/v1alpha3
+kind: Harness
+metadata:
+  name: adk-go
+  namespace: kagent
+spec:
+  kagent: {}
+  workload:
+    image: ${KAGENT_ADK_GO_IMAGE}
+  substrate:
+    workerPoolRef:
+      name: kagent-default
+    snapshotPolicy:
+      location: s3://ate-snapshots/kagent
+---
+apiVersion: api.kagent.dev/v1alpha3
+kind: Harness
+metadata:
+  name: claude
+  namespace: kagent
+spec:
+  claude: {}
+  workload:
+    image: ${KAGENT_CLAUDE_IMAGE}
+  substrate:
+    workerPoolRef:
+      name: kagent-default
+    snapshotPolicy:
+      location: s3://ate-snapshots/kagent
+---
 apiVersion: api.kagent.dev/v1alpha3
 kind: Agent
 metadata:
@@ -8,24 +39,18 @@ metadata:
   namespace: kagent
 spec:
   template:
-    description: Go ADK test agent.
-    modelConfig:
-      name: default-model-config
-    systemPrompt: You are a helpful assistant running on kagent.
-    tools:
-      - mcp:
-          server:
-            kind: RemoteMCPServer
-            name: kagent-tool-server
-  harness:
-    kagent: {}
-    workload:
-      image: ${KAGENT_ADK_GO_IMAGE}
-    substrate:
-      workerPoolRef:
-        name: kagent-default
-      snapshotPolicy:
-        location: s3://ate-snapshots/kagent
+    inline:
+      description: Go ADK test agent.
+      modelConfig:
+        name: default-model-config
+      systemPrompt: You are a helpful assistant running on kagent.
+      tools:
+        - mcp:
+            server:
+              kind: RemoteMCPServer
+              name: kagent-tool-server
+  harnessRef:
+    name: adk-go
 ---
 apiVersion: api.kagent.dev/v1alpha3
 kind: Agent
@@ -34,21 +59,15 @@ metadata:
   namespace: kagent
 spec:
   template:
-    description: Claude Code harness test agent.
-    modelConfig:
-      name: default-model-config
-    systemPrompt: You are a helpful assistant running on kagent.
-    tools:
-      - mcp:
-          server:
-            kind: RemoteMCPServer
-            name: kagent-tool-server
-  harness:
-    claude: {}
-    workload:
-      image: ${KAGENT_CLAUDE_IMAGE}
-    substrate:
-      workerPoolRef:
-        name: kagent-default
-      snapshotPolicy:
-        location: s3://ate-snapshots/kagent
+    inline:
+      description: Claude Code harness test agent.
+      modelConfig:
+        name: default-model-config
+      systemPrompt: You are a helpful assistant running on kagent.
+      tools:
+        - mcp:
+            server:
+              kind: RemoteMCPServer
+              name: kagent-tool-server
+  harnessRef:
+    name: claude
