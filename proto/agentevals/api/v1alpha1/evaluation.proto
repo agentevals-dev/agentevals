@@ -1,0 +1,210 @@
+syntax = "proto3";
+
+package agentevals.api.v1alpha1;
+
+import "agentevals/api/v1alpha1/common.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/agentevals-dev/agentevals/gen/go/agentevals/api/v1alpha1;apiv1alpha1";
+
+service EvaluationService {
+  rpc ListMetrics(ListMetricsRequest) returns (ListMetricsResponse);
+  // Evaluates traces. Streams progress, each group's performance metrics before evaluation, each
+  // group's results, and the final result, after which the stream ends. When run storage is
+  // configured, the evaluation is also recorded as a run.
+  rpc EvaluateTraces(EvaluateTracesRequest) returns (stream EvaluateTracesResponse);
+}
+
+message ListMetricsRequest {}
+
+message Metric {
+  string name = 1;
+  string category = 2;
+  string description = 3;
+  // Needs a golden eval set.
+  bool requires_eval_set = 4;
+  // Calls a judge model.
+  bool requires_llm = 5;
+  // Needs Google Cloud credentials.
+  bool requires_gcp = 6;
+  // Needs rubrics in the eval set.
+  bool requires_rubrics = 7;
+  // Usable with recorded traces.
+  bool working = 8;
+}
+
+message ListMetricsResponse {
+  repeated Metric metrics = 1;
+}
+
+enum TrajectoryMatchType {
+  // The metric's default.
+  TRAJECTORY_MATCH_TYPE_UNSPECIFIED = 0;
+  TRAJECTORY_MATCH_TYPE_EXACT = 1;
+  TRAJECTORY_MATCH_TYPE_IN_ORDER = 2;
+  TRAJECTORY_MATCH_TYPE_ANY_ORDER = 3;
+}
+
+// A built-in metric, by name (see ListMetrics), with optional overrides.
+message BuiltinEvaluator {
+  string name = 1;
+  // 0 to 1. Unset uses the metric's default.
+  optional double threshold = 2;
+  string judge_model = 3;
+  TrajectoryMatchType trajectory_match_type = 4;
+  // Name of a credential_refs entry whose value is the judge API key.
+  string credential_ref = 5;
+  // Base URL of an OpenAI compatible judge endpoint.
+  string judge_base_url = 6;
+}
+
+// An evaluator file on the server, run as a subprocess.
+message CodeEvaluator {
+  string name = 1;
+  // 0 to 1. Unset means 0.5.
+  optional double threshold = 2;
+  // Seconds. Unset means 30.
+  optional int32 timeout = 3;
+  google.protobuf.Struct config = 4;
+  // Unset means local.
+  string executor = 5;
+  // Path of the evaluator file (.py, .js, .ts and so on) on the server.
+  string path = 6;
+}
+
+// An evaluator fetched from a remote source.
+message RemoteEvaluator {
+  string name = 1;
+  // 0 to 1. Unset means 0.5.
+  optional double threshold = 2;
+  // Seconds. Unset means 30.
+  optional int32 timeout = 3;
+  google.protobuf.Struct config = 4;
+  // Unset means local.
+  string executor = 5;
+  // Unset means github.
+  string source = 6;
+  // A relative path within the source.
+  string ref = 7;
+}
+
+message Evaluator {
+  oneof kind {
+    BuiltinEvaluator builtin = 1;
+    CodeEvaluator code = 2;
+    RemoteEvaluator remote = 3;
+  }
+}
+
+message EvalParams {
+  // Names must be unique. Empty means tool_trajectory_avg_score.
+  repeated Evaluator evaluators = 1;
+  // At least 1. Unset means 10.
+  optional int32 max_concurrent_traces = 2;
+  // At least 1. Unset means 5.
+  optional int32 max_concurrent_evals = 3;
+  // Unset means GROUP_BY_AUTO.
+  GroupBy group_by = 4;
+}
+
+enum EvalStatus {
+  EVAL_STATUS_UNSPECIFIED = 0;
+  EVAL_STATUS_PASSED = 1;
+  EVAL_STATUS_FAILED = 2;
+  EVAL_STATUS_NOT_EVALUATED = 3;
+}
+
+// A metric's result for one turn.
+message InvocationResult {
+  // Unset when the turn has no score.
+  optional double score = 1;
+  EvalStatus status = 2;
+}
+
+message MetricResult {
+  string metric_name = 1;
+  optional double score = 2;
+  EvalStatus eval_status = 3;
+  // One entry per turn, in turn order.
+  repeated InvocationResult per_invocation = 4;
+  optional string error = 5;
+  // error.type.
+  optional string error_type = 6;
+  // Metric specific details.
+  google.protobuf.Struct details = 7;
+  optional double duration_ms = 8;
+}
+
+message TurnRef {
+  string trace_id = 1;
+  string span_id = 2;
+}
+
+// The results of one evaluation group: a trace, or a conversation of several traces.
+message TraceResult {
+  // The group's earliest trace.
+  string trace_id = 1;
+  int32 num_invocations = 2;
+  repeated MetricResult metric_results = 3;
+  repeated string conversion_warnings = 4;
+  google.protobuf.Struct performance_metrics = 5;
+  // service.name.
+  string service_name = 6;
+  // gen_ai.agent.name.
+  string agent_name = 7;
+  repeated string trace_ids = 8;
+  // gen_ai.conversation.id.
+  string conversation_id = 9;
+  string group_key = 10;
+  // The eval set case the group was compared with.
+  string eval_case_id = 11;
+  // How the case was chosen.
+  string eval_case_match = 12;
+  // The judged turns, in order.
+  repeated TurnRef turn_refs = 13;
+}
+
+message RunResult {
+  repeated TraceResult trace_results = 1;
+  repeated string errors = 2;
+  google.protobuf.Struct performance_metrics = 3;
+  // Set when the evaluation was recorded as a run.
+  string run_id = 4;
+}
+
+message EvaluateTracesRequest {
+  TraceInput traces = 1;
+  // The golden. Required by metrics with requires_eval_set.
+  oneof eval_set {
+    // An ADK EvalSet as JSON.
+    google.protobuf.Struct adk_eval_set = 2;
+  }
+  EvalParams params = 3;
+  // Logical credential name to a secret reference, for example
+  // {"kind": "kubernetes", "namespace": "...", "name": "...", "key": "..."} or
+  // {"kind": "env", "name": "..."}. Values are resolved per request and never returned.
+  map<string, google.protobuf.Struct> credential_refs = 4;
+}
+
+message EvaluationProgress {
+  string message = 1;
+}
+
+// A group's performance metrics, sent before it is evaluated.
+message GroupPerformance {
+  // The group's earliest trace.
+  string trace_id = 1;
+  google.protobuf.Struct performance_metrics = 2;
+  google.protobuf.Struct trace_metadata = 3;
+}
+
+message EvaluateTracesResponse {
+  oneof event {
+    EvaluationProgress progress = 1;
+    GroupPerformance performance = 2;
+    // A group's results so far.
+    TraceResult trace_result = 3;
+    // The final result.
+    RunResult done = 4;
+  }
+}

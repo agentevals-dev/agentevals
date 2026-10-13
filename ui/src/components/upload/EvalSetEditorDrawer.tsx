@@ -9,14 +9,21 @@ import { JsonPreview } from '../builder/JsonPreview';
 import { readFileAsText, convertSnakeToCamel, convertCamelToSnake } from '../../lib/utils';
 import type { EvalSet, EvalSetMetadata, EvalCase, Invocation } from '../../lib/types';
 
-function parseEvalSetFromJson(raw: any): EvalSet {
+interface RawEvalSet {
+  eval_set_id?: string;
+  name?: string;
+  description?: string;
+  eval_cases?: { eval_id?: string; conversation?: unknown[] }[];
+}
+
+function parseEvalSetFromJson(raw: RawEvalSet): EvalSet {
   return {
     eval_set_id: raw.eval_set_id || '',
     name: raw.name || '',
     description: raw.description || '',
-    eval_cases: (raw.eval_cases || []).map((ec: any) => ({
+    eval_cases: (raw.eval_cases || []).map(ec => ({
       eval_id: ec.eval_id || '',
-      conversation: (ec.conversation || []).map((inv: any) => convertSnakeToCamel(inv) as Invocation),
+      conversation: (ec.conversation || []).map(inv => convertSnakeToCamel(inv) as Invocation),
     })),
   };
 }
@@ -47,16 +54,23 @@ export const EvalSetEditorDrawer: React.FC<EvalSetEditorDrawerProps> = ({ file, 
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Opening the drawer, or another file, starts over (state adjusted during render, not in an effect).
+  const [shown, setShown] = useState({ open, file });
+  if (shown.open !== open || shown.file !== file) {
+    setShown({ open, file });
+    if (open) {
+      setLoading(true);
+      setError(null);
+      setDirty(false);
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
 
-    setLoading(true);
-    setError(null);
-    setDirty(false);
-
     readFileAsText(file)
       .then((content) => {
-        const parsed = JSON.parse(content);
+        const parsed = JSON.parse(content) as RawEvalSet;
         setEvalSet(parseEvalSetFromJson(parsed));
         setLoading(false);
       })

@@ -1,4 +1,4 @@
-"""Option A: /api/evaluate variants persist when run_service is configured.
+"""/api/evaluate variants persist when run_service is configured.
 
 These tests stub a memory-backed RunService onto app.state so we can drive
 the persistence path without standing up a real Postgres. The lifespan
@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import tempfile
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from agentevals.api.app import create_app
+from agentevals.config import EvalParams
 from agentevals.run.service import RunService
 from agentevals.storage.repos.memory import MemoryRepos
 
@@ -80,6 +82,20 @@ class TestEvaluateMultipartSync:
         assert run.spec.target.trace_files == ["helm.json"]
         assert run.spec.target.trace_count == 1
 
+    def test_recorded_run_keeps_no_server_paths(self, app_with_runs):
+        app, repos = app_with_runs
+        with TestClient(app) as client:
+            with SAMPLE_TRACE.open("rb") as f:
+                r = client.post(
+                    "/api/evaluate",
+                    files={"trace_files": ("helm.json", f, "application/json")},
+                    data={"config": '{"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}'},
+                )
+        assert r.status_code == 200
+        [run] = asyncio.run(repos.runs.list())
+        assert set(run.spec.eval_config) <= set(EvalParams.model_fields)
+        assert tempfile.gettempdir() not in run.spec.model_dump_json()
+
     def test_results_persisted_alongside_run(self, app_with_runs):
         app, repos = app_with_runs
         with TestClient(app) as client:
@@ -98,7 +114,7 @@ class TestEvaluateMultipartSync:
 
     def test_each_call_creates_distinct_run(self, app_with_runs):
         """Multiple UI uploads accumulate in run history; each gets its own
-        Run row. This is the core OSS user value of Option A."""
+        Run row."""
         app, repos = app_with_runs
         with TestClient(app) as client:
             for _ in range(3):

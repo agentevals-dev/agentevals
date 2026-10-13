@@ -1,0 +1,12 @@
+version: v2
+modules:
+  - path: .
+deps:
+  # OTLP proto release that the installed opentelemetry-proto package is generated from.
+  - buf.build/opentelemetry/opentelemetry:v1.9.0
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

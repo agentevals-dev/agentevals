@@ -1,7 +1,7 @@
 import React from 'react';
 import { css } from '@emotion/react';
 import { MessageCircle, Wrench, MessageSquare } from 'lucide-react';
-import type { Invocation } from '../../lib/types';
+import type { Invocation, Part } from '../../lib/types';
 
 interface InvocationSummaryPanelProps {
   invocations: Invocation[];
@@ -15,7 +15,7 @@ export const InvocationSummaryPanel: React.FC<InvocationSummaryPanelProps> = ({
   onSelectInvocation,
 }) => {
   // Helper to extract text from content parts
-  const getTextFromParts = (parts: any[]) => {
+  const getTextFromParts = (parts: Part[]) => {
     return parts.filter(p => p.text).map(p => p.text).join(' ');
   };
 

@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package agentevals.api.v1alpha1;
+
+import "opentelemetry/proto/logs/v1/logs.proto";
+import "opentelemetry/proto/trace/v1/trace.proto";
+
+option go_package = "github.com/agentevals-dev/agentevals/gen/go/agentevals/api/v1alpha1;apiv1alpha1";
+
+// limit 0 means the default of 50; the maximum is 100.
+message PageRequest {
+  int32 limit = 1;
+  // Opaque token from a previous PageResponse.
+  string page_token = 2;
+}
+
+message PageResponse {
+  // Empty on the last page.
+  string next_page_token = 1;
+}
+
+enum TraceFormat {
+  // Detected from the content.
+  TRACE_FORMAT_UNSPECIFIED = 0;
+  // One OTLP/JSON document (hex ids, as the OTLP/HTTP JSON encoding).
+  TRACE_FORMAT_OTLP_JSON = 1;
+  // One OTLP/JSON document or span per line.
+  TRACE_FORMAT_OTLP_JSONL = 2;
+  // A Jaeger JSON export.
+  TRACE_FORMAT_JAEGER_JSON = 3;
+}
+
+// A trace file as bytes, as the REST API takes uploads. At most 10 MiB.
+message TraceDocument {
+  bytes content = 1;
+  TraceFormat format = 2;
+  // The file name, used in messages and as a session name hint (trace_<name>.json).
+  string name = 3;
+}
+
+// OTLP telemetry as protobuf. Logs carry the GenAI events that belong to the spans.
+message OtlpTelemetry {
+  opentelemetry.proto.trace.v1.TracesData traces = 1;
+  opentelemetry.proto.logs.v1.LogsData logs = 2;
+}
+
+// Traces to read. Both fields may be set; their traces are combined.
+message TraceInput {
+  OtlpTelemetry otlp = 1;
+  repeated TraceDocument documents = 2;
+}
+
+// How traces form evaluation units.
+enum GroupBy {
+  // The default of the field that uses it.
+  GROUP_BY_UNSPECIFIED = 0;
+  // Conversation when any trace carries agentevals.session_name or the eval set has a multi
+  // turn case, otherwise trace.
+  GROUP_BY_AUTO = 1;
+  // Every trace on its own.
+  GROUP_BY_TRACE = 2;
+  // Traces sharing agentevals.session_name, gen_ai.conversation.id or session.id form one unit.
+  GROUP_BY_CONVERSATION = 3;
+}

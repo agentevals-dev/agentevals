@@ -1,3 +1,6 @@
+import type { JsonObject } from '@bufbuild/protobuf';
+import type { Session } from './liveSessions';
+
 // API envelope
 export interface StandardResponse<T> {
   data: T;
@@ -7,7 +10,7 @@ export interface StandardResponse<T> {
 // Core trace data structures
 export interface Log {
   timestamp: number;
-  fields: Record<string, any>;
+  fields: JsonObject;
 }
 
 export interface Span {
@@ -17,7 +20,7 @@ export interface Span {
   operationName: string;
   startTime: number; // microseconds
   duration: number; // microseconds
-  tags: Record<string, any>;
+  tags: JsonObject;
   logs: Log[];
   children: Span[];
 }
@@ -42,25 +45,25 @@ export interface Part {
 
 export interface FunctionCall {
   name: string;
-  args: Record<string, any>;
+  args: JsonObject;
   id?: string;
 }
 
 export interface FunctionResponse {
   name: string;
-  response: Record<string, any>;
+  response: JsonObject;
   id?: string;
 }
 
 export interface ToolCall {
   name: string;
-  args: Record<string, any>;
+  args: JsonObject;
   id?: string;
 }
 
 export interface ToolResponse {
   name: string;
-  response: Record<string, any>;
+  response: JsonObject;
   id?: string;
 }
 
@@ -105,7 +108,7 @@ export type EvalStatus = 'PASSED' | 'FAILED' | 'NOT_EVALUATED' | 'ERROR';
 
 export interface ToolCallComparison {
   name: string;
-  args: Record<string, any>;
+  args: JsonObject;
 }
 
 export interface TrajectoryComparison {
@@ -476,57 +479,6 @@ export const AVAILABLE_METRICS: MetricMetadata[] = [
   }
 ];
 
-// Streaming / Live session types
-export interface ConversationElement {
-  type: 'user_input' | 'tool_call' | 'tool_result' | 'agent_response' | 'turn_error';
-  timestamp: number;
-  invocationId: string;
-  data: any;
-}
-
-export interface ExternalEvaluation {
-  name: string;
-  scoreValue?: number | null;
-  scoreLabel?: string | null;
-  explanation?: string | null;
-  spanId: string;
-  sourceService?: string | null;
-}
-
-export interface StreamingInvocation {
-  /** Span id of the turn's anchor span. */
-  invocationId: string;
-  traceId?: string;
-  userText: string;
-  agentText: string;
-  toolCalls: Array<{ name: string; args: any; id?: string }>;
-  toolResponses?: Array<{ name: string; response: any; id?: string }>;
-  modelInfo?: Record<string, any>;
-  status?: 'unset' | 'ok' | 'error';
-  errorType?: string | null;
-  contentCaptured?: boolean;
-  warnings?: string[];
-  /** ``gen_ai.evaluation.result`` events found in the telemetry (from other evaluators). */
-  externalEvaluations?: ExternalEvaluation[];
-}
-
-export interface LiveSession {
-  sessionId: string;
-  traceId: string;
-  evalSetId: string | null;
-  spans: any[];
-  status: 'active' | 'complete';
-  metadata: Record<string, any>;
-  invocations?: StreamingInvocation[];
-  liveElements: ConversationElement[];
-  liveStats: {
-    totalInputTokens: number;
-    totalOutputTokens: number;
-    model?: string;
-  };
-  startedAt: string;
-}
-
 // Inspector-specific types
 export type ExtractionType = 'user_input' | 'tool_use' | 'tool_response' | 'final_response';
 
@@ -560,13 +512,14 @@ export type TraceFileFormat = 'jaeger' | 'otlp-json' | 'otlp-jsonl';
 
 export interface SpanLocationRef {
   /** The span object inside the parsed file; patches edit it in place. */
-  raw: any;
+  raw: object;
 }
 
 export interface ParsedTraceFile {
   format: TraceFileFormat;
   fileName: string;
-  rawData: any;
+  /** The parsed document; one entry per line for ``otlp-jsonl``. */
+  rawData: unknown;
   spanIndex: Map<string, SpanLocationRef>;
 }
 
@@ -594,10 +547,8 @@ export interface AnnotationQueueItem {
   model?: string;
   totalTokens?: number;
   annotation?: Annotation;
-  invocations?: StreamingInvocation[];
-  liveElements?: ConversationElement[];
-  liveStats?: { totalInputTokens: number; totalOutputTokens: number; model?: string };
-  metadata?: Record<string, any>;
+  /** The live session as it was when queued. */
+  session: Session;
 }
 
 export interface AnnotationQueue {

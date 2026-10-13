@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
+import dataclasses
 import json
 import logging
 import os
 import re
 import shutil
 import tempfile
+from collections.abc import AsyncIterator
 from contextlib import contextmanager
 from typing import Any
 
@@ -19,7 +20,7 @@ from pydantic.alias_generators import to_camel
 from agentevals import __version__
 
 from ..adk_bridge import invocation_to_dict, to_adk_invocations
-from ..builtin_metrics import METRICS_NEEDING_EXPECTED, METRICS_NEEDING_GCP, METRICS_NEEDING_LLM
+from ..builtin_metrics import metric_catalog
 from ..config import EvalParams, EvalRunConfig
 from ..genai.extract import extract_conversation
 from ..loader import load_traces
@@ -29,15 +30,26 @@ from ..resolvers import (
     resolve_credential_refs,
     set_resolved_credentials,
 )
+from ..run.service import RunService
 from ..runner import (
     RunResult,
     evaluation_groups,
     load_eval_set,
     load_eval_set_from_dict,
     run_evaluation,
-    run_evaluation_from_traces,
 )
-from ..trace_metrics import extract_performance_metrics, extract_trace_metadata
+from ..trace_metrics import extract_trace_metadata
+from .evaluation import (
+    CredentialResolutionError,
+    Evaluation,
+    EvaluationEvent,
+    GroupResult,
+    Performance,
+    Progress,
+    evaluate,
+    persist_evaluation,
+    stream_evaluation,
+)
 from .models import (
     ApiKeyStatus,
     ConfigData,
@@ -127,32 +139,6 @@ def _camel_keys(obj: Any) -> Any:
     return obj
 
 
-def _group_views(key: str, traces: list) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Performance metrics and metadata of one evaluation group, as camelCase wire dicts."""
-    conversation = extract_conversation(traces, key)
-    return (
-        _camel_keys(extract_performance_metrics(conversation, traces)),
-        _camel_keys(extract_trace_metadata(traces, conversation)),
-    )
-
-
-def _performance_events(traces: list, group_by: str, eval_set) -> list[str]:
-    """One early ``performance_metrics`` event per evaluation group, keyed by the group's trace id."""
-    events = []
-    for key, members in evaluation_groups(traces, group_by, eval_set):
-        try:
-            perf_metrics, trace_metadata = _group_views(key, members)
-            evt = SSEPerformanceMetricsEvent(
-                trace_id=members[0].trace_id,
-                performance_metrics=perf_metrics,
-                trace_metadata=trace_metadata,
-            )
-            events.append(f"event: performance_metrics\ndata: {evt.model_dump_json(by_alias=True)}\n\n")
-        except Exception as e:
-            logger.error(f"Failed to extract early performance metrics for {key}: {e}")
-    return events
-
-
 def _safe_upload_path(temp_dir: str, filename: str, idx: int = 0) -> str:
     """Build a save path inside ``temp_dir`` from a client-controlled filename.
 
@@ -179,40 +165,129 @@ def _load_eval_set_dict(path: str | None) -> dict | None:
         return None
 
 
-async def _maybe_persist_evaluate_run(
-    request: Request,
-    *,
-    params: "EvalParams",
-    eval_set_dict: dict | None,
-    trace_format: str | None,
-    upload_filenames: list[str] | None,
-    run_result: "RunResult",
-) -> str | None:
-    """Best-effort: persist the just-completed eval as a Run row + Result
-    rows when ``app.state.run_service`` is configured (postgres backend).
-    Returns the synthesized ``run_id`` for inclusion in the response, or
-    ``None`` on the memory backend or on persistence failure (eval result
-    is still returned to the caller in that case)."""
-    service = getattr(request.app.state, "run_service", None)
-    if service is None:
-        return None
+def _run_service(request: Request) -> RunService | None:
+    return getattr(request.app.state, "run_service", None)
+
+
+def _config_json(config: str) -> dict[str, Any]:
     try:
-        run = await service.record_eval_run(
-            params=params,
-            eval_set_dict=eval_set_dict,
-            trace_format=trace_format,
-            upload_filenames=upload_filenames,
-            run_result=run_result,
-        )
-        return str(run.run_id)
-    except Exception:
-        logger.exception("failed to persist /api/evaluate run; eval result still returned to caller")
+        return json.loads(config)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid config JSON: {exc}") from exc
+
+
+def _credential_refs_form(raw: str | None) -> dict[str, dict[str, Any]] | None:
+    try:
+        return _parse_credential_refs_form(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid credentialRefs: {exc}") from exc
+
+
+async def _save_upload(upload: UploadFile, path: str, what: str) -> None:
+    content = await upload.read()
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail=f"{what} exceeds 10MB limit")
+    with open(path, "wb") as f:  # noqa: ASYNC230
+        f.write(content)
+
+
+async def _save_trace_uploads(trace_files: list[UploadFile], temp_dir: str) -> list[str]:
+    paths = []
+    for idx, trace_file in enumerate(trace_files):
+        if not trace_file.filename:
+            continue
+        if not trace_file.filename.lower().endswith((".json", ".jsonl")):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file extension for {trace_file.filename}. Only .json and .jsonl files are allowed.",
+            )
+        path = _safe_upload_path(temp_dir, trace_file.filename, idx)
+        await _save_upload(trace_file, path, f"File {trace_file.filename}")
+        paths.append(path)
+    if not paths:
+        raise HTTPException(status_code=400, detail="No valid trace files provided")
+    return paths
+
+
+async def _save_eval_set_upload(eval_set_file: UploadFile | None, temp_dir: str) -> str | None:
+    if not eval_set_file or not eval_set_file.filename:
         return None
+    if not eval_set_file.filename.endswith(".json"):
+        raise HTTPException(
+            status_code=400, detail="Invalid file extension for eval set. Only .json files are allowed."
+        )
+    path = os.path.join(temp_dir, f"evalset_{os.path.basename(eval_set_file.filename)}")
+    await _save_upload(eval_set_file, path, "Eval set file")
+    return path
+
+
+def _eval_run_config(config_dict: dict[str, Any], trace_paths: list[str], eval_set_path: str | None) -> EvalRunConfig:
+    try:
+        return EvalRunConfig.model_validate(
+            {
+                **config_dict,
+                "traceFiles": trace_paths,
+                "evalSetFile": eval_set_path,
+                "traceFormat": config_dict.get("trace_format"),
+            }
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid config: {exc}") from exc
+
+
+def _sse(event: Any) -> str:
+    return f"data: {event.model_dump_json(by_alias=True)}\n\n"
+
+
+def _sse_error(message: str) -> str:
+    return _sse(SSEErrorEvent(error=message))
+
+
+def _sse_event(event: EvaluationEvent) -> str:
+    if isinstance(event, Performance):
+        payload = SSEPerformanceMetricsEvent(
+            trace_id=event.trace_id,
+            performance_metrics=_camel_keys(event.performance_metrics),
+            trace_metadata=_camel_keys(event.trace_metadata),
+        )
+        return f"event: performance_metrics\n{_sse(payload)}"
+    if isinstance(event, Progress):
+        return _sse(SSEProgressEvent(message=event.message))
+    if isinstance(event, GroupResult):
+        return _sse(
+            SSETraceProgressEvent(
+                trace_progress=SSETraceProgress(
+                    trace_id=event.result.trace_id,
+                    partial_result=_camel_keys(event.result.model_dump(by_alias=True)),
+                )
+            )
+        )
+    return _sse(SSEDoneEvent(result=_camel_keys(event.result.model_dump(by_alias=True))))
+
+
+async def _sse_evaluation(evaluation: Evaluation, request: Request) -> AsyncIterator[str]:
+    try:
+        async for event in stream_evaluation(evaluation, run_service=_run_service(request)):
+            yield _sse_event(event)
+    except CredentialResolutionError as exc:
+        yield _sse_error(f"Could not resolve credentialRefs: {exc}")
+    except Exception as exc:
+        logger.exception("Evaluation stream failed")
+        yield _sse_error(str(exc))
+
+
+def _event_stream(events: AsyncIterator[str]) -> StreamingResponse:
+    return StreamingResponse(
+        events,
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 router = APIRouter()
 
 _MAX_JSON_BODY_BYTES = 50 * 1024 * 1024  # 50 MB (multipart endpoints allow 10 MB per file)
+_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 @router.get("/health", response_model=StandardResponse[HealthData])
@@ -236,168 +311,7 @@ async def get_config(request: Request):
 
 @router.get("/metrics", response_model=StandardResponse[list[MetricInfo]])
 async def list_metrics():
-    from ..config import UNSUPPORTED_BUILTIN_METRICS
-
-    def _needs_rubrics(name: str) -> bool:
-        return name.startswith("rubric_based_")
-
-    _METRIC_CATEGORIES = {
-        "tool_trajectory_avg_score": "trajectory",
-        "response_match_score": "response",
-        "response_evaluation_score": "response",
-        "final_response_match_v2": "response",
-        "rubric_based_final_response_quality_v1": "quality",
-        "rubric_based_tool_use_quality_v1": "quality",
-        "hallucinations_v1": "safety",
-        "safety_v1": "safety",
-        "per_turn_user_simulator_quality_v1": "simulation",
-        "multi_turn_task_success_v1": "multi-turn",
-        "multi_turn_trajectory_quality_v1": "multi-turn",
-        "multi_turn_tool_use_quality_v1": "multi-turn",
-        "rubric_based_multi_turn_trajectory_quality_v1": "multi-turn",
-    }
-
-    try:
-        from google.adk.evaluation.metric_evaluator_registry import (
-            DEFAULT_METRIC_EVALUATOR_REGISTRY,
-        )
-
-        registry_metrics = DEFAULT_METRIC_EVALUATOR_REGISTRY.get_registered_metrics()
-
-        metrics = []
-        for m in registry_metrics:
-            if m.metric_name in UNSUPPORTED_BUILTIN_METRICS:
-                continue
-
-            metrics.append(
-                MetricInfo(
-                    name=m.metric_name,
-                    category=_METRIC_CATEGORIES.get(m.metric_name, "other"),
-                    requires_eval_set=m.metric_name in METRICS_NEEDING_EXPECTED,
-                    requires_llm=m.metric_name in METRICS_NEEDING_LLM,
-                    requires_gcp=m.metric_name in METRICS_NEEDING_GCP,
-                    requires_rubrics=_needs_rubrics(m.metric_name),
-                    description=m.description or "No description available",
-                    working=not _needs_rubrics(m.metric_name),
-                )
-            )
-
-        return StandardResponse(data=metrics)
-
-    except ImportError:
-        fallback = [
-            MetricInfo(
-                name="tool_trajectory_avg_score",
-                category="trajectory",
-                requires_eval_set=True,
-                requires_llm=False,
-                requires_gcp=False,
-                requires_rubrics=False,
-                working=True,
-                description="Compare tool call sequences against expected trajectory",
-            ),
-            MetricInfo(
-                name="response_match_score",
-                category="response",
-                requires_eval_set=True,
-                requires_llm=False,
-                requires_gcp=False,
-                requires_rubrics=False,
-                working=True,
-                description="Text similarity between actual and expected responses using ROUGE-1",
-            ),
-            MetricInfo(
-                name="response_evaluation_score",
-                category="response",
-                requires_eval_set=True,
-                requires_llm=False,
-                requires_gcp=True,
-                requires_rubrics=False,
-                working=True,
-                description="Semantic evaluation of response quality using Vertex AI",
-            ),
-            MetricInfo(
-                name="final_response_match_v2",
-                category="response",
-                requires_eval_set=True,
-                requires_llm=True,
-                requires_gcp=False,
-                requires_rubrics=False,
-                working=True,
-                description="LLM-based comparison of final responses",
-            ),
-            MetricInfo(
-                name="hallucinations_v1",
-                category="safety",
-                requires_eval_set=False,
-                requires_llm=True,
-                requires_gcp=False,
-                requires_rubrics=False,
-                working=True,
-                description="Detect hallucinated information in responses",
-            ),
-            MetricInfo(
-                name="safety_v1",
-                category="safety",
-                requires_eval_set=False,
-                requires_llm=False,
-                requires_gcp=True,
-                requires_rubrics=False,
-                working=True,
-                description="Safety and security assessment using Vertex AI",
-            ),
-            MetricInfo(
-                name="rubric_based_final_response_quality_v1",
-                category="quality",
-                requires_eval_set=False,
-                requires_llm=True,
-                requires_gcp=False,
-                requires_rubrics=True,
-                working=False,
-                description="Rubric-based quality assessment of responses (requires rubrics config)",
-            ),
-            MetricInfo(
-                name="rubric_based_tool_use_quality_v1",
-                category="quality",
-                requires_eval_set=False,
-                requires_llm=True,
-                requires_gcp=False,
-                requires_rubrics=True,
-                working=False,
-                description="Rubric-based assessment of tool usage quality (requires rubrics config)",
-            ),
-            MetricInfo(
-                name="multi_turn_task_success_v1",
-                category="multi-turn",
-                requires_eval_set=False,
-                requires_llm=False,
-                requires_gcp=True,
-                requires_rubrics=False,
-                working=True,
-                description="Evaluates if the agent achieved the goal(s) of the multi-turn conversation (Vertex AI)",
-            ),
-            MetricInfo(
-                name="multi_turn_trajectory_quality_v1",
-                category="multi-turn",
-                requires_eval_set=False,
-                requires_llm=False,
-                requires_gcp=True,
-                requires_rubrics=False,
-                working=True,
-                description="Evaluates the overall trajectory the agent took across the conversation (Vertex AI)",
-            ),
-            MetricInfo(
-                name="multi_turn_tool_use_quality_v1",
-                category="multi-turn",
-                requires_eval_set=False,
-                requires_llm=False,
-                requires_gcp=True,
-                requires_rubrics=False,
-                working=True,
-                description="Evaluates function calls made during a multi-turn conversation (Vertex AI)",
-            ),
-        ]
-        return StandardResponse(data=fallback)
+    return StandardResponse(data=[MetricInfo(**dataclasses.asdict(m)) for m in metric_catalog()])
 
 
 @router.post("/validate/eval-set", response_model=StandardResponse[EvalSetValidation])
@@ -516,7 +430,9 @@ async def convert_trace_files(
             first = members[0]
             conversation = extract_conversation(members, key)
             invocations = [_serialize_invocation(inv) for inv in to_adk_invocations(conversation.turns)]
-            warnings = [w for t in members for w in t.warnings] + [w for t in conversation.turns for w in t.warnings]
+            warnings = [w for t in members for w in t.warnings] + [
+                w.reason for t in conversation.turns for w in t.warnings
+            ]
             meta_dict = extract_trace_metadata(members, conversation)
             meta = TraceConversionMetadata(
                 agent_name=meta_dict.get("agent_name"),
@@ -556,92 +472,18 @@ async def evaluate_traces(
     eval_set_file: UploadFile | None = File(None),
     credential_refs: str | None = Form(None),
 ):
-    """
-    Evaluate agent traces using the provided evaluator configuration.
+    """Evaluate trace files with the given evaluator configuration (a JSON string).
 
-    Args:
-        trace_files: List of Jaeger or OTLP JSON trace files
-        config: JSON string with evaluation configuration
-        eval_set_file: Optional golden eval set file
-        credential_refs: Optional JSON string mapping logical credential names to
-            secret references, resolved so LLM-as-Judge graders can authenticate
-
-    Returns:
-        RunResult with trace results and any errors
+    ``credential_refs`` is an optional JSON object mapping logical credential names to secret
+    references, resolved so LLM as judge graders can authenticate.
     """
     temp_dir = tempfile.mkdtemp()
     try:
-        try:
-            config_dict = json.loads(config)
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid config JSON: {exc}") from exc
-
-        try:
-            cred_refs = _parse_credential_refs_form(credential_refs)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid credentialRefs: {exc}") from exc
-
-        trace_paths = []
-        for idx, trace_file in enumerate(trace_files):
-            if not trace_file.filename:
-                continue
-
-            if not (trace_file.filename.endswith(".json") or trace_file.filename.endswith(".jsonl")):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid file extension for {trace_file.filename}. Only .json and .jsonl files are allowed.",
-                )
-
-            trace_path = _safe_upload_path(temp_dir, trace_file.filename, idx)
-            with open(trace_path, "wb") as f:  # noqa: ASYNC230
-                content = await trace_file.read()
-
-                if len(content) > 10 * 1024 * 1024:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"File {trace_file.filename} exceeds 10MB limit",
-                    )
-
-                f.write(content)
-            trace_paths.append(trace_path)
-
-        if not trace_paths:
-            raise HTTPException(
-                status_code=400,
-                detail="No valid trace files provided",
-            )
-
-        trace_format = config_dict.get("trace_format")
-
-        eval_set_path = None
-        if eval_set_file and eval_set_file.filename:
-            if not eval_set_file.filename.endswith(".json"):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Invalid file extension for eval set. Only .json files are allowed.",
-                )
-
-            eval_set_path = os.path.join(temp_dir, f"evalset_{os.path.basename(eval_set_file.filename)}")
-            with open(eval_set_path, "wb") as f:  # noqa: ASYNC230
-                content = await eval_set_file.read()
-                if len(content) > 10 * 1024 * 1024:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Eval set file exceeds 10MB limit",
-                    )
-                f.write(content)
-
-        try:
-            eval_config = EvalRunConfig.model_validate(
-                {
-                    **config_dict,
-                    "traceFiles": trace_paths,
-                    "evalSetFile": eval_set_path,
-                    "traceFormat": trace_format,
-                }
-            )
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid config: {exc}") from exc
+        config_dict = _config_json(config)
+        cred_refs = _credential_refs_form(credential_refs)
+        trace_paths = await _save_trace_uploads(trace_files, temp_dir)
+        eval_set_path = await _save_eval_set_upload(eval_set_file, temp_dir)
+        eval_config = _eval_run_config(config_dict, trace_paths, eval_set_path)
 
         logger.info(
             "Evaluating %d trace file(s) with evaluators: %s",
@@ -652,26 +494,26 @@ async def evaluate_traces(
         with _scoped_credentials(resolved_creds):
             result = await run_evaluation(eval_config)
 
-        run_id = await _maybe_persist_evaluate_run(
-            request,
-            params=eval_config,
-            eval_set_dict=_load_eval_set_dict(eval_set_path),
-            trace_format=eval_config.trace_format,
-            upload_filenames=[tf.filename for tf in trace_files if tf.filename],
-            run_result=result,
+        run_id = await persist_evaluation(
+            _run_service(request),
+            Evaluation(
+                traces=[],
+                params=eval_config,
+                eval_set_dict=_load_eval_set_dict(eval_set_path),
+                trace_format=eval_config.trace_format,
+                upload_filenames=[tf.filename for tf in trace_files if tf.filename],
+            ),
+            result,
         )
         if run_id:
             result.run_id = run_id
-
-        result_dict = _camel_keys(result.model_dump(by_alias=True))
-        return StandardResponse(data=result_dict)
+        return StandardResponse(data=_camel_keys(result.model_dump(by_alias=True)))
 
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception("Evaluation failed")
         raise HTTPException(status_code=500, detail=f"Internal error: {exc!s}") from exc
-
     finally:
         shutil.rmtree(temp_dir)
 
@@ -688,178 +530,48 @@ async def evaluate_traces_stream(
     temp_dir = tempfile.mkdtemp()
     upload_filenames = [tf.filename for tf in trace_files if tf.filename]
 
-    async def event_generator():
+    async def events():
         try:
             try:
-                config_dict = json.loads(config)
-            except json.JSONDecodeError as exc:
-                yield f"data: {SSEErrorEvent(error=f'Invalid config JSON: {exc}').model_dump_json(by_alias=True)}\n\n"
+                config_dict = _config_json(config)
+                cred_refs = _credential_refs_form(credential_refs)
+                trace_paths = await _save_trace_uploads(trace_files, temp_dir)
+                eval_set_path = await _save_eval_set_upload(eval_set_file, temp_dir)
+                eval_config = _eval_run_config(config_dict, trace_paths, eval_set_path)
+            except HTTPException as exc:
+                yield _sse_error(exc.detail)
                 return
 
-            try:
-                cred_refs = _parse_credential_refs_form(credential_refs)
-            except ValueError as exc:
-                yield f"data: {SSEErrorEvent(error=f'Invalid credentialRefs: {exc}').model_dump_json(by_alias=True)}\n\n"
-                return
-
-            trace_paths = []
-            for idx, trace_file in enumerate(trace_files):
-                if not trace_file.filename:
-                    continue
-
-                if not (trace_file.filename.endswith(".json") or trace_file.filename.endswith(".jsonl")):
-                    yield f"data: {SSEErrorEvent(error=f'Invalid file extension for {trace_file.filename}').model_dump_json(by_alias=True)}\n\n"
-                    return
-
-                trace_path = _safe_upload_path(temp_dir, trace_file.filename, idx)
-                with open(trace_path, "wb") as f:  # noqa: ASYNC230
-                    content = await trace_file.read()
-
-                    if len(content) > 10 * 1024 * 1024:
-                        yield f"data: {SSEErrorEvent(error=f'File {trace_file.filename} exceeds 10MB').model_dump_json(by_alias=True)}\n\n"
-                        return
-
-                    f.write(content)
-                trace_paths.append(trace_path)
-
-            if not trace_paths:
-                yield f"data: {SSEErrorEvent(error='No valid trace files provided').model_dump_json(by_alias=True)}\n\n"
-                return
-
-            trace_format = config_dict.get("trace_format")
-
-            eval_set_path = None
-            if eval_set_file and eval_set_file.filename:
-                if not eval_set_file.filename.endswith(".json"):
-                    yield f"data: {SSEErrorEvent(error='Invalid file extension for eval set').model_dump_json(by_alias=True)}\n\n"
-                    return
-
-                eval_set_path = os.path.join(temp_dir, f"evalset_{os.path.basename(eval_set_file.filename)}")
-                with open(eval_set_path, "wb") as f:  # noqa: ASYNC230
-                    content = await eval_set_file.read()
-                    if len(content) > 10 * 1024 * 1024:
-                        yield f"data: {SSEErrorEvent(error='Eval set file exceeds 10MB').model_dump_json(by_alias=True)}\n\n"
-                        return
-                    f.write(content)
-
-            try:
-                eval_config = EvalRunConfig.model_validate(
-                    {
-                        **config_dict,
-                        "traceFiles": trace_paths,
-                        "evalSetFile": eval_set_path,
-                        "traceFormat": trace_format,
-                    }
-                )
-            except Exception as exc:
-                yield f"data: {SSEErrorEvent(error=f'Invalid config: {exc}').model_dump_json(by_alias=True)}\n\n"
-                return
-
-            loaded_traces = []
+            traces = []
             load_errors: list[str] = []
-            for trace_file_path in trace_paths:
+            for path in trace_paths:
                 try:
-                    loaded_traces.extend(load_traces(trace_file_path, format=eval_config.trace_format))
+                    traces.extend(load_traces(path, format=eval_config.trace_format))
                 except Exception as exc:
-                    load_errors.append(f"Failed to load trace file '{os.path.basename(trace_file_path)}': {exc}")
-            stream_eval_set = None
+                    load_errors.append(f"Failed to load trace file '{os.path.basename(path)}': {exc}")
+            eval_set = None
             if eval_set_path:
                 try:
-                    stream_eval_set = load_eval_set(eval_set_path)
+                    eval_set = load_eval_set(eval_set_path)
                 except Exception as exc:
                     load_errors.append(f"Failed to load eval set: {exc}")
 
-            for event in _performance_events(loaded_traces, eval_config.group_by, stream_eval_set):
-                yield event
-
-            queue: asyncio.Queue = asyncio.Queue()
-
-            async def progress_callback(message: str):
-                await queue.put(("progress", message))
-
-            async def trace_progress_callback(trace_result):
-                await queue.put(("trace_progress", trace_result))
-
-            async def run_with_progress():
-                if loaded_traces:
-                    result = await run_evaluation_from_traces(
-                        traces=loaded_traces,
-                        config=eval_config,
-                        eval_set=stream_eval_set,
-                        progress_callback=progress_callback,
-                        trace_progress_callback=trace_progress_callback,
-                    )
-                else:
-                    result = RunResult(errors=["No traces loaded."])
-                if load_errors:
-                    result.errors = load_errors + result.errors
-                await queue.put(("done", result))
-
-            try:
-                resolved_creds = await resolve_credential_refs(cred_refs) if cred_refs else None
-            except ValueError as exc:
-                yield f"data: {SSEErrorEvent(error=f'Could not resolve credentialRefs: {exc}').model_dump_json(by_alias=True)}\n\n"
-                return
-
-            with _scoped_credentials(resolved_creds):
-                eval_task = asyncio.create_task(run_with_progress())
-
-                try:
-                    while True:
-                        msg = await queue.get()
-                        tag, payload = msg
-
-                        if tag == "done":
-                            run_id = await _maybe_persist_evaluate_run(
-                                request,
-                                params=eval_config,
-                                eval_set_dict=_load_eval_set_dict(eval_set_path),
-                                trace_format=eval_config.trace_format,
-                                upload_filenames=upload_filenames,
-                                run_result=payload,
-                            )
-                            if run_id:
-                                payload.run_id = run_id
-                            evt = SSEDoneEvent(
-                                result=_camel_keys(payload.model_dump(by_alias=True)),
-                            )
-                            yield f"data: {evt.model_dump_json(by_alias=True)}\n\n"
-                            break
-                        elif tag == "trace_progress":
-                            evt = SSETraceProgressEvent(
-                                trace_progress=SSETraceProgress(
-                                    trace_id=payload.trace_id,
-                                    partial_result=_camel_keys(payload.model_dump(by_alias=True)),
-                                )
-                            )
-                            yield f"data: {evt.model_dump_json(by_alias=True)}\n\n"
-                        elif tag == "progress":
-                            evt = SSEProgressEvent(message=payload)
-                            yield f"data: {evt.model_dump_json(by_alias=True)}\n\n"
-                finally:
-                    if not eval_task.done():
-                        eval_task.cancel()
-                        try:
-                            await eval_task
-                        except asyncio.CancelledError:
-                            pass
-
-        except Exception as exc:
-            logger.exception("Evaluation stream failed")
-            evt = SSEErrorEvent(error=str(exc))
-            yield f"data: {evt.model_dump_json(by_alias=True)}\n\n"
-
+            evaluation = Evaluation(
+                traces=traces,
+                params=eval_config,
+                eval_set=eval_set,
+                credential_refs=cred_refs,
+                load_errors=load_errors,
+                eval_set_dict=_load_eval_set_dict(eval_set_path),
+                trace_format=eval_config.trace_format,
+                upload_filenames=upload_filenames,
+            )
+            async for frame in _sse_evaluation(evaluation, request):
+                yield frame
         finally:
             shutil.rmtree(temp_dir)
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+    return _event_stream(events())
 
 
 def _parse_json_request(request: EvaluateJsonRequest):
@@ -894,8 +606,14 @@ def _check_json_body_size(raw_request: Request):
         )
 
 
-def _sse_error(message: str) -> str:
-    return f"data: {SSEErrorEvent(error=message).model_dump_json(by_alias=True)}\n\n"
+def _json_evaluation(request: EvaluateJsonRequest, traces: list, eval_set) -> Evaluation:
+    return Evaluation(
+        traces=traces,
+        params=request.config,
+        eval_set=eval_set,
+        credential_refs=request.credential_refs,
+        eval_set_dict=request.eval_set,
+    )
 
 
 @router.post("/evaluate/json", response_model=StandardResponse[RunResult])
@@ -903,28 +621,11 @@ async def evaluate_traces_json(request: EvaluateJsonRequest, raw_request: Reques
     """Evaluate OTLP JSON traces passed in the request body."""
     _check_json_body_size(raw_request)
     traces, eval_set = _parse_json_request(request)
-    resolved_creds = await _resolve_credentials(request.credential_refs)
-
     try:
-        with _scoped_credentials(resolved_creds):
-            result = await run_evaluation_from_traces(
-                traces=traces,
-                config=request.config,
-                eval_set=eval_set,
-            )
-        run_id = await _maybe_persist_evaluate_run(
-            raw_request,
-            params=request.config,
-            eval_set_dict=request.eval_set,
-            trace_format=None,
-            upload_filenames=None,
-            run_result=result,
-        )
-        if run_id:
-            result.run_id = run_id
+        result = await evaluate(_json_evaluation(request, traces, eval_set), run_service=_run_service(raw_request))
         return StandardResponse(data=_camel_keys(result.model_dump(by_alias=True)))
-    except HTTPException:
-        raise
+    except CredentialResolutionError as exc:
+        raise HTTPException(status_code=400, detail=f"Could not resolve credentialRefs: {exc}") from exc
     except Exception as exc:
         logger.exception("JSON evaluation failed")
         raise HTTPException(status_code=500, detail=f"Internal error: {exc!s}") from exc
@@ -935,95 +636,13 @@ async def evaluate_traces_json_stream(request: EvaluateJsonRequest, raw_request:
     """Evaluate OTLP JSON traces with real-time progress via SSE."""
     _check_json_body_size(raw_request)
 
-    async def event_generator():
+    async def events():
         try:
-            try:
-                traces, eval_set = _parse_json_request(request)
-            except HTTPException as exc:
-                yield _sse_error(exc.detail)
-                return
+            traces, eval_set = _parse_json_request(request)
+        except HTTPException as exc:
+            yield _sse_error(exc.detail)
+            return
+        async for frame in _sse_evaluation(_json_evaluation(request, traces, eval_set), raw_request):
+            yield frame
 
-            for event in _performance_events(traces, request.config.group_by, eval_set):
-                yield event
-
-            queue: asyncio.Queue = asyncio.Queue()
-
-            async def progress_callback(message: str):
-                await queue.put(("progress", message))
-
-            async def trace_progress_callback(trace_result):
-                await queue.put(("trace_progress", trace_result))
-
-            async def run_with_progress():
-                result = await run_evaluation_from_traces(
-                    traces=traces,
-                    config=request.config,
-                    eval_set=eval_set,
-                    progress_callback=progress_callback,
-                    trace_progress_callback=trace_progress_callback,
-                )
-                await queue.put(("done", result))
-
-            try:
-                resolved_creds = (
-                    await resolve_credential_refs(request.credential_refs) if request.credential_refs else None
-                )
-            except ValueError as exc:
-                yield _sse_error(f"Could not resolve credentialRefs: {exc}")
-                return
-
-            with _scoped_credentials(resolved_creds):
-                eval_task = asyncio.create_task(run_with_progress())
-
-                try:
-                    while True:
-                        msg = await queue.get()
-                        tag, payload = msg
-
-                        if tag == "done":
-                            run_id = await _maybe_persist_evaluate_run(
-                                raw_request,
-                                params=request.config,
-                                eval_set_dict=request.eval_set,
-                                trace_format=None,
-                                upload_filenames=None,
-                                run_result=payload,
-                            )
-                            if run_id:
-                                payload.run_id = run_id
-                            evt = SSEDoneEvent(
-                                result=_camel_keys(payload.model_dump(by_alias=True)),
-                            )
-                            yield f"data: {evt.model_dump_json(by_alias=True)}\n\n"
-                            break
-                        elif tag == "trace_progress":
-                            evt = SSETraceProgressEvent(
-                                trace_progress=SSETraceProgress(
-                                    trace_id=payload.trace_id,
-                                    partial_result=_camel_keys(payload.model_dump(by_alias=True)),
-                                )
-                            )
-                            yield f"data: {evt.model_dump_json(by_alias=True)}\n\n"
-                        elif tag == "progress":
-                            evt = SSEProgressEvent(message=payload)
-                            yield f"data: {evt.model_dump_json(by_alias=True)}\n\n"
-                finally:
-                    if not eval_task.done():
-                        eval_task.cancel()
-                        try:
-                            await eval_task
-                        except asyncio.CancelledError:
-                            pass
-
-        except Exception as exc:
-            logger.exception("JSON evaluation stream failed")
-            yield _sse_error(str(exc))
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+    return _event_stream(events())

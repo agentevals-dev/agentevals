@@ -2,7 +2,6 @@ import { useState } from 'react';
 
 interface UserMessageProps {
   text: string;
-  timestamp: number;
 }
 
 export function UserMessage({ text }: UserMessageProps) {
@@ -33,14 +32,20 @@ export function UserMessage({ text }: UserMessageProps) {
 
 interface ToolCallMessageProps {
   name: string;
-  args: Record<string, any>;
-  timestamp: number;
+  /** The arguments as JSON; ``undefined`` when not recorded. */
+  args: unknown;
+}
+
+function formatArgs(args: unknown): string {
+  if (args === undefined || args === null) return '';
+  if (typeof args === 'object' && !Array.isArray(args)) {
+    return Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
+  }
+  return JSON.stringify(args);
 }
 
 export function ToolCallMessage({ name, args }: ToolCallMessageProps) {
-  const argsStr = Object.keys(args).length > 0
-    ? Object.keys(args).map(k => `${k}=${JSON.stringify(args[k])}`).join(', ')
-    : '';
+  const argsStr = formatArgs(args);
 
   return (
     <div style={{
@@ -62,9 +67,8 @@ export function ToolCallMessage({ name, args }: ToolCallMessageProps) {
 const TRUNCATE_LENGTH = 120;
 
 interface ToolResultMessageProps {
-  response: Record<string, any>;
+  response: unknown;
   isError?: boolean;
-  timestamp: number;
 }
 
 export function ToolResultMessage({ response, isError }: ToolResultMessageProps) {
@@ -104,7 +108,6 @@ export function ToolResultMessage({ response, isError }: ToolResultMessageProps)
 
 interface AgentMessageProps {
   text: string;
-  timestamp: number;
   isStreaming?: boolean;
 }
 
@@ -147,7 +150,6 @@ export function AgentMessage({ text, isStreaming }: AgentMessageProps) {
 
 interface TurnErrorMessageProps {
   errorType?: string | null;
-  timestamp: number;
 }
 
 export function TurnErrorMessage({ errorType }: TurnErrorMessageProps) {

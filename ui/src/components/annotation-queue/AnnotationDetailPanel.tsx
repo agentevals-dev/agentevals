@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AnnotationQueueItem, Annotation, FirstPassLabel } from '../../lib/types';
-import { ToolCallMessage, ToolResultMessage } from '../streaming/LiveMessage';
+import { TurnMessages } from '../streaming/LiveConversationPanel';
 
 interface AnnotationDetailPanelProps {
   item: AnnotationQueueItem;
@@ -25,11 +25,8 @@ export function AnnotationDetailPanel({ item, onSave, onClose }: AnnotationDetai
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const invocations = item.invocations || [];
-  const elements = item.liveElements || [];
-
-  const totalTokens = item.totalTokens ||
-    (item.liveStats ? item.liveStats.totalInputTokens + item.liveStats.totalOutputTokens : 0);
+  const turns = item.session.turns;
+  const totalTokens = item.totalTokens ?? 0;
 
   return (
     <div style={{ display: 'flex', height: '100%', minHeight: 0, background: 'var(--bg-surface)' }}>
@@ -116,15 +113,15 @@ export function AnnotationDetailPanel({ item, onSave, onClose }: AnnotationDetai
           Conversation
         </div>
 
-        {invocations.length > 0 ? (
+        {turns.length > 0 ? (
           <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '8px' }}>
-            {invocations.map((inv, idx) => (
+            {turns.map((turn, idx) => (
               <div
-                key={inv.invocationId}
+                key={`${turn.traceId}:${turn.spanId}`}
                 style={{
-                  marginBottom: idx < invocations.length - 1 ? '20px' : '0',
-                  paddingBottom: idx < invocations.length - 1 ? '20px' : '0',
-                  borderBottom: idx < invocations.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                  marginBottom: idx < turns.length - 1 ? '20px' : '0',
+                  paddingBottom: idx < turns.length - 1 ? '20px' : '0',
+                  borderBottom: idx < turns.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                 }}
               >
                 <div style={{
@@ -133,66 +130,7 @@ export function AnnotationDetailPanel({ item, onSave, onClose }: AnnotationDetai
                 }}>
                   Turn {idx + 1}
                 </div>
-
-                <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>User</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.6', padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: '6px', borderLeft: '3px solid #7C3AED' }}>
-                    {inv.userText || '(no text)'}
-                  </div>
-                </div>
-
-                {inv.toolCalls.length > 0 && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Tool Calls</div>
-                    {inv.toolCalls.map((tc, i) => {
-                      const tr = inv.toolResponses?.find(r => r.id === tc.id || r.name === tc.name);
-                      return (
-                        <div key={i}>
-                          <ToolCallMessage name={tc.name} args={tc.args || {}} timestamp={0} />
-                          {tr && <ToolResultMessage response={tr.response} isError={!!tr.response?.isError} timestamp={0} />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {inv.agentText && (
-                  <div>
-                    <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Agent</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.6', padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: '6px', borderLeft: '3px solid #10b981' }}>
-                      {inv.agentText}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : elements.length > 0 ? (
-          <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {elements.map((el, idx) => (
-              <div key={idx}>
-                {el.type === 'tool_call' ? (
-                  <ToolCallMessage name={el.data?.toolCall?.name || 'unknown'} args={el.data?.toolCall?.args || {}} timestamp={el.timestamp} />
-                ) : el.type === 'tool_result' ? (
-                  <ToolResultMessage response={el.data?.response} isError={el.data?.isError} timestamp={el.timestamp} />
-                ) : (
-                  <>
-                    <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                      {el.type === 'user_input' ? 'User' : 'Agent'}
-                    </div>
-                    <div style={{
-                      fontSize: '13px',
-                      color: 'var(--text-primary)',
-                      lineHeight: '1.6',
-                      padding: '8px 12px',
-                      background: 'var(--bg-surface)',
-                      borderRadius: '6px',
-                      borderLeft: `3px solid ${el.type === 'user_input' ? '#7C3AED' : '#10b981'}`,
-                    }}>
-                      {el.data?.text || '(no text)'}
-                    </div>
-                  </>
-                )}
+                <TurnMessages turn={turn} />
               </div>
             ))}
           </div>

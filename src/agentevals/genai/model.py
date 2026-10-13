@@ -17,14 +17,38 @@ AnchorKind = Literal["agent", "workflow", "root"]
 
 
 class Usage(BaseModel):
-    input_tokens: int = 0
-    output_tokens: int = 0
-    cache_read_input_tokens: int = 0
-    cache_write_input_tokens: int = 0
-    reasoning_output_tokens: int = 0
+    """Token counts. ``None`` means not recorded, which is not the same as 0."""
+
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_read_input_tokens: int | None = None
+    cache_write_input_tokens: int | None = None
+    reasoning_output_tokens: int | None = None
 
     def __add__(self, other: Usage) -> Usage:
-        return Usage(**{k: getattr(self, k) + getattr(other, k) for k in Usage.model_fields})
+        return Usage(**{k: _add(getattr(self, k), getattr(other, k)) for k in Usage.model_fields})
+
+
+def _add(a: int | None, b: int | None) -> int | None:
+    if a is None:
+        return b
+    return a if b is None else a + b
+
+
+GAP_TOOL_NAME_MISSING = "tool_name_missing"
+GAP_TOOL_RESULT_BY_ORDER = "tool_result_by_order"
+GAP_TOOL_DATA_BY_NAME = "tool_data_by_name"
+GAP_TOOL_FROM_PARTS_ONLY = "tool_from_parts_only"
+GAP_POSSIBLE_CONTINUATION = "possible_continuation"
+
+
+class Gap(BaseModel):
+    """Why part of a turn is missing or approximate. ``code`` is stable; ``reason`` is for people."""
+
+    model_config = ConfigDict(frozen=True)
+
+    code: str
+    reason: str
 
 
 class LlmCall(BaseModel):
@@ -107,7 +131,7 @@ class Turn(BaseModel):
     conversation_id: str | None = None
     framework_ids: dict[str, str] = Field(default_factory=dict)
     external_evaluations: list[ExternalEvaluation] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
+    warnings: list[Gap] = Field(default_factory=list)
 
 
 class Conversation(BaseModel):

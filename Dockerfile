@@ -52,6 +52,6 @@ USER app
 ENV PATH="/app/.venv/bin:$PATH"
 ENV AGENTEVALS_SERVER_URL=http://127.0.0.1:8001
 
-EXPOSE 8001 4318 4317 8080
+EXPOSE 8001 4318 4317 8002 8080
 
 CMD ["agentevals", "serve", "--host", "0.0.0.0", "--port", "8001", "--otlp-http-port", "4318", "--otlp-grpc-port", "4317", "--mcp-port", "8080"]

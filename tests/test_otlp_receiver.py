@@ -33,6 +33,7 @@ from agentevals.api.otlp_processing import (
     ingest_logs,
     ingest_traces,
 )
+from agentevals.api.v1alpha1 import views_pb2
 from agentevals.cli import _install_shared_exit_handler
 from agentevals.genai.routing import GenAIRoutingPolicy
 from agentevals.otel.encode import encode_document
@@ -800,15 +801,25 @@ class TestExportResultCounts:
 
 
 # ---------------------------------------------------------------------------
-# Live manager: SSE and recompute
+# Live manager: watchers and recompute
 # ---------------------------------------------------------------------------
 
 
-def _drain(client) -> list[dict]:
+async def _drain(watcher) -> list:
+    """Every pending ``WatchSessionsResponse`` (with turns), without waiting for new ones."""
     out = []
-    while not client.queue.empty():
-        out.append(client.queue.get_nowait())
-    return out
+    while True:
+        try:
+            event = await asyncio.wait_for(watcher.next(), 0.05)
+        except TimeoutError:
+            return out
+        if event is None:
+            return out
+        out.append(event.with_turns)
+
+
+def _upserts(events: list) -> list:
+    return [e.upsert for e in events if e.HasField("upsert")]
 
 
 async def _settle(mgr: LiveManager) -> None:
@@ -820,65 +831,61 @@ async def _settle(mgr: LiveManager) -> None:
 
 
 class TestLiveManager:
-    async def test_ingest_broadcasts_session_started_and_span_stubs(self):
+    async def test_ingest_publishes_the_new_session(self):
         mgr = LiveManager()
-        client = mgr.register_sse_client()
+        watcher = mgr.subscribe(include_turns=True)
         await mgr.ingest_spans(decode_traces_json(_request([_chat()], _named("s1", "e1"))))
-        events = _drain(client)
-        started = next(e for e in events if e["type"] == "session_started")
-        assert (started["session"]["sessionId"], started["session"]["evalSetId"]) == ("s1", "e1")
-        received = next(e for e in events if e["type"] == "span_received")
-        assert received["span"] == {"traceId": tid("t1"), "spanId": sid("c1"), "parentSpanId": None, "name": "chat gpt"}
-        assert "attributes" not in received["span"]
+        events = await _drain(watcher)
+        assert events[0].HasField("synced")
+        summary = _upserts(events)[0].summary
+        assert (summary.id, summary.eval_set_id) == ("s1", "e1")
 
-    async def test_recompute_streams_elements_then_session_complete(self):
+    async def test_recompute_publishes_turns_then_the_complete_session(self):
         mgr = LiveManager(completion_grace_seconds=0.0)
-        client = mgr.register_sse_client()
+        watcher = mgr.subscribe(include_turns=True)
         await mgr.ingest_spans(decode_traces_json(_request([_chat(text="Roll", reply="Rolled 4")], _named("s1"))))
         await asyncio.sleep(0.01)
         await _settle(mgr)
-        events = _drain(client)
-        kinds = [e["type"] for e in events]
-        assert kinds.index("user_input") < kinds.index("session_complete")
-        complete = next(e for e in events if e["type"] == "session_complete")
-        assert complete["invocations"][0]["userText"] == "Roll"
-        assert complete["invocations"][0]["agentText"] == "Rolled 4"
-        assert complete["invocations"][0]["invocationId"] == sid("c1")
-        assert sum(e["inputTokens"] for e in events if e["type"] == "token_update") == 10
-        assert mgr.sessions["s1"].invocations == complete["invocations"]
+        session = _upserts(await _drain(watcher))[-1]
+        assert session.summary.state == views_pb2.SESSION_STATE_COMPLETE
+        turn = session.turns[0]
+        assert (turn.user_text, turn.answer_text, turn.span_id) == ("Roll", "Rolled 4", sid("c1"))
+        assert session.summary.totals.usage.input_tokens == 10
+        assert mgr.view(mgr.sessions["s1"]).with_turns.upsert == session
 
-    async def test_reopened_session_sends_only_session_complete(self):
+    async def test_reopened_session_is_published_complete_again(self):
         mgr = LiveManager(completion_grace_seconds=0.0)
-        client = mgr.register_sse_client()
+        watcher = mgr.subscribe(include_turns=True)
         await mgr.ingest_spans(decode_traces_json(_request([_chat(span="c1")], _named("s1"))))
         await asyncio.sleep(0.01)
         await _settle(mgr)
-        _drain(client)
+        await _drain(watcher)
         await mgr.ingest_spans(decode_traces_json(_request([_chat(trace="t1", span="c2", text="Again")], _named("s1"))))
         await asyncio.sleep(0.01)
         await _settle(mgr)
-        kinds = {e["type"] for e in _drain(client)}
-        assert kinds <= {"span_received", "session_complete"}
-        assert "session_complete" in kinds
+        session = _upserts(await _drain(watcher))[-1]
+        assert session.summary.state == views_pb2.SESSION_STATE_COMPLETE
+        assert "Again" in [t.user_text for t in session.turns]
 
-    async def test_slow_sse_client_is_dropped(self):
-        mgr = LiveManager()
-        client = mgr.register_sse_client()
-        for n in range(1001):
-            mgr.broadcast({"type": "noise", "n": n})
-        assert client.dropped is True
-        assert client not in mgr.clients
-        assert client.queue.get_nowait() is None
+    async def test_a_watcher_that_does_not_read_keeps_one_event_per_session(self):
+        mgr = LiveManager(completion_grace_seconds=0.0)
+        watcher = mgr.subscribe(include_turns=False)
+        for n in range(20):
+            await mgr.ingest_spans(decode_traces_json(_request([_chat(span=f"c{n}")], _named("s1"))))
+            await _settle(mgr)
+        events = await _drain(watcher)
+        assert [e.WhichOneof("event") for e in events] == ["synced", "upsert"]
+        assert watcher in mgr.watchers
 
     async def test_debug_load_session_is_complete_and_listed(self):
         mgr = LiveManager()
-        client = mgr.register_sse_client()
+        watcher = mgr.subscribe(include_turns=True)
         decoded = decode_traces_json(_request([_chat()]))
         session = mgr.load_session("bundle", decoded.spans, [], eval_set_id="e")
         await _settle(mgr)
         assert session.is_complete and session.session_id == "bundle"
-        kinds = [e["type"] for e in _drain(client)]
-        assert kinds == ["session_started", "session_complete"]
+        events = await _drain(watcher)
+        assert _upserts(events)[-1].summary.state == views_pb2.SESSION_STATE_COMPLETE
 
     async def test_shutdown_stops_the_ticker(self):
         mgr = LiveManager()

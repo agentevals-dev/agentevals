@@ -260,7 +260,7 @@ async def _evaluate_group(
     trace_result.conversation_id = conversation.conversation_id
     trace_result.turn_refs = [TurnRef(trace_id=t.ref.trace_id, span_id=t.ref.span_id) for t in conversation.turns]
     trace_result.conversion_warnings = sorted(
-        {w for trace in traces for w in trace.warnings} | {w for t in conversation.turns for w in t.warnings}
+        {w for trace in traces for w in trace.warnings} | {w.reason for t in conversation.turns for w in t.warnings}
     )
 
     if not conversation.turns:

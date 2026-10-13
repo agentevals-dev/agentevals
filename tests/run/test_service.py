@@ -79,7 +79,7 @@ class TestRunServiceQueries:
 
 
 class TestRecordEvalRun:
-    """Option A: /api/evaluate synchronously persists runs + results."""
+    """/api/evaluate synchronously persists runs + results."""
 
     def _params(self) -> EvalParams:
         return EvalParams(evaluators=[BuiltinMetricDef(name="m1")])

@@ -2,7 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { TraceContext } from './TraceContext';
 import type { TraceState } from './TraceContext';
-import type { ViewType, EvalConfig, EvalSet, EvalSetMetadata, EvalCase, LiveSession, AnnotationQueue, Annotation } from '../lib/types';
+import type { ViewType, EvalConfig, EvalSet, EvalSetMetadata, EvalCase, AnnotationQueue, Annotation } from '../lib/types';
+import { isComplete, primaryTraceId, sessionId, startedAtIso, totalTokens } from '../lib/liveSessions';
+import type { Session } from '../lib/liveSessions';
 import { evaluateTracesStreaming, convertTraces, getConfig, healthCheck } from '../api/client';
 import { buildEvalConfig } from '../lib/eval-config';
 
@@ -277,7 +279,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
       setEvaluationOrigin: (view: ViewType | null) =>
         setState((prev) => ({ ...prev, evaluationOrigin: view })),
 
-      setStreamingSessions: (updater: (prev: Map<string, LiveSession>) => Map<string, LiveSession>) =>
+      setStreamingSessions: (updater: (prev: Map<string, Session>) => Map<string, Session>) =>
         setState((prev) => ({ ...prev, streamingSessions: updater(prev.streamingSessions) })),
 
       removeSession: (sessionId: string) =>
@@ -291,7 +293,7 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
         setState((prev) => ({
           ...prev,
           streamingSessions: new Map(
-            [...prev.streamingSessions].filter(([, s]) => s.status === 'active')
+            [...prev.streamingSessions].filter(([, s]) => !isComplete(s))
           ),
         })),
 
@@ -322,25 +324,21 @@ export const TraceProvider: React.FC<TraceProviderProps> = ({ children }) => {
         return id;
       },
 
-      addToAnnotationQueue: (queueId: string, session: LiveSession) => {
+      addToAnnotationQueue: (queueId: string, session: Session) => {
         setState((prev) => {
           const queues = prev.annotationQueues.map((q) => {
+            const id = sessionId(session);
             if (q.id !== queueId) return q;
-            if (q.items.some((item) => item.sessionId === session.sessionId)) return q;
-            const totalTokens =
-              (session.liveStats?.totalInputTokens ?? 0) +
-              (session.liveStats?.totalOutputTokens ?? 0);
+            if (q.items.some((item) => item.sessionId === id)) return q;
+            const tokenCount = totalTokens(session.summary?.totals?.usage);
             const newItem = {
-              sessionId: session.sessionId,
-              traceId: session.traceId,
-              agentName: session.metadata?.['gen_ai.agent.name'] || session.metadata?.['service.name'],
-              startTime: session.startedAt,
-              model: session.liveStats?.model || session.metadata?.model,
-              totalTokens: totalTokens > 0 ? totalTokens : undefined,
-              invocations: session.invocations,
-              liveElements: session.liveElements,
-              liveStats: session.liveStats,
-              metadata: session.metadata,
+              sessionId: id,
+              traceId: primaryTraceId(session),
+              agentName: session.summary?.agent || undefined,
+              startTime: startedAtIso(session),
+              model: session.summary?.models[0],
+              totalTokens: tokenCount > 0 ? tokenCount : undefined,
+              session,
             };
             return { ...q, items: [...q.items, newItem] };
           });

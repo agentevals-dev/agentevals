@@ -425,3 +425,41 @@ class TestSinkFanoutErrorIsolation:
         await fanout.emit_final(run_id, {}, attempt=1)
         await fanout.emit_error(run_id, "x", attempt=1)
         assert good_writes == ["partial", "final", "error"]
+
+
+class TestWebhookLogs:
+    """Webhook URLs and response bodies often carry tokens; logs keep the origin and the status."""
+
+    MARK = "qxmark"
+
+    async def _emit(self, url: str, handler) -> None:
+        with _mock_async_client(httpx.MockTransport(handler)):
+            await HttpWebhookSink(url, max_attempts=1).emit_final(uuid4(), {}, attempt=1)
+
+    async def test_rejection(self, caplog):
+        caplog.set_level(logging.WARNING, logger="agentevals.run.sinks")
+        await self._emit(
+            f"https://hooks.example.com/services/{self.MARK}?sig={self.MARK}",
+            lambda request: httpx.Response(401, text=f"bad token {self.MARK}"),
+        )
+        assert "https://hooks.example.com returned 401" in caplog.text
+        assert self.MARK not in caplog.text
+
+    async def test_server_error(self, caplog):
+        caplog.set_level(logging.WARNING, logger="agentevals.run.sinks")
+        await self._emit(
+            f"https://user:{self.MARK}@hooks.example.com/x",
+            lambda request: httpx.Response(503, text=self.MARK),
+        )
+        assert "https://hooks.example.com failed after 1 attempts: HTTP 503" in caplog.text
+        assert self.MARK not in caplog.text
+
+    async def test_transport_error(self, caplog):
+        caplog.set_level(logging.WARNING, logger="agentevals.run.sinks")
+
+        def refuse(request):
+            raise httpx.ConnectError(f"connect to {self.MARK} refused")
+
+        await self._emit(f"https://hooks.example.com/{self.MARK}", refuse)
+        assert "failed after 1 attempts: ConnectError" in caplog.text
+        assert self.MARK not in caplog.text

@@ -1,22 +1,9 @@
+import type { SessionSummary } from '../../generated/agentevals/api/v1alpha1/views_pb';
+import { tokens } from '../../lib/liveSessions';
+
 interface SessionMetadataProps {
-  session: {
-    sessionId: string;
-    traceId: string;
-    metadata: Record<string, any>;
-    startedAt: string;
-    status: 'active' | 'complete';
-    invocations?: Array<{
-      modelInfo?: {
-        provider?: string;
-        cacheCreationTokens?: number;
-        cacheReadTokens?: number;
-      };
-    }>;
-  };
-  liveStats: {
-    totalInputTokens: number;
-    totalOutputTokens: number;
-  };
+  summary: SessionSummary;
+  provider?: string;
 }
 
 function MetadataItem({ label, children }: { label: string; children: React.ReactNode }) {
@@ -42,11 +29,10 @@ function MetadataItem({ label, children }: { label: string; children: React.Reac
   );
 }
 
-export function SessionMetadata({ session, liveStats }: SessionMetadataProps) {
-  const totalTokens = liveStats.totalInputTokens + liveStats.totalOutputTokens;
-  const provider = session.invocations?.[0]?.modelInfo?.provider;
-  const totalCacheCreation = session.invocations?.reduce((sum, inv) => sum + (inv.modelInfo?.cacheCreationTokens || 0), 0) || 0;
-  const totalCacheRead = session.invocations?.reduce((sum, inv) => sum + (inv.modelInfo?.cacheReadTokens || 0), 0) || 0;
+export function SessionMetadata({ summary, provider }: SessionMetadataProps) {
+  const { input, output, cacheRead = 0, cacheWrite = 0 } = tokens(summary.totals?.usage);
+  const total = (input ?? 0) + (output ?? 0);
+  const totals = summary.totals;
 
   return (
     <div style={{
@@ -58,38 +44,45 @@ export function SessionMetadata({ session, liveStats }: SessionMetadataProps) {
       alignItems: 'center',
       flexWrap: 'wrap',
     }}>
-      {totalTokens > 0 && (
+      {summary.agent && <MetadataItem label="Agent">{summary.agent}</MetadataItem>}
+
+      {summary.agentVersion && <MetadataItem label="Version">{summary.agentVersion}</MetadataItem>}
+
+      {total > 0 && (
         <MetadataItem label="Tokens">
           <span style={{ color: '#10b981' }}>
-            {totalTokens.toLocaleString()}
+            {total.toLocaleString()}
           </span>
           <span style={{
             fontSize: '11px',
             color: 'var(--text-tertiary)',
             marginLeft: '6px',
           }}>
-            (↓{liveStats.totalInputTokens.toLocaleString()} ↑{liveStats.totalOutputTokens.toLocaleString()})
+            (↓{(input ?? 0).toLocaleString()} ↑{(output ?? 0).toLocaleString()})
           </span>
+          {totals && totals.modelCallsWithUsage < totals.modelCalls && (
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: '6px' }}>
+              measured in {totals.modelCallsWithUsage} of {totals.modelCalls} calls
+            </span>
+          )}
         </MetadataItem>
       )}
 
-      {provider && (
-        <MetadataItem label="Provider">{provider}</MetadataItem>
-      )}
+      {provider && <MetadataItem label="Provider">{provider}</MetadataItem>}
 
-      {(totalCacheCreation > 0 || totalCacheRead > 0) && (
+      {(cacheWrite > 0 || cacheRead > 0) && (
         <MetadataItem label="Cache Tokens">
           <span style={{ color: '#f59e0b' }}>
-            {totalCacheRead > 0 && `${totalCacheRead.toLocaleString()} read`}
-            {totalCacheCreation > 0 && totalCacheRead > 0 && ' / '}
-            {totalCacheCreation > 0 && `${totalCacheCreation.toLocaleString()} created`}
+            {cacheRead > 0 && `${cacheRead.toLocaleString()} read`}
+            {cacheWrite > 0 && cacheRead > 0 && ' / '}
+            {cacheWrite > 0 && `${cacheWrite.toLocaleString()} created`}
           </span>
         </MetadataItem>
       )}
 
-      {Object.keys(session.metadata).length > 0 && Object.entries(session.metadata).map(([key, value]) => (
-        <MetadataItem key={key} label={key}>{String(value)}</MetadataItem>
-      ))}
+      {summary.conversationId && <MetadataItem label="Conversation">{summary.conversationId}</MetadataItem>}
+
+      <MetadataItem label="Spans">{summary.spanCount.toLocaleString()}</MetadataItem>
     </div>
   );
 }

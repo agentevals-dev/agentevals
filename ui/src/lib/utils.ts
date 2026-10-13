@@ -48,7 +48,7 @@ export function truncateTraceId(traceId: string, length: number = 12): string {
 /**
  * Get color for status
  */
-export function getStatusColor(status: EvalStatus): string {
+export function getStatusColor(status: EvalStatus | 'PARTIAL'): string {
   switch (status) {
     case 'PASSED':
       return 'var(--status-success)';
@@ -66,7 +66,7 @@ export function getStatusColor(status: EvalStatus): string {
 /**
  * Get glow effect for status
  */
-export function getStatusGlow(status: EvalStatus): string {
+export function getStatusGlow(status: EvalStatus | 'PARTIAL'): string {
   switch (status) {
     case 'PASSED':
       return 'var(--glow-success)';
@@ -190,11 +190,11 @@ function convertKeys(obj: unknown, rename: (key: string) => string): unknown {
   return obj;
 }
 
-export function convertSnakeToCamel(obj: any): any {
+export function convertSnakeToCamel(obj: unknown): unknown {
   return convertKeys(obj, (key) => key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()));
 }
 
-export function convertCamelToSnake(obj: any): any {
+export function convertCamelToSnake(obj: unknown): unknown {
   return convertKeys(obj, (key) => key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`));
 }
 

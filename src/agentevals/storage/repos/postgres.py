@@ -230,6 +230,21 @@ class PostgresRunRepository:
         lease_seconds = int(lease.total_seconds())
         async with self._pool.acquire() as conn:
             async with conn.transaction():
+                # A run whose lease expired on its last attempt, or after cancel was requested, is
+                # never claimed again; finish it so it does not stay running forever.
+                await conn.execute(
+                    f"""
+                    UPDATE {self._t}
+                       SET status = CASE WHEN cancel_requested THEN 'cancelled' ELSE 'failed' END,
+                           error = CASE WHEN cancel_requested THEN error
+                                        ELSE 'worker lease expired on the last attempt' END,
+                           finished_at = now()
+                     WHERE status = 'running'
+                       AND lease_expires_at < now()
+                       AND (attempt >= $1 OR cancel_requested)
+                    """,
+                    max_attempts,
+                )
                 row = await conn.fetchrow(
                     f"""
                     UPDATE {self._t}
@@ -341,7 +356,7 @@ class PostgresResultRepository:
                 r.evaluator_type,
                 r.status.value,
                 r.score,
-                [s for s in r.per_invocation_scores if s is not None],
+                list(r.per_invocation_scores),
                 r.trace_id,
                 r.span_id,
                 json.dumps(r.details or {}),

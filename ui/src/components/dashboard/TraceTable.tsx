@@ -3,7 +3,7 @@ import { Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { css } from '@emotion/react';
 import { Clock, User, Cpu, MessageSquare, CheckCircle2, XCircle, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
-import type { TraceTableRow, Annotation, TrajectoryComparison } from '../../lib/types';
+import type { TraceTableRow, Annotation, TrajectoryComparison, Part } from '../../lib/types';
 import { formatTimestamp } from '../../lib/utils';
 import { TrajectoryComparisonDetails } from '../inspector/TrajectoryComparisonDetails';
 
@@ -168,7 +168,7 @@ const tableStyle = css`
   }
 `;
 
-const extractText = (parts: any[]): string => {
+const extractText = (parts: Part[] | undefined): string => {
   if (!parts) return '';
   return parts
     .filter(p => p.text)
@@ -251,7 +251,7 @@ export const TraceTable: React.FC<TraceTableProps> = ({
       key: 'conversation',
       width: 300,
       ellipsis: true,
-      render: (_: any, record: TraceTableRow) => {
+      render: (_: unknown, record: TraceTableRow) => {
         if (!record.userInputPreview) {
           return (
             <div className="loading-cell">
@@ -328,7 +328,7 @@ export const TraceTable: React.FC<TraceTableProps> = ({
       title: metricName.replace(/_/g, ' ').toUpperCase(),
       key: metricName,
       width: 160,
-      render: (_: any, record: TraceTableRow) => {
+      render: (_: unknown, record: TraceTableRow) => {
         const metricResult = record.metricResults.get(metricName);
 
         if (!metricResult) {
@@ -377,7 +377,7 @@ export const TraceTable: React.FC<TraceTableProps> = ({
       title: 'Annotation',
       key: 'annotation',
       width: 220,
-      render: (_: any, record: TraceTableRow) => {
+      render: (_: unknown, record: TraceTableRow) => {
         const annotation: Annotation | undefined = record.annotation;
         if (!annotation) {
           return <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>;

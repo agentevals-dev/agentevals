@@ -20,6 +20,7 @@ from ..config import EvalParams
 from ..runner import RunResult
 from ..storage.models import Run, RunSpec, RunStatus, TraceTarget
 from ..storage.repos import ResultRepository, RunRepository
+from .fetcher import validate_trace_id
 from .result_builder import build_results, summarize_run_result
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,8 @@ class RunService:
             EvalParams.model_validate(spec.eval_config or {})
         except ValidationError as exc:
             raise ValueError(f"Invalid eval_config: {exc}") from exc
+        if spec.target.kind == "http":
+            validate_trace_id(spec.target.trace_id or "")
 
     async def get(self, run_id: UUID) -> Run | None:
         return await self._runs.get(run_id)
@@ -107,7 +110,7 @@ class RunService:
         spec = RunSpec(
             approach="trace_replay",
             target=target,
-            eval_config=params.model_dump(by_alias=False),
+            eval_config=params.model_dump(by_alias=False, include=set(EvalParams.model_fields)),
             eval_set=eval_set_dict,
         )
 

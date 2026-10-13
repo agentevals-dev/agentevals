@@ -1,7 +1,7 @@
 {
  "schema": "otel_core.truth/v1",
  "fixture": "hand/strands_span_events",
- "source": "hand authored from reports/E_part3a_dialects.md (Strands gen_ai_latest_experimental, span events). Validate against a live run at STOP 4.",
+ "source": "hand authored (Strands gen_ai_latest_experimental, span events)",
  "turns": [
   {
    "user_text": "What is the weather in Paris?",
