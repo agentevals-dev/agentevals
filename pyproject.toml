@@ -38,7 +38,7 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-grpc>=1.38",
     # Floors of the generated API code in agentevals.api.v1alpha1 (see proto/buf.gen.yaml).
     "grpcio>=1.78",
-    "protobuf>=6.33.5,<7",
+    "protobuf>=6.33.5,<8",
     "grpcio-health-checking>=1.78",
     "grpcio-reflection>=1.78",
     "grpcio-status>=1.78",
