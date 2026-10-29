@@ -13,6 +13,7 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
+from google.adk.evaluation.app_details import AgentDetails, AppDetails
 from google.adk.evaluation.eval_case import EvalCase, IntermediateData, Invocation, InvocationEvent
 from google.adk.evaluation.eval_rubrics import Rubric, RubricContent
 from google.adk.evaluation.eval_set import EvalSet
@@ -96,6 +97,35 @@ def _as_dict(value: Any, key: str) -> dict[str, Any]:
     return {key: value}
 
 
+def _app_details(turn: Turn) -> AppDetails | None:
+    """Include all captured tools, even those the agent never called."""
+    tools_by_agent: dict[str, dict[str, genai_types.FunctionDeclaration]] = {}
+    for call in turn.llm_calls:
+        for definition in call.tool_definitions:
+            name = definition.get("name")
+            if not isinstance(name, str) or not name:
+                continue
+            tools = tools_by_agent.setdefault(call.agent_name or turn.agent_name or "agent", {})
+            if name not in tools:
+                description = definition.get("description")
+                tools[name] = genai_types.FunctionDeclaration(
+                    name=name,
+                    description=description if isinstance(description, str) else None,
+                    parameters_json_schema=definition.get("parameters"),
+                )
+    if not tools_by_agent:
+        return None
+    return AppDetails(
+        agent_details={
+            name: AgentDetails(
+                name=name,
+                tool_declarations=[genai_types.Tool(function_declarations=list(tools.values()))],
+            )
+            for name, tools in tools_by_agent.items()
+        }
+    )
+
+
 def to_adk_invocation(turn: Turn) -> Invocation:
     user_text = text_of(turn.user_input)
     final_text = text_of(turn.final_output)
@@ -124,6 +154,7 @@ def to_adk_invocation(turn: Turn) -> Invocation:
             tool_responses=tool_responses,
             intermediate_responses=intermediate,
         ),
+        app_details=_app_details(turn),
         creation_timestamp=turn.start_ns / 1e9,
         **_durations(turn),
     )
