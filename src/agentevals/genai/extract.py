@@ -301,6 +301,29 @@ def _logical_call(analysis: TraceAnalysis, chain_ids: list[str]) -> LlmCall:
             else None
         ),
     )
+    inputs = _first(chain, lambda v: v.messages(sc.INPUT_MESSAGES)) or []
+    outputs = _first(chain, lambda v: v.messages(sc.OUTPUT_MESSAGES)) or []
+    if all(leaf.sources.get(key) == "legacy_indexed" for key in (sc.INPUT_MESSAGES, sc.OUTPUT_MESSAGES)):
+        for view in chain[1:]:
+            if not view.is_adk or any(
+                view.sources.get(key) != "adk" for key in (sc.INPUT_MESSAGES, sc.OUTPUT_MESSAGES)
+            ):
+                continue
+            adk_inputs, adk_outputs = view.messages(sc.INPUT_MESSAGES), view.messages(sc.OUTPUT_MESSAGES)
+            if not adk_inputs or not adk_outputs:
+                continue
+            historical = tool_calls_of(adk_inputs)
+            requested = [*historical, *tool_calls_of(adk_outputs)]
+            answered = tool_responses_of(adk_inputs)
+            if not requested or not all(
+                isinstance(part["id"], str) and part["id"].strip() for part in [*requested, *answered]
+            ):
+                continue
+            if not {part["id"] for part in answered} <= {part["id"] for part in historical}:
+                continue
+            # ADK remaps provider tool IDs; select its captured request and response together.
+            inputs, outputs = adk_inputs, adk_outputs
+            break
     return LlmCall(
         ref=leaf.span.ref,
         wrapper_ref=chain[-1].span.ref if len(chain) > 1 else None,
@@ -313,8 +336,8 @@ def _logical_call(analysis: TraceAnalysis, chain_ids: list[str]) -> LlmCall:
         usage=_first(chain, _usage),
         finish_reasons=[str(r) for r in finish or []],
         system_instructions=_first(chain, lambda v: v.messages(sc.SYSTEM_INSTRUCTIONS)) or [],
-        input_messages=_first(chain, lambda v: v.messages(sc.INPUT_MESSAGES)) or [],
-        output_messages=_first(chain, lambda v: v.messages(sc.OUTPUT_MESSAGES)) or [],
+        input_messages=inputs,
+        output_messages=outputs,
         tool_definitions=_first(chain, lambda v: v.messages(sc.TOOL_DEFINITIONS)) or [],
         status=status,
         error_type=error_type,
