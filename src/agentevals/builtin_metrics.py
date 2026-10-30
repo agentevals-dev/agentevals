@@ -194,8 +194,8 @@ def _enrich_app_details(invocations: list[Invocation]) -> list[Invocation]:
     ADK judges read tool declarations from ``app_details.agent_details``. Without them,
     ``multi_turn_tool_use_quality_v1`` has no schema to compare calls against, and the
     ``hallucinations_v1`` / ``rubric_based_*`` prompts state "Agent has no tools." next to
-    the tool calls they show. Our trace converters do not populate ``app_details``, so we
-    synthesize a minimal record from tool names observed across the conversation.
+    the tool calls they show. When no invocation carries captured tool declarations in
+    ``app_details``, synthesize a minimal record from names observed across the conversation.
     """
     from google.adk.evaluation.app_details import AgentDetails, AppDetails
     from google.genai import types as genai_types

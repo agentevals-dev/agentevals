@@ -8,6 +8,7 @@ claims as unsupported (agentevals-dev/agentevals#230).
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from collections.abc import AsyncGenerator
@@ -301,3 +302,52 @@ async def test_every_prebuilt_metric_receives_invocation_events(monkeypatch, met
     for inv in [*recorder.actual, *recorder.expected]:
         assert isinstance(inv.intermediate_data, InvocationEvents)
         assert inv.app_details is not None
+
+
+class _ToolUseFakeJudge(BaseLlm):
+    prompts: list[str] = []
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        self.prompts.append(llm_request.contents[0].parts[0].text)
+        text = "ID: rubric_0\nProperty: Uses appropriate tools.\nRationale: fake\nVerdict: yes"
+        yield LlmResponse(content=genai_types.Content(role="model", parts=[genai_types.Part(text=text)]))
+
+
+@pytest.mark.skipif(not os.path.exists(HELM_TRACE), reason="samples/helm.json not available")
+@pytest.mark.parametrize("builtin", [False, True], ids=["direct-evaluator", "builtin-metric"])
+async def test_replayed_tool_use_judge_sees_all_available_tools(monkeypatch, builtin):
+    (turn,) = extract_conversation(load_traces(HELM_TRACE)).turns
+    invocations = to_adk_invocations([turn])
+    definitions = turn.llm_calls[0].tool_definitions
+    assert len(definitions) == 9
+    assert {call.name for call in turn.tool_calls} == {"helm_list_releases"}
+
+    metric_name = "rubric_based_tool_use_quality_v1"
+    rubrics = ["Uses appropriate tools."]
+    evaluator = builtin_metrics.get_evaluator(
+        builtin_metrics.build_eval_metric(metric_name, None, 0.5, rubrics=rubrics)
+    )
+    judge = _ToolUseFakeJudge(model="fake-judge")
+    evaluator._judge_model = judge
+    if builtin:
+        monkeypatch.setattr(builtin_metrics, "get_evaluator", lambda _metric: evaluator)
+        result = await evaluate_builtin_metric(metric_name, invocations, None, None, 0.5, rubrics=rubrics)
+        assert result.error is None
+        assert result.score == 1.0
+    else:
+        result = await evaluator.evaluate_invocations(actual_invocations=invocations)
+        assert result.overall_score == 1.0
+
+    available_tools = json.loads(judge.prompts[0].split("<available_tools>\n")[1].split("</available_tools>")[0])
+    declarations = {
+        declaration["name"]: declaration
+        for tool in available_tools["tool_declarations"]["helm_agent"]
+        for declaration in tool["function_declarations"]
+    }
+    assert set(declarations) == {definition["name"] for definition in definitions}
+    for definition in definitions:
+        declaration = declarations[definition["name"]]
+        assert declaration["description"] == definition["description"]
+        assert declaration["parameters_json_schema"] == definition["parameters"]
