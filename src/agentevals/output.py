@@ -276,4 +276,5 @@ def _status_icon(status: str) -> str:
         "PASSED": "[PASS]",
         "FAILED": "[FAIL]",
         "NOT_EVALUATED": "[----]",
+        "INFORMATIONAL": "[INFO]",
     }.get(status, "[????]")

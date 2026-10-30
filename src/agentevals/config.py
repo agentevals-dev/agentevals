@@ -29,6 +29,12 @@ RUBRIC_METRIC_TYPES = {
     "rubric_based_tool_use_quality_v1": "TOOL_USE_QUALITY",
 }
 
+# Metrics that report a value to track and never pass or fail, so they take no threshold. ADK
+# reports them as INFORMATIONAL and rejects a threshold.
+INFORMATIONAL_METRICS = frozenset(
+    {"tool_call_count_v1", "inference_call_count_v1", "token_usage_v1", "invocation_duration_v1"}
+)
+
 GroupBy = Literal["auto", "trace", "conversation"]
 
 
@@ -108,6 +114,14 @@ class BuiltinMetricDef(BaseModel):
             raise ValueError(
                 f"Built-in metric '{self.name}' does not take rubrics. "
                 f"Metrics that do: {', '.join(sorted(RUBRIC_METRIC_TYPES))}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _no_threshold_on_informational_metrics(self) -> BuiltinMetricDef:
+        if self.threshold is not None and self.name in INFORMATIONAL_METRICS:
+            raise ValueError(
+                f"Built-in metric '{self.name}' reports a value and never passes or fails, so it takes no threshold"
             )
         return self
 
@@ -214,7 +228,7 @@ def make_builtin_evaluator_entries(
             BuiltinMetricDef(
                 name=name,
                 judge_model=judge_model,
-                threshold=threshold,
+                threshold=None if name in INFORMATIONAL_METRICS else threshold,
                 trajectory_match_type=trajectory_match_type,
             )
         )
@@ -239,7 +253,7 @@ def apply_builtin_overrides(
             payload = evaluator.model_dump(by_alias=False)
             if judge_model is not None:
                 payload["judge_model"] = judge_model
-            if threshold is not None:
+            if threshold is not None and evaluator.name not in INFORMATIONAL_METRICS:
                 payload["threshold"] = threshold
             if trajectory_match_type is not None:
                 payload["trajectory_match_type"] = trajectory_match_type

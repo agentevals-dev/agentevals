@@ -62,6 +62,12 @@ class TestTableFormatTiming:
         output = format_results(self._make_result(duration_ms=None), fmt="table")
         assert "Time" in output
 
+    def test_informational_status_has_its_own_icon(self):
+        mr = MetricResult(metric_name="token_usage_v1", score=3906.0, eval_status="INFORMATIONAL")
+        tr = TraceResult(trace_id="abc123", num_invocations=1, metric_results=[mr])
+        output = format_results(RunResult(trace_results=[tr]), fmt="table")
+        assert "[INFO]  token_usage_v1" in output
+
 
 class TestJsonFormatTiming:
     def test_duration_ms_in_json(self):

@@ -1,7 +1,7 @@
 import React from 'react';
 import { css } from '@emotion/react';
 import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, AlertCircle, Minus } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Info, Minus } from 'lucide-react';
 import type { MetricResult } from '../../lib/types';
 import { getScoreColor } from '../../lib/utils';
 
@@ -93,20 +93,25 @@ export const MetricScoreCard: React.FC<MetricScoreCardProps> = ({
   compact = false,
 }) => {
   const { metricName, score, evalStatus, perInvocationScores, error } = metricResult;
+  const informational = evalStatus === 'INFORMATIONAL';
 
   const StatusIcon =
     evalStatus === 'PASSED' ? CheckCircle :
     evalStatus === 'FAILED' ? XCircle :
     evalStatus === 'ERROR' ? AlertCircle :
+    informational ? Info :
     Minus;
 
   const statusColor =
     evalStatus === 'PASSED' ? 'var(--status-success)' :
     evalStatus === 'FAILED' ? 'var(--status-failure)' :
     evalStatus === 'ERROR' ? 'var(--status-warning)' :
+    informational ? 'var(--text-secondary)' :
     'var(--text-muted)';
 
-  const scoreColor = score !== null ? getScoreColor(score, threshold) : 'var(--text-muted)';
+  const scoreColor = informational
+    ? 'var(--text-secondary)'
+    : score !== null ? getScoreColor(score, threshold) : 'var(--text-muted)';
   const scorePercentage = score !== null ? score * 100 : 0;
 
   return (
@@ -122,17 +127,19 @@ export const MetricScoreCard: React.FC<MetricScoreCardProps> = ({
       {score !== null && (
         <div className="score-section">
           <div className="score-value" style={{ color: scoreColor }}>
-            Score: {score.toFixed(3)}
+            {informational ? 'Value' : 'Score'}: {score.toFixed(3)}
           </div>
-          <div className="score-bar-container">
-            <motion.div
-              className="score-bar"
-              style={{ backgroundColor: scoreColor }}
-              initial={{ width: 0 }}
-              animate={{ width: `${scorePercentage}%` }}
-              transition={{ duration: 0.8, ease: 'easeOut' }}
-            />
-          </div>
+          {!informational && (
+            <div className="score-bar-container">
+              <motion.div
+                className="score-bar"
+                style={{ backgroundColor: scoreColor }}
+                initial={{ width: 0 }}
+                animate={{ width: `${scorePercentage}%` }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+              />
+            </div>
+          )}
           {perInvocationScores.length > 0 && !compact && (
             <div className="per-invocation">
               Per-invocation: [{perInvocationScores.map(s => s?.toFixed(2) ?? 'null').join(', ')}]

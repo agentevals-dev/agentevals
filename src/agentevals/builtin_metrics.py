@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -28,7 +29,7 @@ from google.adk.evaluation.eval_metrics import (
 from google.adk.evaluation.eval_rubrics import Rubric, RubricContent
 from google.adk.evaluation.evaluator import EvaluationResult, Evaluator
 
-from .config import RUBRIC_METRIC_TYPES
+from .config import INFORMATIONAL_METRICS, RUBRIC_METRIC_TYPES
 from .resolvers import get_resolved_credential
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,7 @@ _METRIC_CATEGORIES = {
     "multi_turn_trajectory_quality_v1": "multi-turn",
     "multi_turn_tool_use_quality_v1": "multi-turn",
     "rubric_based_multi_turn_trajectory_quality_v1": "multi-turn",
+    **dict.fromkeys(INFORMATIONAL_METRICS, "efficiency"),
 }
 
 
@@ -113,7 +115,7 @@ def metric_catalog() -> list[MetricDescription]:
     return out
 
 
-def _to_invocation_events(inv: Invocation) -> Invocation:
+def _to_invocation_events(inv: Invocation, model_calls: Sequence[InvocationEvent] = ()) -> Invocation:
     """Return a copy of *inv* with ``intermediate_data`` shaped as ``InvocationEvents``.
 
     ADK's own runtime (``EvaluationGenerator.convert_events_to_eval_invocations``) always
@@ -129,6 +131,9 @@ def _to_invocation_events(inv: Invocation) -> Invocation:
     that still have no call are appended rather than dropped, because missing evidence makes
     the hallucinations judge label grounded claims as unsupported. ADK authors calls and
     responses with the agent name (no separate ``"tool"`` actor); ``"agent"`` mirrors that.
+
+    *model_calls* are appended as given: content-less model call events that ADK's token and
+    inference call counts read, and that every other evaluator skips.
     """
     from google.genai import types as genai_types
 
@@ -178,6 +183,7 @@ def _to_invocation_events(inv: Invocation) -> Invocation:
                 content=genai_types.Content(role="model", parts=list(parts)),
             )
         )
+    events.extend(model_calls)
 
     return inv.model_copy(update={"intermediate_data": InvocationEvents(invocation_events=events)})
 
@@ -321,6 +327,9 @@ def build_eval_metric(
     ``rubrics`` feed the ``rubric_based_*`` metrics' criterion: plain strings
     get positional ids, ADK ``Rubric`` objects are used as given.
     """
+    if metric_name in INFORMATIONAL_METRICS:
+        return EvalMetric(metric_name=metric_name, threshold=threshold)
+
     effective_threshold = threshold if threshold is not None else 0.5
 
     criterion: BaseCriterion | None = None
@@ -512,6 +521,7 @@ async def evaluate_builtin_metric(
     expected_reason: str | None = None,
     rubrics: list[str | Rubric] | None = None,
     case_rubrics: list[Rubric] | None = None,
+    model_calls: list[list[InvocationEvent]] | None = None,
 ):
     """Evaluate a built-in metric. Case rubrics apply to every invocation;
     invocation rubrics apply by position, with their ADK types unchanged.
@@ -568,7 +578,10 @@ async def evaluate_builtin_metric(
                 )
             _inject_judge_credential(evaluator, api_key, judge_base_url)
 
-        actual_invocations = _enrich_app_details([_to_invocation_events(inv) for inv in actual_invocations])
+        calls = model_calls or [[] for _ in actual_invocations]
+        actual_invocations = _enrich_app_details(
+            [_to_invocation_events(inv, c) for inv, c in zip(actual_invocations, calls, strict=True)]
+        )
         if expected_invocations is not None:
             expected_invocations = _enrich_app_details([_to_invocation_events(inv) for inv in expected_invocations])
 

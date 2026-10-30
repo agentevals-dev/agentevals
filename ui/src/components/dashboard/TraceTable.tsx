@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { css } from '@emotion/react';
-import { Clock, User, Cpu, MessageSquare, CheckCircle2, XCircle, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Clock, User, Cpu, MessageSquare, CheckCircle2, XCircle, Info, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
 import type { TraceTableRow, Annotation, TrajectoryComparison, Part } from '../../lib/types';
 import { formatTimestamp } from '../../lib/utils';
 import { TrajectoryComparisonDetails } from '../inspector/TrajectoryComparisonDetails';
@@ -349,6 +349,18 @@ export const TraceTable: React.FC<TraceTableProps> = ({
         }
 
         const score = metricResult.score;
+
+        if (metricResult.evalStatus === 'INFORMATIONAL') {
+          return (
+            <div className="metric-cell">
+              <Info size={14} color="var(--text-secondary)" />
+              <span className="score-badge" style={{ color: 'var(--text-secondary)' }}>
+                {score !== null ? score.toFixed(2) : 'N/A'}
+              </span>
+            </div>
+          );
+        }
+
         const passed = score !== null && score >= threshold;
 
         return (

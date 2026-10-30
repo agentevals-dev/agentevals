@@ -83,13 +83,14 @@ export const SummaryStats: React.FC<SummaryStatsProps> = ({ traceResults }) => {
   const passRate = calculatePassRate(allMetricResults);
   const avgScore = calculateAvgScore(allMetricResults);
 
-  const passedTraces = traceResults.filter((tr) =>
-    tr.metricResults.every((m) => m.evalStatus === 'PASSED')
-  ).length;
+  const passedTraces = traceResults.filter((tr) => {
+    const gated = tr.metricResults.filter((m) => m.evalStatus !== 'INFORMATIONAL');
+    return gated.length > 0 && gated.every((m) => m.evalStatus === 'PASSED');
+  }).length;
 
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
-  const passOffset = circumference - (passRate * circumference);
+  const passOffset = circumference - ((passRate ?? 0) * circumference);
 
   return (
     <div css={statsStyle}>
@@ -126,7 +127,7 @@ export const SummaryStats: React.FC<SummaryStatsProps> = ({ traceResults }) => {
               strokeDashoffset={passOffset}
             />
           </svg>
-          <div className="circle-text">{Math.round(passRate * 100)}%</div>
+          <div className="circle-text">{passRate === null ? 'N/A' : `${Math.round(passRate * 100)}%`}</div>
         </div>
         <div className="stat-label">
           Pass Rate ({passedTraces}/{totalTraces} traces)

@@ -56,6 +56,8 @@ export function getStatusColor(status: EvalStatus | 'PARTIAL'): string {
       return 'var(--status-failure)';
     case 'NOT_EVALUATED':
       return 'var(--text-muted)';
+    case 'INFORMATIONAL':
+      return 'var(--text-secondary)';
     case 'ERROR':
       return 'var(--status-warning)';
     default:
@@ -143,17 +145,21 @@ export function readFileAsText(file: File): Promise<string> {
 /**
  * Calculate pass rate from results
  */
-export function calculatePassRate(results: { evalStatus: EvalStatus }[]): number {
-  if (results.length === 0) return 0;
-  const passed = results.filter((r) => r.evalStatus === 'PASSED').length;
-  return passed / results.length;
+export function calculatePassRate(results: { evalStatus: EvalStatus }[]): number | null {
+  const gated = results.filter((r) => r.evalStatus !== 'INFORMATIONAL');
+  if (gated.length === 0) return null;
+  const passed = gated.filter((r) => r.evalStatus === 'PASSED').length;
+  return passed / gated.length;
 }
 
 /**
  * Calculate average score from results
  */
-export function calculateAvgScore(results: { score: number | null }[]): number | null {
-  const scores = results.map((r) => r.score).filter((s): s is number => s !== null);
+export function calculateAvgScore(results: { score: number | null; evalStatus: EvalStatus }[]): number | null {
+  const scores = results
+    .filter((r) => r.evalStatus !== 'INFORMATIONAL')
+    .map((r) => r.score)
+    .filter((s): s is number => s !== null);
   if (scores.length === 0) return null;
   return scores.reduce((sum, score) => sum + score, 0) / scores.length;
 }

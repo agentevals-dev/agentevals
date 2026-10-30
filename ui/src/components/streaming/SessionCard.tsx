@@ -361,8 +361,12 @@ export function SessionCard({ session, isSelected, onSelect, onRemove, evaluatio
                     borderRadius: '6px',
                     background: mr.evalStatus === 'PASSED'
                       ? 'rgba(34, 197, 94, 0.15)'
-                      : 'rgba(239, 68, 68, 0.15)',
-                    color: mr.evalStatus === 'PASSED' ? '#22c55e' : '#ef4444',
+                      : mr.evalStatus === 'INFORMATIONAL'
+                        ? 'var(--bg-elevated)'
+                        : 'rgba(239, 68, 68, 0.15)',
+                    color: mr.evalStatus === 'PASSED'
+                      ? '#22c55e'
+                      : mr.evalStatus === 'INFORMATIONAL' ? 'var(--text-secondary)' : '#ef4444',
                     fontSize: '12px',
                     fontWeight: 700,
                   }}

@@ -22,6 +22,7 @@ class EvalStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EVAL_STATUS_PASSED: _ClassVar[EvalStatus]
     EVAL_STATUS_FAILED: _ClassVar[EvalStatus]
     EVAL_STATUS_NOT_EVALUATED: _ClassVar[EvalStatus]
+    EVAL_STATUS_INFORMATIONAL: _ClassVar[EvalStatus]
 TRAJECTORY_MATCH_TYPE_UNSPECIFIED: TrajectoryMatchType
 TRAJECTORY_MATCH_TYPE_EXACT: TrajectoryMatchType
 TRAJECTORY_MATCH_TYPE_IN_ORDER: TrajectoryMatchType
@@ -30,6 +31,7 @@ EVAL_STATUS_UNSPECIFIED: EvalStatus
 EVAL_STATUS_PASSED: EvalStatus
 EVAL_STATUS_FAILED: EvalStatus
 EVAL_STATUS_NOT_EVALUATED: EvalStatus
+EVAL_STATUS_INFORMATIONAL: EvalStatus
 
 class ListMetricsRequest(_message.Message):
     __slots__ = ()

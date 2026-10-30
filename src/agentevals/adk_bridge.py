@@ -13,7 +13,7 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
-from google.adk.evaluation.eval_case import EvalCase, IntermediateData, Invocation
+from google.adk.evaluation.eval_case import EvalCase, IntermediateData, Invocation, InvocationEvent
 from google.adk.evaluation.eval_rubrics import Rubric, RubricContent
 from google.adk.evaluation.eval_set import EvalSet
 from google.genai import types as genai_types
@@ -21,7 +21,7 @@ from google.genai import types as genai_types
 from .config import RubricDef
 from .genai.matching import ExpectedConversation, ExpectedTurn
 from .genai.messages import text_of
-from .genai.model import Turn
+from .genai.model import Turn, Usage
 
 
 def load_eval_set(path: str) -> EvalSet:
@@ -125,11 +125,87 @@ def to_adk_invocation(turn: Turn) -> Invocation:
             intermediate_responses=intermediate,
         ),
         creation_timestamp=turn.start_ns / 1e9,
+        **_durations(turn),
     )
 
 
 def to_adk_invocations(turns: Sequence[Turn]) -> list[Invocation]:
     return [to_adk_invocation(t) for t in turns]
+
+
+Interval = tuple[int, int]
+
+
+def _union(intervals: Sequence[Interval]) -> list[Interval]:
+    merged: list[Interval] = []
+    for start, end in sorted(intervals):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def _length(intervals: Sequence[Interval]) -> int:
+    return sum(end - start for start, end in intervals)
+
+
+def _overlap(a: Sequence[Interval], b: Sequence[Interval]) -> int:
+    return sum(max(0, min(e1, e2) - max(s1, s2)) for s1, e1 in a for s2, e2 in b)
+
+
+def _clipped(spans: Sequence[tuple[int | None, int | None]], turn: Interval) -> list[Interval] | None:
+    """The spans' intervals clipped to the turn, or None when any span was not timed."""
+    out = []
+    for start, end in spans:
+        if not start or not end or end < start:
+            return None
+        out.append((max(start, turn[0]), min(end, turn[1])))
+    return _union([(s, e) for s, e in out if e > s])
+
+
+def _durations(turn: Turn) -> dict[str, float | None]:
+    """ADK's turn timing: the total, the time a model call was in flight, and the time inside a
+    tool not awaiting a model. A part with an untimed span is None, which ADK reports as n/a."""
+    if not turn.start_ns or turn.end_ns <= turn.start_ns:
+        return {}
+    bounds = (turn.start_ns, turn.end_ns)
+    model = _clipped([(c.leaf_start_ns, c.leaf_end_ns) for c in turn.llm_calls], bounds)
+    tool = _clipped([(t.start_ns, t.end_ns) for t in turn.tool_calls], bounds)
+    tool_ns = None if tool is None or model is None else _length(tool) - _overlap(tool, model)
+    return {
+        "duration": (turn.end_ns - turn.start_ns) / 1e9,
+        "model_duration": None if model is None else _length(model) / 1e9,
+        "tool_duration": None if tool_ns is None else tool_ns / 1e9,
+    }
+
+
+def _usage_metadata(usage: Usage | None) -> genai_types.GenerateContentResponseUsageMetadata | None:
+    """Semconv usage in Gemini's shape. Semconv output tokens include reasoning, while Gemini
+    reports candidates and thoughts apart, so reasoning is taken back out of the output count."""
+    if usage is None or all(v is None for v in usage.model_dump().values()):
+        return None
+    output, reasoning = usage.output_tokens, usage.reasoning_output_tokens
+    candidates = output - reasoning if output is not None and reasoning is not None and reasoning <= output else output
+    return genai_types.GenerateContentResponseUsageMetadata(
+        prompt_token_count=usage.input_tokens,
+        candidates_token_count=candidates,
+        thoughts_token_count=reasoning,
+        cached_content_token_count=usage.cache_read_input_tokens,
+    )
+
+
+def model_call_events(turn: Turn) -> list[InvocationEvent]:
+    """One content-less event per model call, the shape ADK's token and inference call counts
+    read. ADK counts an event as a model call when it has usage or a model version."""
+    return [
+        InvocationEvent(
+            author=call.agent_name or turn.agent_name or "agent",
+            usage_metadata=_usage_metadata(call.usage),
+            model_version=call.response_model or call.request_model or "",
+        )
+        for call in turn.llm_calls
+    ]
 
 
 def invocation_to_dict(inv: Invocation) -> dict[str, Any]:
