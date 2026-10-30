@@ -1,6 +1,6 @@
 import React from 'react';
 import { css } from '@emotion/react';
-import { CheckCircle, XCircle, AlertCircle, MinusCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Info, MinusCircle, Loader2 } from 'lucide-react';
 import type { MetricResult } from '../../lib/types';
 import { getStatusColor } from '../../lib/utils';
 import { TrajectoryComparisonDetails } from './TrajectoryComparisonDetails';
@@ -127,6 +127,8 @@ function getStatusIcon(status: string) {
       return XCircle;
     case 'ERROR':
       return AlertCircle;
+    case 'INFORMATIONAL':
+      return Info;
     default:
       return MinusCircle;
   }

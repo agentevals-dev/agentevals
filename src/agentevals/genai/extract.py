@@ -321,6 +321,8 @@ def _logical_call(analysis: TraceAnalysis, chain_ids: list[str]) -> LlmCall:
         delegated=info.under_tool,
         start_ns=min(v.span.start_time_unix_nano for v in chain),
         end_ns=max(v.span.end_time_unix_nano for v in chain),
+        leaf_start_ns=leaf.span.start_time_unix_nano,
+        leaf_end_ns=leaf.span.end_time_unix_nano,
     )
 
 
@@ -418,6 +420,7 @@ def _tool_calls_from_spans(analysis: TraceAnalysis, chains: list[list[str]], war
                 is_error=is_error,
                 error_type=error_type or (sc.ERROR_TYPE_OTHER if is_error else None),
                 start_ns=span.start_time_unix_nano,
+                end_ns=span.end_time_unix_nano,
             )
         )
     return out

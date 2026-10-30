@@ -779,6 +779,13 @@ export enum EvalStatus {
    * @generated from enum value: EVAL_STATUS_NOT_EVALUATED = 3;
    */
   NOT_EVALUATED = 3,
+
+  /**
+   * A value was reported for tracking; the metric never passes or fails.
+   *
+   * @generated from enum value: EVAL_STATUS_INFORMATIONAL = 4;
+   */
+  INFORMATIONAL = 4,
 }
 
 /**

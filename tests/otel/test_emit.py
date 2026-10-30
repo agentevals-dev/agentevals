@@ -149,6 +149,22 @@ class TestRecords:
         assert "gen_ai.evaluation.explanation" not in quiet
         assert loud["gen_ai.evaluation.explanation"] == "no eval set provided"
 
+    def test_informational_values_are_labelled_informational(self):
+        conversation, index = _two_turns()
+        evaluator = BuiltinMetricDef(name="token_usage_v1")
+        metric = MetricResult(
+            metric_name=evaluator.name,
+            score=150.0,
+            eval_status="INFORMATIONAL",
+            per_invocation_scores=[100.0, None],
+            per_invocation_statuses=["INFORMATIONAL", "INFORMATIONAL"],
+        )
+        attrs = [dict(r.attributes) for r in _emit(conversation, index, [metric], [evaluator])]
+        assert [(a.get("gen_ai.evaluation.score.value"), a["gen_ai.evaluation.score.label"]) for a in attrs] == [
+            (100.0, "informational"),
+            (None, "not_evaluated"),
+        ]
+
     def test_records_never_carry_content(self):
         conversation, index = _two_turns()
         metric = MetricResult(

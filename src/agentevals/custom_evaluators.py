@@ -344,16 +344,23 @@ async def evaluate_custom_evaluator(
     from .runner import MetricResult
 
     if isinstance(evaluator_def, BuiltinMetricDef):
-        from .adk_bridge import criterion_rubrics, expected_invocations, expected_rubrics, to_adk_invocations
+        from .adk_bridge import (
+            criterion_rubrics,
+            expected_invocations,
+            expected_rubrics,
+            model_call_events,
+            to_adk_invocations,
+        )
         from .builtin_metrics import evaluate_builtin_metric
 
         actual_invocations = to_adk_invocations(actual.turns)
+        model_calls = [model_call_events(t) for t in actual.turns]
         golden = expected_invocations(expected)
         alignment: dict[str, int] = {}
         if golden is not None and len(golden) != len(actual_invocations):
             aligned = align(actual.turns, expected.turns)
             n = len(aligned.pairs)
-            actual_invocations, golden = actual_invocations[:n], golden[:n]
+            actual_invocations, golden, model_calls = actual_invocations[:n], golden[:n], model_calls[:n]
             alignment = {"missing_turns": aligned.missing_turns, "unexpected_turns": aligned.unexpected_turns}
         result = await evaluate_builtin_metric(
             metric_name=evaluator_def.name,
@@ -367,6 +374,7 @@ async def evaluate_custom_evaluator(
             expected_reason=expected_reason,
             rubrics=criterion_rubrics(evaluator_def.rubrics),
             case_rubrics=expected_rubrics(expected),
+            model_calls=model_calls,
         )
         if alignment:
             result.details = {**(result.details or {}), **alignment}

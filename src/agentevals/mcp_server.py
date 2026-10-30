@@ -261,8 +261,9 @@ def create_server(server_url: str | None = None, **fastmcp_kwargs: Any) -> FastM
                 - num_invocations: number of agent invocations in the trace
                 - metrics: list of metric results, each with:
                     - metric: the metric name
-                    - score: numeric score (0.0 to 1.0), or null if not scored
-                    - status: "PASSED", "FAILED", or "NOT_EVALUATED"
+                    - score: numeric score (0.0 to 1.0, or the reported value for INFORMATIONAL
+                      metrics such as token_usage_v1), or null if not scored
+                    - status: "PASSED", "FAILED", "NOT_EVALUATED", or "INFORMATIONAL"
                     - error: error message if the metric failed to run
                 - warnings: conversion warnings, if any
             - errors: top-level errors (e.g. trace files that failed to load)

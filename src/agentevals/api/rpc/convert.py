@@ -56,6 +56,7 @@ EVAL_STATUS = {
     "PASSED": evaluation_pb2.EVAL_STATUS_PASSED,
     "FAILED": evaluation_pb2.EVAL_STATUS_FAILED,
     "NOT_EVALUATED": evaluation_pb2.EVAL_STATUS_NOT_EVALUATED,
+    "INFORMATIONAL": evaluation_pb2.EVAL_STATUS_INFORMATIONAL,
 }
 GROUP_BY = {
     "auto": common_pb2.GROUP_BY_AUTO,

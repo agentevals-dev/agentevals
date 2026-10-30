@@ -120,6 +120,8 @@ enum EvalStatus {
   EVAL_STATUS_PASSED = 1;
   EVAL_STATUS_FAILED = 2;
   EVAL_STATUS_NOT_EVALUATED = 3;
+  // A value was reported for tracking; the metric never passes or fails.
+  EVAL_STATUS_INFORMATIONAL = 4;
 }
 
 // A metric's result for one turn.

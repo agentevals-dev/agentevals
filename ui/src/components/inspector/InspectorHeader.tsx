@@ -49,7 +49,7 @@ export const InspectorHeader: React.FC<InspectorHeaderProps> = ({
   };
 
   const overallStatus = traceResult.metricResults.every(
-    m => m.evalStatus === 'PASSED' || m.evalStatus === 'NOT_EVALUATED'
+    m => m.evalStatus === 'PASSED' || m.evalStatus === 'NOT_EVALUATED' || m.evalStatus === 'INFORMATIONAL'
   ) ? 'PASSED' : traceResult.metricResults.some(
     m => m.evalStatus === 'FAILED'
   ) ? 'FAILED' : 'PARTIAL';

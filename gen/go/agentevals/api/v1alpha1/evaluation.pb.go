@@ -82,6 +82,8 @@ const (
 	EvalStatus_EVAL_STATUS_PASSED        EvalStatus = 1
 	EvalStatus_EVAL_STATUS_FAILED        EvalStatus = 2
 	EvalStatus_EVAL_STATUS_NOT_EVALUATED EvalStatus = 3
+	// A value was reported for tracking; the metric never passes or fails.
+	EvalStatus_EVAL_STATUS_INFORMATIONAL EvalStatus = 4
 )
 
 // Enum value maps for EvalStatus.
@@ -91,12 +93,14 @@ var (
 		1: "EVAL_STATUS_PASSED",
 		2: "EVAL_STATUS_FAILED",
 		3: "EVAL_STATUS_NOT_EVALUATED",
+		4: "EVAL_STATUS_INFORMATIONAL",
 	}
 	EvalStatus_value = map[string]int32{
 		"EVAL_STATUS_UNSPECIFIED":   0,
 		"EVAL_STATUS_PASSED":        1,
 		"EVAL_STATUS_FAILED":        2,
 		"EVAL_STATUS_NOT_EVALUATED": 3,
+		"EVAL_STATUS_INFORMATIONAL": 4,
 	}
 )
 
@@ -1705,13 +1709,14 @@ const file_agentevals_api_v1alpha1_evaluation_proto_rawDesc = "" +
 	"!TRAJECTORY_MATCH_TYPE_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bTRAJECTORY_MATCH_TYPE_EXACT\x10\x01\x12\"\n" +
 	"\x1eTRAJECTORY_MATCH_TYPE_IN_ORDER\x10\x02\x12#\n" +
-	"\x1fTRAJECTORY_MATCH_TYPE_ANY_ORDER\x10\x03*x\n" +
+	"\x1fTRAJECTORY_MATCH_TYPE_ANY_ORDER\x10\x03*\x97\x01\n" +
 	"\n" +
 	"EvalStatus\x12\x1b\n" +
 	"\x17EVAL_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12EVAL_STATUS_PASSED\x10\x01\x12\x16\n" +
 	"\x12EVAL_STATUS_FAILED\x10\x02\x12\x1d\n" +
-	"\x19EVAL_STATUS_NOT_EVALUATED\x10\x032\xf2\x01\n" +
+	"\x19EVAL_STATUS_NOT_EVALUATED\x10\x03\x12\x1d\n" +
+	"\x19EVAL_STATUS_INFORMATIONAL\x10\x042\xf2\x01\n" +
 	"\x11EvaluationService\x12h\n" +
 	"\vListMetrics\x12+.agentevals.api.v1alpha1.ListMetricsRequest\x1a,.agentevals.api.v1alpha1.ListMetricsResponse\x12s\n" +
 	"\x0eEvaluateTraces\x12..agentevals.api.v1alpha1.EvaluateTracesRequest\x1a/.agentevals.api.v1alpha1.EvaluateTracesResponse0\x01BQZOgithub.com/agentevals-dev/agentevals/gen/go/agentevals/api/v1alpha1;apiv1alpha1b\x06proto3"

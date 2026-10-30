@@ -75,6 +75,10 @@ class LlmCall(BaseModel):
     delegated: bool = False
     start_ns: int = 0
     end_ns: int = 0
+    # The leaf span alone. A wrapper can enclose more than the request: ADK's call_llm also
+    # covers the tools the response asked for.
+    leaf_start_ns: int = 0
+    leaf_end_ns: int = 0
 
 
 class ToolCall(BaseModel):
@@ -93,6 +97,7 @@ class ToolCall(BaseModel):
     is_error: bool = False
     error_type: str | None = None
     start_ns: int | None = None
+    end_ns: int | None = None
 
 
 class ExternalEvaluation(BaseModel):
