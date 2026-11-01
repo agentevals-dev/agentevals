@@ -122,15 +122,16 @@ def _to_invocation_events(inv: Invocation, model_calls: Sequence[InvocationEvent
     emits actual invocations as ``InvocationEvents``, and several evaluators read only that
     variant of the ``IntermediateDataType`` union: ``hallucinations_v1`` and the multi-turn
     Vertex metrics treat ``IntermediateData`` as an empty trajectory, so the judge never
-    sees tool outputs. agentevals' trace converters populate ``IntermediateData``, so every
-    built-in metric is fed through this adapter.
+    sees tool outputs. The bridge preserves source-owned events; older eval sets may still
+    carry flat ``IntermediateData`` and pass through this compatibility adapter.
 
     Each tool call is followed by its response, matched by ``id`` first, then by tool name
     in order among responses whose ``id`` matches no call (instrumentations disagree on call
     ids, e.g. positional ids in LLM messages vs per-execution ids on tool spans). Responses
     that still have no call are appended rather than dropped, because missing evidence makes
-    the hallucinations judge label grounded claims as unsupported. ADK authors calls and
-    responses with the agent name (no separate ``"tool"`` actor); ``"agent"`` mirrors that.
+    the hallucinations judge label grounded claims as unsupported. Legacy flat data uses
+    its sole captured agent owner, or ``"agent"`` when no ownership metadata is available.
+    Multiple captured owners are ambiguous after flattening and cannot be reconstructed.
 
     *model_calls* are appended as given: content-less model call events that ADK's token and
     inference call counts read, and that every other evaluator skips.
@@ -138,9 +139,20 @@ def _to_invocation_events(inv: Invocation, model_calls: Sequence[InvocationEvent
     from google.genai import types as genai_types
 
     if inv.intermediate_data is None or isinstance(inv.intermediate_data, InvocationEvents):
-        return inv
+        if not model_calls:
+            return inv
+        events = list(inv.intermediate_data.invocation_events) if inv.intermediate_data else []
+        if events[-len(model_calls) :] != list(model_calls):
+            events.extend(model_calls)
+        return inv.model_copy(update={"intermediate_data": InvocationEvents(invocation_events=events)})
 
     id_: IntermediateData = inv.intermediate_data
+    owners = list(inv.app_details.agent_details) if inv.app_details else []
+    if len(owners) > 1 and (id_.tool_uses or id_.tool_responses):
+        raise ValueError(
+            "Legacy flat tool evidence has multiple agent owners; source-owned invocation events are required"
+        )
+    owner = owners[0] if len(owners) == 1 else "agent"
     call_ids = {tc.id for tc in id_.tool_uses if tc.id}
     responses = list(id_.tool_responses)
     consumed = [False] * len(responses)
@@ -158,7 +170,7 @@ def _to_invocation_events(inv: Invocation, model_calls: Sequence[InvocationEvent
 
     def _response_event(tr: genai_types.FunctionResponse) -> InvocationEvent:
         return InvocationEvent(
-            author="agent",
+            author=owner,
             content=genai_types.Content(role="user", parts=[genai_types.Part(function_response=tr)]),
         )
 
@@ -166,7 +178,7 @@ def _to_invocation_events(inv: Invocation, model_calls: Sequence[InvocationEvent
     for tool_call in id_.tool_uses:
         events.append(
             InvocationEvent(
-                author="agent",
+                author=owner,
                 content=genai_types.Content(role="model", parts=[genai_types.Part(function_call=tool_call)]),
             )
         )
@@ -179,7 +191,7 @@ def _to_invocation_events(inv: Invocation, model_calls: Sequence[InvocationEvent
     for author, parts in id_.intermediate_responses:
         events.append(
             InvocationEvent(
-                author=author or "agent",
+                author=author or owner,
                 content=genai_types.Content(role="model", parts=list(parts)),
             )
         )
@@ -189,46 +201,40 @@ def _to_invocation_events(inv: Invocation, model_calls: Sequence[InvocationEvent
 
 
 def _enrich_app_details(invocations: list[Invocation]) -> list[Invocation]:
-    """Synthesize minimal ``app_details`` so judges know which tools the agent had.
-
-    ADK judges read tool declarations from ``app_details.agent_details``. Without them,
-    ``multi_turn_tool_use_quality_v1`` has no schema to compare calls against, and the
-    ``hallucinations_v1`` / ``rubric_based_*`` prompts state "Agent has no tools." next to
-    the tool calls they show. Our trace converters do not populate ``app_details``, so we
-    synthesize a minimal record from tool names observed across the conversation.
-    """
+    """Fill missing event owners with names-only metadata, preserving captured declarations."""
     from google.adk.evaluation.app_details import AgentDetails, AppDetails
     from google.genai import types as genai_types
 
-    if any(inv.app_details and inv.app_details.agent_details for inv in invocations):
-        return invocations
-
-    tool_names: dict[str, None] = {}
+    enriched = []
     for inv in invocations:
-        data = inv.intermediate_data
-        if data is None:
-            continue
-        if isinstance(data, IntermediateData):
-            for tc in data.tool_uses:
-                if tc.name:
-                    tool_names.setdefault(tc.name)
-        elif isinstance(data, InvocationEvents):
-            for ev in data.invocation_events:
-                if not (ev.content and ev.content.parts):
-                    continue
-                for part in ev.content.parts:
-                    if part.function_call and part.function_call.name:
-                        tool_names.setdefault(part.function_call.name)
-
-    if not tool_names:
-        return invocations
-
-    function_declarations = [genai_types.FunctionDeclaration(name=name) for name in tool_names]
-    tool = genai_types.Tool(function_declarations=function_declarations)
-    agent_details = AgentDetails(name="agent", instructions="", tool_declarations=[tool])
-    app_details = AppDetails(agent_details={"agent": agent_details})
-
-    return [inv.model_copy(update={"app_details": app_details}) for inv in invocations]
+        data = _to_invocation_events(inv).intermediate_data
+        captured = inv.app_details.agent_details if inv.app_details else {}
+        names_by_owner: dict[str, dict[str, None]] = {}
+        for event in data.invocation_events if data else []:
+            names = names_by_owner.setdefault(event.author, {})
+            for part in event.content.parts or [] if event.content else []:
+                if part.function_call and part.function_call.name:
+                    names.setdefault(part.function_call.name)
+        missing = {
+            owner: AgentDetails(
+                name=owner,
+                tool_declarations=[
+                    genai_types.Tool(
+                        function_declarations=[genai_types.FunctionDeclaration(name=name) for name in names]
+                    )
+                ]
+                if names
+                else [],
+            )
+            for owner, names in names_by_owner.items()
+            if owner not in captured and (names or captured)
+        }
+        enriched.append(
+            inv.model_copy(update={"app_details": AppDetails(agent_details={**captured, **missing})})
+            if missing
+            else inv
+        )
+    return enriched
 
 
 def rubric_strings_to_objects(rubric_texts: list[str]) -> list[Rubric]:

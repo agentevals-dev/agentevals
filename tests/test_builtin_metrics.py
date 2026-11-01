@@ -261,8 +261,8 @@ class TestHallucinationsSeesToolEvidence:
     async def test_replayed_trace_tool_output_reaches_judge(self, fake_judge):
         judges = fake_judge(evidence="kagent-crds-0.7.14")
         (inv,) = to_adk_invocations(extract_conversation(load_traces(HELM_TRACE)).turns)
-        assert isinstance(inv.intermediate_data, IntermediateData)
-        assert "kagent-crds-0.7.14" in str(inv.intermediate_data.tool_responses[0].response)
+        assert isinstance(inv.intermediate_data, InvocationEvents)
+        assert "kagent-crds-0.7.14" in str(get_all_tool_responses(inv.intermediate_data)[0].response)
 
         result = await evaluate_builtin_metric("hallucinations_v1", [inv], None, None, 0.5)
 

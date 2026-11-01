@@ -250,6 +250,12 @@ The `parts` array can contain text, function calls, or function responses. Most 
 
 Each `FunctionCall` has `name`, `args`, and `id`. Each `FunctionResponse` has `name`, `response`, and `id`. Match `id` values between calls and responses to pair them.
 
+Trace conversion returns native ADK `InvocationEvents` in memory so tool calls
+and results retain their source agent's name. EvalSet and `/api/convert` exports
+keep the flat `IntermediateData` JSON above. Golden inputs accept either ADK
+variant. Flat tool evidence with one captured agent uses that owner; multiple
+captured agents require explicit event authors because flattening loses ownership.
+
 ## Which Evaluators Use Eval Sets
 
 Not all evaluators require an eval set. Use `agentevals evaluator list --source builtin` to see which built-in evaluators do:
