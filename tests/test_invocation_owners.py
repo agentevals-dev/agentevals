@@ -1,15 +1,26 @@
 """Native event ownership survives conversion without changing exported JSON."""
 
 import json
+from pathlib import Path
 
 import pytest
 from google.adk.evaluation.app_details import AgentDetails, AppDetails
 from google.adk.evaluation.eval_case import EvalCase, IntermediateData, InvocationEvents
+from google.adk.models.base_llm import BaseLlm
+from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
 from agentevals.adk_bridge import expected_from_case, invocation_to_dict, to_adk_invocation
-from agentevals.builtin_metrics import _enrich_app_details, _to_invocation_events, build_eval_metric, get_evaluator
+from agentevals.builtin_metrics import (
+    _enrich_app_details,
+    _to_invocation_events,
+    build_eval_metric,
+    evaluate_builtin_metric,
+    get_evaluator,
+)
+from agentevals.genai.extract import extract_conversation
 from agentevals.genai.model import ToolCall, Turn
+from agentevals.loader import load_traces
 from agentevals.otel.model import SpanRef
 
 
@@ -108,6 +119,45 @@ def test_named_agent_reaches_native_final_prompt_with_captured_metadata():
     )
     prompt = get_evaluator(metric).format_auto_rater_prompt(prepared, None)
     assert "Which severity?" in prompt and "lookup" in prompt
+
+
+@pytest.mark.parametrize("captured_metadata", [False, True])
+async def test_semconv_trace_completes_native_final_response_evaluation(monkeypatch, captured_metadata):
+    from agentevals import builtin_metrics
+
+    fixture = Path(__file__).parent / "fixtures/otlp/adk_py/v2proj_span_only/S2.json"
+    (turn,) = extract_conversation(load_traces(str(fixture))).turns
+    invocation = to_adk_invocation(turn)
+    if captured_metadata:
+        invocation.app_details = AppDetails(agent_details={"weather_agent": AgentDetails(name="weather_agent")})
+    prompts = []
+
+    class Judge(BaseLlm):
+        async def generate_content_async(self, llm_request, stream=False):
+            prompts.append(llm_request.contents[0].parts[0].text)
+            yield LlmResponse(
+                content=types.Content(
+                    role="model",
+                    parts=[
+                        types.Part(
+                            text="ID: rubric_0\nProperty: Uses captured evidence.\nRationale: fake\nVerdict: yes"
+                        )
+                    ],
+                )
+            )
+
+    metric_name = "rubric_based_final_response_quality_v1"
+    evaluator = get_evaluator(build_eval_metric(metric_name, None, 1.0, rubrics=["Uses captured evidence."]))
+    evaluator._judge_model = Judge(model="fake-judge")
+    monkeypatch.setattr(builtin_metrics, "get_evaluator", lambda _: evaluator)
+
+    result = await evaluate_builtin_metric(
+        metric_name, [invocation], None, None, 1.0, rubrics=["Uses captured evidence."]
+    )
+
+    assert result.error is None
+    assert result.score == 1.0
+    assert prompts and all("weather_agent" in prompt and "get_weather" in prompt for prompt in prompts)
 
 
 def test_legacy_single_owner_is_used_without_overwriting_native_authors():
