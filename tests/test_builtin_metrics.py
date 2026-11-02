@@ -312,16 +312,17 @@ class _ToolUseFakeJudge(BaseLlm):
         yield LlmResponse(content=genai_types.Content(role="model", parts=[genai_types.Part(text=text)]))
 
 
-@pytest.mark.skipif(not os.path.exists(HELM_TRACE), reason="samples/helm.json not available")
+@pytest.mark.parametrize("metric_name", ["rubric_based_tool_use_quality_v1", "rubric_based_final_response_quality_v1"])
 @pytest.mark.parametrize("builtin", [False, True], ids=["direct-evaluator", "builtin-metric"])
-async def test_replayed_tool_use_judge_sees_all_available_tools(monkeypatch, builtin):
-    (turn,) = extract_conversation(load_traces(HELM_TRACE)).turns
+async def test_replayed_judge_sees_all_available_tools(monkeypatch, builtin, metric_name):
+    (turn,) = extract_conversation(
+        load_traces(os.path.join(os.path.dirname(__file__), "fixtures/otlp/adk_py/v2proj_span_only/S2.json"))
+    ).turns
     invocations = to_adk_invocations([turn])
     definitions = turn.llm_calls[0].tool_definitions
-    assert len(definitions) == 9
-    assert {call.name for call in turn.tool_calls} == {"helm_list_releases"}
+    assert {definition["name"] for definition in definitions} == {"get_weather", "get_time"}
+    assert {call.name for call in turn.tool_calls} == {"get_weather", "get_time"}
 
-    metric_name = "rubric_based_tool_use_quality_v1"
     rubrics = ["Uses appropriate tools."]
     evaluator = builtin_metrics.get_evaluator(
         builtin_metrics.build_eval_metric(metric_name, None, 0.5, rubrics=rubrics)
@@ -337,10 +338,10 @@ async def test_replayed_tool_use_judge_sees_all_available_tools(monkeypatch, bui
         result = await evaluator.evaluate_invocations(actual_invocations=invocations)
         assert result.overall_score == 1.0
 
-    available_tools = json.loads(judge.prompts[0].split("<available_tools>\n")[1].split("</available_tools>")[0])
+    available_tools = json.loads(judge.prompts[0].rsplit("<available_tools>\n", 1)[1].split("</available_tools>")[0])
     declarations = {
         declaration["name"]: declaration
-        for tool in available_tools["tool_declarations"]["helm_agent"]
+        for tool in available_tools["tool_declarations"]["weather_agent"]
         for declaration in tool["function_declarations"]
     }
     assert set(declarations) == {definition["name"] for definition in definitions}

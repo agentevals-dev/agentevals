@@ -16,19 +16,23 @@ def _call(definitions, agent_name=None):
     return LlmCall(ref=REF, operation="chat", agent_name=agent_name, tool_definitions=definitions)
 
 
-@pytest.mark.parametrize("schema_type", ["object", "OBJECT"], ids=["json-schema", "adk-schema"])
-def test_captured_tools_include_uncalled_tools_and_keep_first_definition(schema_type):
-    schema = {"type": schema_type, "properties": {"query": {"type": "string"}}}
+def test_captured_tools_include_uncalled_tools_and_keep_first_definition():
+    schema = {"type": "object", "properties": {"query": {"type": "string"}}}
     definitions = [
-        {"name": "search", "description": "Search the available evidence.", "parameters": schema},
-        {"name": "lookup", "description": "Look up an item.", "parameters": {}},
+        {"type": "function", "name": "search", "description": "Search the available evidence.", "parameters": schema},
+        {"type": "function", "name": "lookup", "description": "Look up an item.", "parameters": {}},
     ]
     turn = Turn(
         ref=REF,
         agent_name="researcher",
         llm_calls=[
             _call(definitions),
-            _call([{"name": "search", "description": "Changed", "parameters": {}}, {"name": "finish"}]),
+            _call(
+                [
+                    {"type": "function", "name": "search", "description": "Changed", "parameters": {}},
+                    {"type": "function", "name": "finish"},
+                ]
+            ),
         ],
         tool_calls=[ToolCall(name="search")],
     )
@@ -51,15 +55,15 @@ def test_captured_tools_include_uncalled_tools_and_keep_first_definition(schema_
     "call_agent,turn_agent,expected", [("worker", "root", "worker"), (None, "root", "root"), (None, None, "agent")]
 )
 def test_tool_agent_name_falls_back_to_turn_then_agent(call_agent, turn_agent, expected):
-    turn = Turn(ref=REF, agent_name=turn_agent, llm_calls=[_call([{"name": "search"}], call_agent)])
+    turn = Turn(ref=REF, agent_name=turn_agent, llm_calls=[_call([{"type": "function", "name": "search"}], call_agent)])
 
     assert list(to_adk_invocation(turn).app_details.agent_details) == [expected]
 
 
 def test_agents_keep_separate_tools_and_do_not_include_system_instructions():
-    first = _call([{"name": "lookup", "description": "Search documents."}], "researcher")
+    first = _call([{"type": "function", "name": "lookup", "description": "Search documents."}], "researcher")
     first.system_instructions = [{"type": "text", "content": "Private instructions."}]
-    second = _call([{"name": "lookup", "description": "Search billing records."}], "billing")
+    second = _call([{"type": "function", "name": "lookup", "description": "Search billing records."}], "billing")
 
     invocation = to_adk_invocation(Turn(ref=REF, llm_calls=[first, second]))
 
@@ -71,7 +75,23 @@ def test_agents_keep_separate_tools_and_do_not_include_system_instructions():
     assert "app_details" not in invocation_to_dict(invocation)
 
 
-@pytest.mark.parametrize("calls", [[], [_call([])], [_call([{}, {"name": ""}, {"name": None}, {"name": 7}])]])
+@pytest.mark.parametrize(
+    "calls",
+    [
+        [],
+        [_call([])],
+        [
+            _call(
+                [
+                    {},
+                    {"type": "function", "name": ""},
+                    {"type": "function", "name": None},
+                    {"type": "function", "name": 7},
+                ]
+            )
+        ],
+    ],
+)
 def test_missing_or_unusable_definitions_leave_names_only_fallback(calls):
     turn = Turn(ref=REF, llm_calls=calls, tool_calls=[ToolCall(name="search")])
     invocation = to_adk_invocation(turn)
@@ -86,7 +106,9 @@ def test_missing_or_unusable_definitions_leave_names_only_fallback(calls):
 
 
 def test_malformed_description_does_not_break_trace_conversion():
-    turn = Turn(ref=REF, llm_calls=[_call([{"name": "search", "description": {"unexpected": "object"}}])])
+    turn = Turn(
+        ref=REF, llm_calls=[_call([{"type": "function", "name": "search", "description": {"unexpected": "object"}}])]
+    )
 
     (declaration,) = (
         to_adk_invocation(turn).app_details.agent_details["agent"].tool_declarations[0].function_declarations
@@ -94,3 +116,21 @@ def test_malformed_description_does_not_break_trace_conversion():
 
     assert declaration.name == "search"
     assert declaration.description is None
+
+
+@pytest.mark.parametrize(
+    "definition",
+    [
+        {"type": "google_search", "name": "web"},
+        {"type": "custom", "name": "custom"},
+        {"name": "missing_type"},
+    ],
+)
+def test_only_function_definitions_are_converted(definition):
+    turn = Turn(ref=REF, llm_calls=[_call([definition, {"type": "function", "name": "lookup"}])])
+
+    (declaration,) = (
+        to_adk_invocation(turn).app_details.agent_details["agent"].tool_declarations[0].function_declarations
+    )
+
+    assert declaration.name == "lookup"

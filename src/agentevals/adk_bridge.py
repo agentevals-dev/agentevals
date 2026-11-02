@@ -107,6 +107,8 @@ def _app_details(turn: Turn) -> AppDetails | None:
     tools_by_agent: dict[str, dict[str, genai_types.FunctionDeclaration]] = {}
     for call in turn.llm_calls:
         for definition in call.tool_definitions:
+            if definition.get("type") != "function":
+                continue
             name = definition.get("name")
             if not isinstance(name, str) or not name:
                 continue
