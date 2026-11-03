@@ -13,7 +13,15 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
-from google.adk.evaluation.eval_case import EvalCase, IntermediateData, Invocation, InvocationEvent
+from google.adk.evaluation.eval_case import (
+    EvalCase,
+    IntermediateData,
+    Invocation,
+    InvocationEvent,
+    InvocationEvents,
+    get_all_tool_calls,
+    get_all_tool_responses,
+)
 from google.adk.evaluation.eval_rubrics import Rubric, RubricContent
 from google.adk.evaluation.eval_set import EvalSet
 from google.genai import types as genai_types
@@ -44,11 +52,8 @@ def expected_from_case(case: EvalCase) -> ExpectedConversation:
     turns = []
     for inv in case.conversation or []:
         data = inv.intermediate_data
-        calls: tuple[dict[str, Any], ...] = ()
-        responses: tuple[dict[str, Any], ...] = ()
-        if isinstance(data, IntermediateData):
-            calls = tuple({"id": c.id, "name": c.name, "arguments": c.args} for c in data.tool_uses)
-            responses = tuple({"id": r.id, "name": r.name, "response": r.response} for r in data.tool_responses)
+        calls = tuple({"id": c.id, "name": c.name, "arguments": c.args} for c in get_all_tool_calls(data))
+        responses = tuple({"id": r.id, "name": r.name, "response": r.response} for r in get_all_tool_responses(data))
         turns.append(
             ExpectedTurn(
                 user_text=_content_text(inv.user_content),
@@ -99,31 +104,55 @@ def _as_dict(value: Any, key: str) -> dict[str, Any]:
 def to_adk_invocation(turn: Turn) -> Invocation:
     user_text = text_of(turn.user_input)
     final_text = text_of(turn.final_output)
-    tool_uses = [
-        genai_types.FunctionCall(id=t.call_id, name=t.name, args=_as_dict(t.arguments, "value"))
-        for t in turn.tool_calls
-    ]
-    tool_responses = [
-        genai_types.FunctionResponse(id=t.call_id, name=t.name, response=_as_dict(t.result, "result"))
-        for t in turn.tool_calls
-        if t.result is not None
-    ]
-    intermediate = [
-        (turn.agent_name or "agent", [genai_types.Part(text=text)])
+    events = []
+    for tool in turn.tool_calls:
+        author = tool.agent_name or turn.agent_name or "agent"
+        events.append(
+            InvocationEvent(
+                author=author,
+                content=genai_types.Content(
+                    role="model",
+                    parts=[
+                        genai_types.Part(
+                            function_call=genai_types.FunctionCall(
+                                id=tool.call_id, name=tool.name, args=_as_dict(tool.arguments, "value")
+                            )
+                        )
+                    ],
+                ),
+            )
+        )
+        if tool.result is not None:
+            events.append(
+                InvocationEvent(
+                    author=author,
+                    content=genai_types.Content(
+                        role="user",
+                        parts=[
+                            genai_types.Part(
+                                function_response=genai_types.FunctionResponse(
+                                    id=tool.call_id, name=tool.name, response=_as_dict(tool.result, "result")
+                                )
+                            )
+                        ],
+                    ),
+                )
+            )
+    events.extend(
+        InvocationEvent(
+            author=turn.agent_name or "agent",
+            content=genai_types.Content(role="model", parts=[genai_types.Part(text=text)]),
+        )
         for text in (text_of([m]) for m in turn.intermediate_outputs)
         if text
-    ]
+    )
     return Invocation(
         invocation_id=turn.ref.span_id,
         user_content=genai_types.Content(role="user", parts=[genai_types.Part(text=user_text or "")]),
         final_response=genai_types.Content(role="model", parts=[genai_types.Part(text=final_text)])
         if final_text
         else None,
-        intermediate_data=IntermediateData(
-            tool_uses=tool_uses,
-            tool_responses=tool_responses,
-            intermediate_responses=intermediate,
-        ),
+        intermediate_data=InvocationEvents(invocation_events=events),
         creation_timestamp=turn.start_ns / 1e9,
         **_durations(turn),
     )
@@ -216,7 +245,26 @@ def invocation_to_dict(inv: Invocation) -> dict[str, Any]:
     if inv.final_response is not None:
         out["final_response"] = inv.final_response.model_dump(mode="json", exclude_none=True)
     if inv.intermediate_data is not None:
-        out["intermediate_data"] = inv.intermediate_data.model_dump(mode="json", exclude_none=True)
+        data = inv.intermediate_data
+        if isinstance(data, InvocationEvents):
+            # Export keeps the existing flat JSON; scoring retains the source event owners.
+            data = IntermediateData(
+                tool_uses=get_all_tool_calls(data),
+                tool_responses=get_all_tool_responses(data),
+                intermediate_responses=[
+                    (event.author, parts)
+                    for event in data.invocation_events
+                    if event.content
+                    and (
+                        parts := [
+                            part
+                            for part in event.content.parts or []
+                            if not part.function_call and not part.function_response
+                        ]
+                    )
+                ],
+            )
+        out["intermediate_data"] = data.model_dump(mode="json", exclude_none=True)
     if inv.creation_timestamp is not None:
         out["creation_timestamp"] = inv.creation_timestamp
     return out

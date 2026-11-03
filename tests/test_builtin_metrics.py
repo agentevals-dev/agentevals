@@ -33,9 +33,6 @@ from agentevals.config import RUBRIC_METRIC_TYPES
 from agentevals.genai.extract import extract_conversation
 from agentevals.loader import load_traces
 
-SAMPLES_DIR = os.path.join(os.path.dirname(__file__), "..", "samples")
-HELM_TRACE = os.path.join(SAMPLES_DIR, "helm.json")
-
 
 def _invocation(
     calls: list[tuple[str, str | None]],
@@ -257,17 +254,17 @@ class TestHallucinationsSeesToolEvidence:
 
         assert result.score == 1.0
 
-    @pytest.mark.skipif(not os.path.exists(HELM_TRACE), reason="samples/helm.json not available")
     async def test_replayed_trace_tool_output_reaches_judge(self, fake_judge):
-        judges = fake_judge(evidence="kagent-crds-0.7.14")
-        (inv,) = to_adk_invocations(extract_conversation(load_traces(HELM_TRACE)).turns)
-        assert isinstance(inv.intermediate_data, IntermediateData)
-        assert "kagent-crds-0.7.14" in str(inv.intermediate_data.tool_responses[0].response)
+        judges = fake_judge(evidence="temp_c")
+        fixture = os.path.join(os.path.dirname(__file__), "fixtures/otlp/adk_py/v2proj_span_only/S2.json")
+        (inv,) = to_adk_invocations(extract_conversation(load_traces(fixture)).turns)
+        assert isinstance(inv.intermediate_data, InvocationEvents)
+        assert get_all_tool_responses(inv.intermediate_data)[0].response["temp_c"] == 21
 
         result = await evaluate_builtin_metric("hallucinations_v1", [inv], None, None, 0.5)
 
         assert result.score == 1.0
-        assert "kagent-crds-0.7.14" in judges[0].validator_contexts[0]
+        assert "temp_c" in judges[0].validator_contexts[0]
 
 
 class _RecordingEvaluator:
