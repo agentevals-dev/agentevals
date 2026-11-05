@@ -38,11 +38,13 @@ jobs:
 
       # The release tag is fetched and used in one step, and check.sh validates it
       # before use, so nothing fetched passes through GITHUB_ENV or an expression.
+      # The newest release is the highest version tag, not GitHub's "Latest" flag,
+      # which a patch to an older line can take (v0.10.x has no telemetry registry).
+      # versionsort.suffix sorts v1.0.0-rc2 before v1.0.0.
       - name: Check kagent main and the newest release
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          release="$(gh release view --repo kagent-dev/kagent --json tagName --jq .tagName)"
+          release="$(git -c versionsort.suffix=- ls-remote --tags --refs --sort=version:refname \
+            https://github.com/kagent-dev/kagent.git 'refs/tags/v*' | tail -n 1 | sed 's#.*refs/tags/##')"
           tests/contract/kagent/check.sh report.md main "$release"
 
       - name: Summarize
