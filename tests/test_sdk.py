@@ -127,51 +127,112 @@ class TestEndpoint:
         assert sdk_export.resolve_endpoint(None, None) == "http://localhost:4318"
 
 
+_APPLICATION_SECRETS = {"authorization", "cookie", "x-api-key"}
+_APPLICATION_HEADER_ENVS = {
+    "generic": {"OTEL_EXPORTER_OTLP_HEADERS": "authorization=Bearer app-token,cookie=sid=1"},
+    "per_signal": {
+        "OTEL_EXPORTER_OTLP_HEADERS": "authorization=Bearer app-token",
+        "OTEL_EXPORTER_OTLP_TRACES_HEADERS": "x-api-key=app-key",
+        "OTEL_EXPORTER_OTLP_LOGS_HEADERS": "x-api-key=app-key",
+    },
+}
+
+
+def _export_span(endpoint: str) -> None:
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(sdk_export._span_exporter(endpoint)))
+    provider.get_tracer("t").start_span("s").end()
+
+
+def _export_log(endpoint: str) -> None:
+    from opentelemetry._logs import LogRecord
+    from opentelemetry.sdk._logs import LoggerProvider
+    from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
+
+    provider = LoggerProvider()
+    provider.add_log_record_processor(SimpleLogRecordProcessor(sdk_export._log_exporter(endpoint)))
+    provider.get_logger("t").emit(LogRecord(body="hi"))
+
+
+_SENDERS = {
+    "span_export": (_export_span, "/v1/traces"),
+    "log_export": (_export_log, "/v1/logs"),
+    "preflight": (sdk_export.preflight, "/v1/traces"),
+}
+
+
 class TestExporterIsolation:
-    """The OTLP exporters fill unset options from OTEL_EXPORTER_OTLP_*; none of it may apply."""
+    """The OTLP exporters fill unset options from OTEL_EXPORTER_OTLP_*, and some versions merge them
+    with explicit ones; none of it may reach the agentevals endpoint. Requests are read at the
+    transport adapter, after requests has merged session and environment settings."""
 
-    def test_span_exporter_ignores_application_otlp_settings(self, monkeypatch):
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", "authorization=Bearer app-token")
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_HEADERS", "x-api-key=app-key")
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://observability.example.com")
-        exporter = sdk_export._span_exporter("http://localhost:4318")
-        assert exporter._endpoint == "http://localhost:4318/v1/traces"
-        assert exporter._headers == {"x-agentevals-sdk": "1"}
-        assert "authorization" not in {k.lower() for k in exporter._session.headers}
-        assert exporter._session.trust_env is False
-
-    @pytest.mark.parametrize("factory", ["_span_exporter", "_log_exporter"])
-    def test_exports_never_use_application_tls_settings(self, factory, monkeypatch):
+    @pytest.fixture
+    def wire(self, monkeypatch):
         import requests.adapters
         from requests.models import Response
 
+        sent = []
+
+        def send(adapter, request, **kwargs):
+            sent.append((request, kwargs))
+            response = Response()
+            response.status_code = 200
+            response.request = request
+            response._content = b""
+            return response
+
+        monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
+        return sent
+
+    @pytest.fixture
+    def application_tls_and_proxy(self, monkeypatch):
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_CERTIFICATE", "/etc/app/ca.pem")
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_CLIENT_KEY", "/etc/app/client.key")
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE", "/etc/app/client.crt")
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE", "/etc/app/traces.crt")
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_CLIENT_CERTIFICATE", "/etc/app/logs.crt")
-        sent = []
+        monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:3128")
+        monkeypatch.setenv("HTTP_PROXY", "http://proxy.example:3128")
 
-        def send(adapter, request, **kwargs):
-            sent.append(kwargs)
-            response = Response()
-            response.status_code = 200
-            response.request = request
-            return response
+    @pytest.mark.parametrize("sender", _SENDERS)
+    @pytest.mark.parametrize("env", _APPLICATION_HEADER_ENVS)
+    def test_application_headers_are_not_sent(self, sender, env, wire, monkeypatch):
+        for name, value in _APPLICATION_HEADER_ENVS[env].items():
+            monkeypatch.setenv(name, value)
+        send, path = _SENDERS[sender]
+        send("https://agentevals.example:4318")
+        assert len(wire) == 1
+        request, _ = wire[0]
+        assert request.url == f"https://agentevals.example:4318{path}"
+        assert request.headers["x-agentevals-sdk"] == "1"
+        assert _APPLICATION_SECRETS.isdisjoint(name.lower() for name in request.headers)
 
-        monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
-        getattr(sdk_export, factory)("https://agentevals.example:4318")._export(b"payload")
-        assert len(sent) == 1
-        assert sent[0]["cert"] is None
-        assert sent[0]["verify"] is True
+    @pytest.mark.parametrize("sender", _SENDERS)
+    def test_application_tls_and_proxy_settings_are_not_used(self, sender, wire, application_tls_and_proxy):
+        _SENDERS[sender][0]("https://agentevals.example:4318")
+        assert len(wire) == 1
+        _, kwargs = wire[0]
+        assert kwargs["cert"] is None
+        assert kwargs["verify"] is True
+        assert kwargs["proxies"] == {}
 
-    def test_log_exporter_ignores_application_otlp_settings(self, monkeypatch):
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", "authorization=Bearer app-token")
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_HEADERS", "x-api-key=app-key")
-        exporter = sdk_export._log_exporter("http://localhost:4318")
-        assert exporter._endpoint == "http://localhost:4318/v1/logs"
-        assert exporter._headers == {"x-agentevals-sdk": "1"}
-        assert exporter._session.trust_env is False
+    @pytest.mark.parametrize("sender", ["span_export", "log_export"])
+    def test_exports_keep_their_transport_headers(self, sender, wire):
+        _SENDERS[sender][0]("http://localhost:4318")
+        request, _ = wire[0]
+        assert request.headers["Content-Type"] == "application/x-protobuf"
+        assert request.headers["Content-Encoding"] == "gzip"
+
+    def test_settings_placed_on_the_session_are_overridden(self, wire):
+        session = sdk_export._http_session()
+        session.cert = ("/etc/app/client.crt", "/etc/app/client.key")
+        session.verify = "/etc/app/ca.pem"
+        session.proxies = {"https": "http://proxy.example:3128"}
+        session.headers["Authorization"] = "Bearer app-token"
+        session.post("https://agentevals.example:4318/v1/traces", data=b"", headers={"X-Api-Key": "app-key"})
+        request, kwargs = wire[0]
+        assert (kwargs["cert"], kwargs["verify"], kwargs["proxies"]) == (None, True, {})
+        assert _APPLICATION_SECRETS.isdisjoint(name.lower() for name in request.headers)
 
 
 # ---------------------------------------------------------------------------

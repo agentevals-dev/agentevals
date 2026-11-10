@@ -10,8 +10,9 @@ exporters never see these attributes. Baggage is not used, because it would prop
 outbound requests.
 
 The exporters are built with an explicit endpoint, explicit headers, an explicit session and
-gzip, and never read ``OTEL_EXPORTER_OTLP_*``: the OTLP exporters fall back to those variables for
-anything left unset, which would send the application's backend credentials to agentevals.
+gzip. The OTLP exporters still fill in headers and TLS options from ``OTEL_EXPORTER_OTLP_*``, and
+some versions merge them with explicit values, which would send the application's backend
+credentials to agentevals. The session therefore enforces isolation on every request it sends.
 """
 
 from __future__ import annotations
@@ -44,6 +45,19 @@ FLUSH_TIMEOUT_MILLIS = 5_000
 PREFLIGHT_TIMEOUT_SECONDS = 2.0
 EXPORT_TIMEOUT_SECONDS = 10.0
 _SDK_HEADER = {"x-agentevals-sdk": "1"}
+_ALLOWED_HEADERS = frozenset(
+    {
+        "accept",
+        "accept-encoding",
+        "connection",
+        "content-encoding",
+        "content-length",
+        "content-type",
+        "transfer-encoding",
+        "user-agent",
+        *_SDK_HEADER,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,18 +150,23 @@ def _http_session() -> Any:
     """A requests session that ignores ``.netrc`` and proxy variables, so nothing configured for
     other hosts is applied to the agentevals endpoint.
 
-    It also drops the TLS options of every request. The exporters build them in ``__init__`` from
-    ``OTEL_EXPORTER_OTLP_*CERTIFICATE`` and ``*CLIENT_KEY`` when they are not passed, and an empty
-    value cannot be passed, so the application's client certificate and CA bundle would otherwise
-    be used for agentevals. Requests verify against the default trust store with no client
-    certificate."""
+    The exporters configure TLS and headers from ``OTEL_EXPORTER_OTLP_*CERTIFICATE``,
+    ``*CLIENT_KEY`` and ``*HEADERS`` when they are not passed, and an empty value cannot be passed.
+    Depending on the version those values land on the request or on the session itself, so isolation is
+    enforced in ``send``, after requests has merged session settings and before anything goes on
+    the wire: requests verify against the default trust store with no client certificate and no
+    proxy, and carry only transport headers and the SDK marker."""
     import requests
 
     class _IsolatedSession(requests.Session):
-        def request(self, method: str, url: str, **kwargs: Any) -> Any:
+        def send(self, request: Any, **kwargs: Any) -> Any:
             kwargs["verify"] = True
             kwargs["cert"] = None
-            return super().request(method, url, **kwargs)
+            kwargs["proxies"] = {}
+            for name in list(request.headers):
+                if name.lower() not in _ALLOWED_HEADERS:
+                    del request.headers[name]
+            return super().send(request, **kwargs)
 
     session = _IsolatedSession()
     session.trust_env = False
