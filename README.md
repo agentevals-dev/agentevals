@@ -118,7 +118,7 @@ python your_agent.py
 
 Sessions appear in the UI at `http://localhost:8001` as the agent runs, with tool calls, inputs and outputs, and can be evaluated there. For gRPC exporters use port 4317 with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`.
 
-Sessions are grouped by `agentevals.session_name`, then `gen_ai.conversation.id`, then `session.id`. `service.instance.id` tells a rerun from the next turn. Set `agentevals.eval_set_id` to associate a session with an eval set.
+Sessions are grouped by `agentevals.session_name`, then `gen_ai.conversation.id`, then `session.id`. `service.instance.id` tells a rerun from the next turn. Set `agentevals.eval.set.id` to associate a session with an eval set.
 
 Per producer settings, such as turning on message content capture, are in [OpenTelemetry Compatibility](docs/otel-compatibility.md). Working setups for each framework are in [examples/zero-code-examples/](examples/zero-code-examples/).
 

@@ -3,8 +3,16 @@
 Each record is parented to the GenAI span it judges, so a backend shows the score next to the
 operation, and carries no content: no user input, model output or tool arguments. Metrics with
 per turn scores give one record per turn; conversation level metrics give one record on the last
-turn. Labels are ``pass``, ``fail`` and ``not_evaluated``; an evaluator error gives ``error.type``
-and no score or label.
+turn. An evaluator error gives ``error.type`` and no score or label. Otherwise the label is one of:
+
+* ``pass`` and ``fail``: the score met the threshold, or did not;
+* ``not_evaluated``: the evaluator gave no score (no eval set, say);
+* ``informational``: a value to track that never passes or fails (the efficiency metrics).
+
+The GenAI conventions give ``pass`` and ``fail`` as examples and ask an implementation to document
+its values; ``docs/opentelemetry-pipeline.md`` lists these for users. The ids use one name on the
+records and on the resource: ``agentevals.eval.run.id``, ``agentevals.eval.case.id`` and
+``agentevals.eval.set.id``.
 
 Off unless turned on, because it sends results to an external backend. Precedence:
 
@@ -28,7 +36,8 @@ import time
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
-from .otel.identity import EMITTER_SCOPE
+from .genai.matching import EVAL_CASE_ID
+from .otel.identity import EMITTER_SCOPE, EVAL_SET_ID
 from .otel.model import Span, attr_str
 from .telemetry import PROCESS_INSTANCE_ID, build_resource, otlp_protocol
 from .telemetry import env_flag as _env_flag
@@ -198,8 +207,8 @@ class EvaluationEmitter:
         common: dict[str, Any] = {}
         for key, value in (
             ("agentevals.eval.run.id", run_id),
-            ("agentevals.eval.case.id", eval_case_id),
-            ("agentevals.eval_set.id", eval_set_id),
+            (EVAL_CASE_ID, eval_case_id),
+            (EVAL_SET_ID, eval_set_id),
         ):
             if value:
                 common[key] = value

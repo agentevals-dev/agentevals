@@ -57,7 +57,7 @@ def _run_agent(
     env = {
         **os.environ,
         "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{otlp_http_port}",
-        "OTEL_RESOURCE_ATTRIBUTES": (f"agentevals.eval_set_id={eval_set_id},agentevals.session_name={session_name}"),
+        "OTEL_RESOURCE_ATTRIBUTES": (f"agentevals.eval.set.id={eval_set_id},agentevals.session_name={session_name}"),
         **(extra_env or {}),
     }
     return subprocess.run(

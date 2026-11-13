@@ -10,7 +10,7 @@ The simplest way to connect any agent to agentevals. Point your standard OTel OT
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent,agentevals.eval_set_id=my-eval"
+export OTEL_RESOURCE_ATTRIBUTES="agentevals.session_name=my-agent,agentevals.eval.set.id=my-eval"
 python your_agent.py
 ```
 
@@ -38,7 +38,7 @@ This approach works with any framework that has OTel instrumentation: LangChain,
 | Attribute | Required | Description |
 |-----------|----------|-------------|
 | `agentevals.session_name` | no | Groups spans into a named session. Without it, sessions are named `otlp-<traceId prefix>`. |
-| `agentevals.eval_set_id` | no | Associates the session with an eval set for scoring. |
+| `agentevals.eval.set.id` | no | Associates the session with an eval set for scoring. |
 
 Set them via `OTEL_RESOURCE_ATTRIBUTES` (env var) or `Resource.create()` in code.
 

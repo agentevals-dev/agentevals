@@ -4,7 +4,7 @@ Sessions run one after another on a shared ``TracerProvider`` whose resource is 
 session cannot live on the provider resource. Instead one :class:`SessionSpanProcessor` per
 provider decides which session a span belongs to when it starts, and when it ends forwards a copy
 whose resource carries the session identity (``agentevals.session_name``,
-``agentevals.eval_set_id``, ``agentevals.session.run_id``, ``agentevals.metadata.*``) to its own
+``agentevals.eval.set.id``, ``agentevals.session.run_id``, ``agentevals.metadata.*``) to its own
 OTLP exporter. Spans outside every session are not exported, and the application's own
 exporters never see these attributes. Baggage is not used, because it would propagate into
 outbound requests.

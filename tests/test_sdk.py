@@ -304,7 +304,7 @@ class TestSyncSession:
         assert [s.name for s in spans] == ["work"]
         resource = _resource(spans[0])
         assert resource["agentevals.session_name"] == "s1"
-        assert resource["agentevals.eval_set_id"] == "e1"
+        assert resource["agentevals.eval.set.id"] == "e1"
         assert resource["agentevals.metadata.a"] == 1
         assert resource["agentevals.metadata.b"] == "two"
         assert len(resource["agentevals.session.run_id"]) == 32
@@ -314,7 +314,7 @@ class TestSyncSession:
         app = AgentEvals(auto_instrument=False, eval_set_id="from-init")
         with app.session(session_name="s1", tracer_provider=provider):
             provider.get_tracer("t").start_span("work").end()
-        assert _resource(exported.get_finished_spans()[0])["agentevals.eval_set_id"] == "from-init"
+        assert _resource(exported.get_finished_spans()[0])["agentevals.eval.set.id"] == "from-init"
 
     def test_each_session_gets_its_own_run_id(self, exported):
         provider = TracerProvider()
@@ -396,7 +396,7 @@ class TestAsyncSession:
             assert name == "async-s1"
             provider.get_tracer("t").start_span("work").end()
         resource = _resource(exported.get_finished_spans()[0])
-        assert (resource["agentevals.session_name"], resource["agentevals.eval_set_id"]) == ("async-s1", "e1")
+        assert (resource["agentevals.session_name"], resource["agentevals.eval.set.id"]) == ("async-s1", "e1")
 
     async def test_concurrent_sessions_stay_apart(self, exported):
         provider = TracerProvider()

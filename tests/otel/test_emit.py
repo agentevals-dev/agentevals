@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import re
+from pathlib import Path
 
 import pytest
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
@@ -12,7 +14,9 @@ from agentevals import evaluation_events as emit
 from agentevals.api.rpc import convert
 from agentevals.config import BuiltinMetricDef, CodeEvaluatorDef, EvalParams
 from agentevals.genai.extract import extract_conversation
+from agentevals.genai.matching import EVAL_CASE_ID
 from agentevals.otel.decode import decode_json_document
+from agentevals.otel.identity import EVAL_SET_ID
 from agentevals.otel.model import build_traces
 from agentevals.runner import MetricResult, run_evaluation_from_traces
 
@@ -30,7 +34,7 @@ ALLOWED = {
     "agentevals.evaluator.type",
     "agentevals.eval.run.id",
     "agentevals.eval.case.id",
-    "agentevals.eval_set.id",
+    "agentevals.eval.set.id",
 }
 
 
@@ -114,7 +118,7 @@ class TestRecords:
         assert (
             attrs[0]["agentevals.eval.run.id"],
             attrs[0]["agentevals.eval.case.id"],
-            attrs[0]["agentevals.eval_set.id"],
+            attrs[0]["agentevals.eval.set.id"],
         ) == ("run-1", "case", "set")
         assert (attrs[0]["gen_ai.agent.name"], attrs[0]["gen_ai.conversation.id"], attrs[0]["gen_ai.response.id"]) == (
             "helper",
@@ -166,6 +170,25 @@ class TestRecords:
             (100.0, "informational"),
             (None, "not_evaluated"),
         ]
+
+    def test_every_label_is_documented(self):
+        doc = (Path(__file__).resolve().parents[2] / "docs" / "opentelemetry-pipeline.md").read_text()
+        table = doc.split("| Label | Meaning |")[1].split("\n\n")[0]
+        documented = set(re.findall(r"^\| `([a-z_]+)` \|", table, re.MULTILINE))
+        assert documented == {*emit._LABELS.values(), emit.LABEL_NOT_EVALUATED}
+
+    def test_ids_are_named_as_the_attributes_agentevals_reads(self):
+        conversation, index = _two_turns()
+        metric = MetricResult(metric_name="judge", score=1.0)
+        [record, *_] = _emit(
+            conversation,
+            index,
+            [metric],
+            [CodeEvaluatorDef(name="judge", path="j.py")],
+            eval_case_id="case",
+            eval_set_id="set",
+        )
+        assert (record.attributes[EVAL_CASE_ID], record.attributes[EVAL_SET_ID]) == ("case", "set")
 
     def test_records_never_carry_content(self):
         conversation, index = _two_turns()
