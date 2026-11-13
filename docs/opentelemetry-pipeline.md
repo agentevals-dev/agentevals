@@ -158,7 +158,7 @@ agentevals run traces.json -e eval_set.json -m tool_trajectory_avg_score --emit-
 
 `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` (with port 4317) switches to gRPC. `OTEL_SDK_DISABLED=true` or `OTEL_LOGS_EXPORTER=none` turns emitting off even when it is enabled. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` work as usual.
 
-Each result is a `gen_ai.evaluation.result` log event attached to the span it scores (the turn's agent span, or its last model call). Metrics that score each turn give one event per turn; others give one event on the last turn.
+Each result is a `gen_ai.evaluation.result` log event attached to the span it scores (the turn's agent span, or its last model call). Metrics that score each turn give one event per turn; others give one event on the last turn. The evaluation APIs name the same span in each turn reference (`evaluated_trace_id`, `evaluated_span_id`).
 
 | Attribute | Value |
 |---|---|

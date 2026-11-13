@@ -292,7 +292,7 @@ def trace_result_to_pb(result: TraceResult) -> evaluation_pb2.TraceResult:
         group_key=result.group_key or "",
         eval_case_id=result.eval_case_id or "",
         eval_case_match=result.eval_case_match or "",
-        turn_refs=[evaluation_pb2.TurnRef(trace_id=r.trace_id, span_id=r.span_id) for r in result.turn_refs],
+        turn_refs=[evaluation_pb2.TurnRef(**r.model_dump()) for r in result.turn_refs],
     )
     if result.performance_metrics:
         out.performance_metrics.CopyFrom(to_struct(result.performance_metrics))

@@ -109,11 +109,12 @@ def _explanation(metric: MetricResult) -> str | None:
     return None
 
 
-def _evaluated_span(turn: Turn) -> tuple[str, str]:
+def evaluated_span(turn: Turn) -> tuple[str, str]:
     """The GenAI span a turn's results attach to: its agent or workflow anchor, else its final call.
 
     A root anchored turn's anchor can be a non GenAI span (an HTTP server span, say); the event
-    should hang off the GenAI operation being evaluated.
+    should hang off the GenAI operation being evaluated. The API reports the same span in each
+    ``TurnRef``, so its clients attach results where these records go.
     """
     calls = turn.llm_calls
     if turn.anchor_kind != "root" or not calls:
@@ -225,7 +226,7 @@ class EvaluationEmitter:
                 items = [(turns[-1], metric.score, metric.eval_status)]
 
             for turn, score, status in items:
-                ref = _evaluated_span(turn)
+                ref = evaluated_span(turn)
                 span = spans.get(ref)
                 attrs = dict(base)
                 if metric.error:

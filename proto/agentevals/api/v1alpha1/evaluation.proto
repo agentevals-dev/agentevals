@@ -146,8 +146,13 @@ message MetricResult {
 }
 
 message TurnRef {
+  // The turn's anchor: its agent or workflow span, else the root span of its trace.
   string trace_id = 1;
   string span_id = 2;
+  // The span the turn's gen_ai.evaluation.result records attach to: the anchor, or the turn's
+  // final model call when the anchor is not a GenAI span. Attach results here.
+  string evaluated_trace_id = 3;
+  string evaluated_span_id = 4;
 }
 
 // The results of one evaluation group: a trace, or a conversation of several traces.

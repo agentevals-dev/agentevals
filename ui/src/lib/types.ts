@@ -150,6 +150,9 @@ export interface PerformanceMetrics {
 export interface TurnRef {
   traceId: string;
   spanId: string;
+  /** The span the turn's evaluation results attach to. */
+  evaluatedTraceId: string;
+  evaluatedSpanId: string;
 }
 
 export interface TraceResult {

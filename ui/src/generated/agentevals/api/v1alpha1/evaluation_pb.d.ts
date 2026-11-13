@@ -448,6 +448,8 @@ export declare const MetricResultSchema: GenMessage<MetricResult>;
  */
 export declare type TurnRef = Message<"agentevals.api.v1alpha1.TurnRef"> & {
   /**
+   * The turn's anchor: its agent or workflow span, else the root span of its trace.
+   *
    * @generated from field: string trace_id = 1;
    */
   traceId: string;
@@ -456,6 +458,19 @@ export declare type TurnRef = Message<"agentevals.api.v1alpha1.TurnRef"> & {
    * @generated from field: string span_id = 2;
    */
   spanId: string;
+
+  /**
+   * The span the turn's gen_ai.evaluation.result records attach to: the anchor, or the turn's
+   * final model call when the anchor is not a GenAI span. Attach results here.
+   *
+   * @generated from field: string evaluated_trace_id = 3;
+   */
+  evaluatedTraceId: string;
+
+  /**
+   * @generated from field: string evaluated_span_id = 4;
+   */
+  evaluatedSpanId: string;
 };
 
 /**
