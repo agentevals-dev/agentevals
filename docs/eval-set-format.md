@@ -293,6 +293,8 @@ Turns are compared in order. Extra or missing turns are reported as `unexpected_
 
 Use `conversation` when each turn of a multi turn conversation is its own trace.
 
+In every mode, a trace that resumes a paused turn of another trace (a span link between their `invoke_agent` spans, see [Sending telemetry](otel-compatibility.md#what-agentevals-needs)) is evaluated with that trace.
+
 ## Usage
 
 ### CLI
