@@ -23,19 +23,23 @@ def _traces(*spans: dict):
 
 
 def _agent(trace, span_id, start, end, inputs=None, outputs=None, links=(), name="assistant"):
-    attrs = {"gen_ai.operation.name": "invoke_agent", "gen_ai.agent.name": name, "gen_ai.conversation.id": "ctx-1"}
+    attrs = {"gen_ai.operation.name": "invoke_agent", "gen_ai.conversation.id": "ctx-1"}
+    if name:
+        attrs["gen_ai.agent.name"] = name
     if inputs:
         attrs["gen_ai.input.messages"] = inputs
     if outputs:
         attrs["gen_ai.output.messages"] = outputs
-    return span(trace, span_id, None, f"invoke_agent {name}", attrs, start, end, links=links)
+    return span(trace, span_id, None, "invoke_agent", attrs, start, end, links=links)
 
 
-def _tool(trace, span_id, parent, start, end, error=None):
-    attrs = {"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": "delete_pod", "gen_ai.tool.call.id": "call_1"}
+def _tool(trace, span_id, parent, start, end, error=None, name="delete_pod", arguments=None):
+    attrs = {"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": name, "gen_ai.tool.call.id": "call_1"}
     if error:
         attrs["error.type"] = error
-    return span(trace, span_id, parent, "execute_tool delete_pod", attrs, start, end)
+    if arguments:
+        attrs["gen_ai.tool.call.arguments"] = arguments
+    return span(trace, span_id, parent, f"execute_tool {name}", attrs, start, end)
 
 
 def _initial(trace="a", span_id="a1", start=1_000, question="Delete pod web-1", name="assistant"):
@@ -87,6 +91,24 @@ def test_a_tool_left_unfinished_without_a_later_finish_stays_as_recorded():
     assert [(t.ref.span_id, t.error_type) for t in turn.tool_calls] == [(sid("a1t"), "unfinished")]
 
 
+def test_the_finished_call_keeps_arguments_only_the_paused_span_recorded():
+    initial = [
+        _agent("a", "a1", 1_000, 3_000, inputs=[user("Delete pod web-1")]),
+        chat(trace="a", span_id="a1c", parent="a1", start=1_100, end=2_000, content=False, finish="tool_call"),
+        _tool("a", "a1t", "a1", 1_200, 3_000, error="unfinished", arguments={"name": "web-1"}),
+    ]
+    [turn] = extract_conversation(_traces(*initial, *_resumed()), "ctx-1").turns
+    assert [(t.ref.span_id, t.arguments, t.is_error) for t in turn.tool_calls] == [
+        (sid("a2t"), {"name": "web-1"}, False)
+    ]
+
+
+def test_calls_sharing_an_id_inside_one_part_stay_apart():
+    resumed = [*_resumed(), _tool("b", "a2d", "a2", 60_200, 60_900, name="describe_pod")]
+    [turn] = extract_conversation(_traces(*_initial(), *resumed), "ctx-1").turns
+    assert sorted(t.name for t in turn.tool_calls) == ["delete_pod", "describe_pod"]
+
+
 def test_every_resumed_segment_joins_the_same_turn():
     second = _resumed(trace="c", span_id="a3", start=90_000, answer="Done, and cleaned up")
     [turn] = extract_conversation(_traces(*_initial(), *_resumed(), *second), "ctx-1").turns
@@ -112,6 +134,12 @@ def test_a_linked_segment_with_its_own_input_is_a_new_turn():
 def test_a_link_to_another_agent_is_not_a_resume():
     resumed = _resumed(name="other")
     assert len(extract_conversation(_traces(*_initial(), *resumed), "ctx-1").turns) == 2
+
+
+def test_a_link_between_unnamed_agents_is_not_a_resume():
+    traces = _traces(*_initial(name=None), *_resumed(name=None))
+    assert len(extract_conversation(traces, "ctx-1").turns) == 2
+    assert len(group_traces(traces, by_conversation=False)) == 2
 
 
 def test_a_resumed_segment_without_its_origin_keeps_a_warning():

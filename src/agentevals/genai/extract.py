@@ -26,7 +26,7 @@ Rules, in brief:
   response must answer one of the requested calls. This reads message content; with
   content capture off the turns stay split and the later one carries a warning.
 * An agent anchored turn whose anchor records no input of its own and links to the anchor of an
-  earlier turn of the same agent resumes that turn (a runtime that pauses a turn for an approval or
+  earlier turn of the same named agent resumes that turn (a runtime that pauses a turn for an approval or
   a question runs the rest of it as a new agent span, often in a new trace). The link is structural,
   so this needs no message content. A tool call recorded in both parts counts once, preferring
   the span that finished without error.
@@ -727,34 +727,40 @@ def resume_links(view: SpanView) -> list[SpanRef]:
 
 
 def resumes(view: SpanView, origin: SpanView) -> bool:
-    """Whether ``view``, linked to ``origin``, continues the turn ``origin`` started."""
+    """Whether ``view``, linked to ``origin``, continues the turn ``origin`` started. Both must name
+    the same agent: a link between unnamed agent spans establishes no identity."""
+    name = attr_str(view.attrs, sc.AGENT_NAME)
     return (
-        classify(origin) == AGENT
+        bool(name)
+        and classify(origin) == AGENT
         and origin.span.start_time_unix_nano < view.span.start_time_unix_nano
-        and attr_str(origin.attrs, sc.AGENT_NAME) == attr_str(view.attrs, sc.AGENT_NAME)
+        and attr_str(origin.attrs, sc.AGENT_NAME) == name
     )
 
 
-def _one_per_call_id(tools: list[ToolCall]) -> list[ToolCall]:
-    out: list[ToolCall] = []
-    seen: dict[str, int] = {}
-    for tool in tools:
-        index = seen.get(tool.call_id) if tool.call_id else None
+def _join_span_tools(earlier: Sequence[ToolCall], later: Sequence[ToolCall]) -> list[ToolCall]:
+    """The tool spans of two parts of one turn. A call both parts recorded (same call id, tool and
+    agent: open at the pause, finished after it) counts once. The span that finished without error
+    wins, and keeps arguments or a result only the other one recorded."""
+    out = [t.model_copy() for t in earlier if t.ref is not None]
+    unmatched = {(t.call_id, t.name, t.agent_name): i for i, t in enumerate(out) if t.call_id}
+    for tool in (t.model_copy() for t in later if t.ref is not None):
+        index = unmatched.pop((tool.call_id, tool.name, tool.agent_name), None) if tool.call_id else None
         if index is None:
-            if tool.call_id:
-                seen[tool.call_id] = len(out)
             out.append(tool)
-        elif out[index].is_error and not tool.is_error:
-            out[index] = tool
+            continue
+        kept, other = (tool, out[index]) if out[index].is_error and not tool.is_error else (out[index], tool)
+        for key in ("arguments", "result"):
+            if _is_empty(getattr(kept, key)) and not _is_empty(getattr(other, key)):
+                setattr(kept, key, getattr(other, key))
+        out[index] = kept
     return out
 
 
 def _merge(previous: Turn, turn: Turn) -> Turn:
     calls = sorted([*previous.llm_calls, *turn.llm_calls], key=lambda c: (c.start_ns, c.end_ns))
     warnings = [*previous.warnings, *turn.warnings]
-    span_tools = _one_per_call_id(
-        [t.model_copy() for t in (*previous.tool_calls, *turn.tool_calls) if t.ref is not None]
-    )
+    span_tools = _join_span_tools(previous.tool_calls, turn.tool_calls)
     if span_tools:
         tools = _fill_from_parts(span_tools, calls, warnings)
     else:
