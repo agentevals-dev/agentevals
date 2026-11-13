@@ -12,6 +12,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from agentevals.config import BuiltinMetricDef, EvalParams
+from agentevals.run.service import RunIdTaken, RunService
+from agentevals.runner import MetricResult, RunResult, TraceResult
 from agentevals.storage.models import Result, ResultStatus, Run, RunSpec, RunStatus, TraceTarget
 from agentevals.storage.postgres.migrator import Migrator
 from agentevals.storage.repos.postgres import PostgresRepos
@@ -134,3 +137,31 @@ class TestExpiredLeases:
         before = await repos.runs.get(run_id)
         assert await _claim(repos) is None
         assert await repos.runs.get(run_id) == before
+
+
+class TestRecordedEvaluations:
+    async def _record(self, repos: PostgresRepos, run_id: UUID | None = None) -> Run:
+        result = RunResult(trace_results=[TraceResult(trace_id="t1", metric_results=[MetricResult(metric_name="m1")])])
+        return await RunService(repos.runs, repos.results).record_eval_run(
+            params=EvalParams(evaluators=[BuiltinMetricDef(name="m1")]),
+            eval_set_dict=None,
+            trace_format=None,
+            upload_filenames=["t1.json"],
+            run_result=result,
+            run_id=run_id,
+        )
+
+    async def test_a_free_run_id_is_recorded(self, db):
+        repos, _ = db
+        run_id = uuid4()
+        assert (await self._record(repos, run_id)).run_id == run_id
+        assert len(await repos.results.list_by_run(run_id)) == 1
+
+    async def test_a_taken_run_id_is_refused_and_the_run_left_alone(self, db):
+        repos, _ = db
+        run_id = await _queued(repos)
+        before = await repos.runs.get(run_id)
+        with pytest.raises(RunIdTaken):
+            await self._record(repos, run_id)
+        assert await repos.runs.get(run_id) == before
+        assert await repos.results.list_by_run(run_id) == []

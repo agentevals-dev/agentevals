@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 
 from agentevals.config import BuiltinMetricDef, EvalParams
-from agentevals.run.service import RunService, RunSubmitConflict
+from agentevals.run.service import RunIdTaken, RunService, RunSubmitConflict
 from agentevals.runner import MetricResult, RunResult, TraceResult
 from agentevals.storage.models import RunSpec, RunStatus, TraceTarget
 from agentevals.storage.repos.memory import MemoryRepos
@@ -153,6 +153,24 @@ class TestRecordEvalRun:
         b = await self._record(svc)
         assert a.run_id != b.run_id
         assert len(await repos.runs.list()) == 2
+
+    async def test_a_given_run_id_is_used(self, service):
+        svc, _ = service
+        run_id = uuid4()
+        assert (await self._record(svc, run_id=run_id)).run_id == run_id
+
+    @pytest.mark.parametrize("taken_by", ["submitted run", "recorded evaluation"])
+    async def test_a_run_id_already_taken_is_refused_and_the_run_left_alone(self, service, taken_by):
+        svc, repos = service
+        if taken_by == "submitted run":
+            existing = await svc.submit(run_id=None, spec=_spec())
+        else:
+            existing = await self._record(svc)
+        before = await repos.results.list_by_run(existing.run_id)
+        with pytest.raises(RunIdTaken):
+            await self._record(svc, run_id=existing.run_id, run_result=self._run_result(errors=["other"]))
+        assert await repos.runs.get(existing.run_id) == existing
+        assert await repos.results.list_by_run(existing.run_id) == before
 
     async def test_persisted_run_has_attempt_and_started_at(self, service):
         """Regression: PostgresRunRepository.create previously hardcoded

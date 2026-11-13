@@ -12,7 +12,7 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID, uuid4
 
 from google.adk.evaluation.eval_set import EvalSet
@@ -21,11 +21,9 @@ from ..config import EvalParams
 from ..genai.extract import extract_conversation
 from ..otel.model import Trace
 from ..resolvers import reset_resolved_credentials, resolve_credential_refs, set_resolved_credentials
+from ..run.service import RunIdTaken, RunService
 from ..runner import RunResult, TraceResult, evaluation_groups, run_evaluation_from_traces
 from ..trace_metrics import extract_performance_metrics, extract_trace_metadata
-
-if TYPE_CHECKING:
-    from ..run.service import RunService
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +196,9 @@ async def persist_evaluation(
             run_result=result,
         )
         return str(run.run_id)
+    except RunIdTaken as exc:
+        logger.warning("Not recording the evaluation: %s", exc)
+        return None
     except Exception:
         logger.exception("Failed to record the evaluation as a run; the result is still returned")
         return None

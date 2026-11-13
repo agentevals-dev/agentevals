@@ -38,6 +38,14 @@ class RunSubmitConflict(Exception):
         self.persisted = persisted
 
 
+class RunIdTaken(Exception):
+    """Raised when an evaluation is recorded under a run id another run already holds."""
+
+    def __init__(self, persisted: Run) -> None:
+        super().__init__(f"run {persisted.run_id} already exists")
+        self.persisted = persisted
+
+
 class RunService:
     def __init__(self, runs: RunRepository, results: ResultRepository) -> None:
         self._runs = runs
@@ -100,6 +108,9 @@ class RunService:
         a terminal status. Two writes (create + update_status), but the
         public :class:`RunRepository` API stays clean of executor-only
         schema knowledge.
+
+        Raises :class:`RunIdTaken`, writing nothing, when another run holds
+        ``run_id``.
         """
         filenames = list(upload_filenames or [])
         target = TraceTarget(
@@ -124,7 +135,11 @@ class RunService:
             worker_id="sync:/api/evaluate",
             started_at=datetime.now(timezone.utc),
         )
-        await self._runs.create(run)
+        # create() inserts only when the id is free and otherwise returns the run holding it, which
+        # never shares this start time.
+        persisted = await self._runs.create(run)
+        if persisted.started_at != run.started_at:
+            raise RunIdTaken(persisted)
 
         results = build_results(run_id, params, run_result)
         await self._results.upsert_many(run_id, results)

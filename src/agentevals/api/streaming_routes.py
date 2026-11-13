@@ -7,6 +7,7 @@ import json
 import logging
 import os
 from typing import TYPE_CHECKING
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -116,6 +117,7 @@ async def _persist_sessions_run(
     session_ids: list[str],
     run_results: list[RunResult],
     session_errors: list[str],
+    run_id: str | None,
 ) -> None:
     """Best-effort: persist a UI-driven session evaluation as a single Run row
     (plus Result rows) when ``app.state.run_service`` is configured (postgres
@@ -140,6 +142,7 @@ async def _persist_sessions_run(
             trace_format="otlp-json",
             upload_filenames=session_ids,
             run_result=combined,
+            run_id=UUID(run_id) if run_id else None,
         )
     except Exception:
         logger.exception("failed to persist evaluate-sessions run; results still returned to caller")
@@ -173,13 +176,17 @@ async def evaluate_sessions(
 
         logger.info("Evaluating %d complete sessions (of %d total)", len(sessions_to_evaluate), len(manager.sessions))
 
+        # Chosen up front so the result records emitted while evaluating carry the recorded run's id.
+        run_id = str(uuid4()) if getattr(http_request.app.state, "run_service", None) is not None else None
         sem = asyncio.Semaphore(5)
 
         async def eval_one_session(session_id: str, session) -> tuple[SessionEvalResult, RunResult | None]:
             async with sem:
                 try:
                     traces = manager.session_traces(session)
-                    eval_result = await run_evaluation_from_traces(traces, params, eval_set, group_key=session_id)
+                    eval_result = await run_evaluation_from_traces(
+                        traces, params, eval_set, group_key=session_id, run_id=run_id
+                    )
 
                     if eval_result.trace_results:
                         trace_result = eval_result.trace_results[0]
@@ -221,6 +228,7 @@ async def evaluate_sessions(
             session_ids=[sid for sid, _ in sessions_to_evaluate],
             run_results=[run_result for _, run_result in evaluated if run_result is not None],
             session_errors=[f"{r.session_id}: {r.error}" for r in results if r.error],
+            run_id=run_id,
         )
 
         return StandardResponse(
