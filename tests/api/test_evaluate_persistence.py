@@ -16,7 +16,9 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 
+from agentevals import evaluation_events as emit
 from agentevals.api.app import create_app
 from agentevals.config import EvalParams
 from agentevals.run.service import RunService
@@ -81,6 +83,22 @@ class TestEvaluateMultipartSync:
         assert run.spec.target.kind == "uploaded"
         assert run.spec.target.trace_files == ["helm.json"]
         assert run.spec.target.trace_count == 1
+
+    def test_records_carry_the_recorded_run_id(self, app_with_runs, monkeypatch):
+        exporter = InMemoryLogRecordExporter()
+        emitter = emit.EvaluationEmitter(exporter)
+        monkeypatch.setattr(emit, "get_emitter", lambda: emitter)
+        app, _ = app_with_runs
+        with TestClient(app) as client:
+            with SAMPLE_TRACE.open("rb") as f:
+                r = client.post(
+                    "/api/evaluate",
+                    files={"trace_files": ("helm.json", f, "application/json")},
+                    data={"config": '{"evaluators": [{"name": "tool_trajectory_avg_score", "type": "builtin"}]}'},
+                )
+        emitter.flush()
+        stamped = {dict(r.log_record.attributes).get("agentevals.eval.run.id") for r in exporter.get_finished_logs()}
+        assert stamped == {r.json()["data"]["runId"]}
 
     def test_recorded_run_keeps_no_server_paths(self, app_with_runs):
         app, repos = app_with_runs

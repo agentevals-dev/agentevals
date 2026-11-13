@@ -981,11 +981,16 @@ func (x *MetricResult) GetDurationMs() float64 {
 }
 
 type TurnRef struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TraceId       string                 `protobuf:"bytes,1,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
-	SpanId        string                 `protobuf:"bytes,2,opt,name=span_id,json=spanId,proto3" json:"span_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The turn's anchor: its agent or workflow span, else the root span of its trace.
+	TraceId string `protobuf:"bytes,1,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	SpanId  string `protobuf:"bytes,2,opt,name=span_id,json=spanId,proto3" json:"span_id,omitempty"`
+	// The span the turn's gen_ai.evaluation.result records attach to: the anchor, or the turn's
+	// final model call when the anchor is not a GenAI span. Attach results here.
+	EvaluatedTraceId string `protobuf:"bytes,3,opt,name=evaluated_trace_id,json=evaluatedTraceId,proto3" json:"evaluated_trace_id,omitempty"`
+	EvaluatedSpanId  string `protobuf:"bytes,4,opt,name=evaluated_span_id,json=evaluatedSpanId,proto3" json:"evaluated_span_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *TurnRef) Reset() {
@@ -1028,6 +1033,20 @@ func (x *TurnRef) GetTraceId() string {
 func (x *TurnRef) GetSpanId() string {
 	if x != nil {
 		return x.SpanId
+	}
+	return ""
+}
+
+func (x *TurnRef) GetEvaluatedTraceId() string {
+	if x != nil {
+		return x.EvaluatedTraceId
+	}
+	return ""
+}
+
+func (x *TurnRef) GetEvaluatedSpanId() string {
+	if x != nil {
+		return x.EvaluatedSpanId
 	}
 	return ""
 }
@@ -1263,8 +1282,12 @@ type EvaluateTracesRequest struct {
 	// {"kind": "kubernetes", "namespace": "...", "name": "...", "key": "..."} or
 	// {"kind": "env", "name": "..."}. Values are resolved per request and never returned.
 	CredentialRefs map[string]*structpb.Struct `protobuf:"bytes,4,rep,name=credential_refs,json=credentialRefs,proto3" json:"credential_refs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Optional. A UUID stamped as agentevals.eval.run.id on every gen_ai.evaluation.result record of
+	// this evaluation. With run storage the evaluation is recorded under this id, and an id that is
+	// already recorded is rejected; without it, storage picks the id and the records carry that.
+	RunId         string `protobuf:"bytes,5,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EvaluateTracesRequest) Reset() {
@@ -1332,6 +1355,13 @@ func (x *EvaluateTracesRequest) GetCredentialRefs() map[string]*structpb.Struct 
 		return x.CredentialRefs
 	}
 	return nil
+}
+
+func (x *EvaluateTracesRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
 }
 
 type isEvaluateTracesRequest_EvalSet interface {
@@ -1656,10 +1686,12 @@ const file_agentevals_api_v1alpha1_evaluation_proto_rawDesc = "" +
 	"\x06_scoreB\b\n" +
 	"\x06_errorB\r\n" +
 	"\v_error_typeB\x0e\n" +
-	"\f_duration_ms\"=\n" +
+	"\f_duration_ms\"\x97\x01\n" +
 	"\aTurnRef\x12\x19\n" +
 	"\btrace_id\x18\x01 \x01(\tR\atraceId\x12\x17\n" +
-	"\aspan_id\x18\x02 \x01(\tR\x06spanId\"\xc8\x04\n" +
+	"\aspan_id\x18\x02 \x01(\tR\x06spanId\x12,\n" +
+	"\x12evaluated_trace_id\x18\x03 \x01(\tR\x10evaluatedTraceId\x12*\n" +
+	"\x11evaluated_span_id\x18\x04 \x01(\tR\x0fevaluatedSpanId\"\xc8\x04\n" +
 	"\vTraceResult\x12\x19\n" +
 	"\btrace_id\x18\x01 \x01(\tR\atraceId\x12'\n" +
 	"\x0fnum_invocations\x18\x02 \x01(\x05R\x0enumInvocations\x12L\n" +
@@ -1681,13 +1713,14 @@ const file_agentevals_api_v1alpha1_evaluation_proto_rawDesc = "" +
 	"\rtrace_results\x18\x01 \x03(\v2$.agentevals.api.v1alpha1.TraceResultR\ftraceResults\x12\x16\n" +
 	"\x06errors\x18\x02 \x03(\tR\x06errors\x12H\n" +
 	"\x13performance_metrics\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x12performanceMetrics\x12\x15\n" +
-	"\x06run_id\x18\x04 \x01(\tR\x05runId\"\xa3\x03\n" +
+	"\x06run_id\x18\x04 \x01(\tR\x05runId\"\xba\x03\n" +
 	"\x15EvaluateTracesRequest\x12;\n" +
 	"\x06traces\x18\x01 \x01(\v2#.agentevals.api.v1alpha1.TraceInputR\x06traces\x12;\n" +
 	"\fadk_eval_set\x18\x02 \x01(\v2\x17.google.protobuf.StructH\x00R\n" +
 	"adkEvalSet\x12;\n" +
 	"\x06params\x18\x03 \x01(\v2#.agentevals.api.v1alpha1.EvalParamsR\x06params\x12k\n" +
-	"\x0fcredential_refs\x18\x04 \x03(\v2B.agentevals.api.v1alpha1.EvaluateTracesRequest.CredentialRefsEntryR\x0ecredentialRefs\x1aZ\n" +
+	"\x0fcredential_refs\x18\x04 \x03(\v2B.agentevals.api.v1alpha1.EvaluateTracesRequest.CredentialRefsEntryR\x0ecredentialRefs\x12\x15\n" +
+	"\x06run_id\x18\x05 \x01(\tR\x05runId\x1aZ\n" +
 	"\x13CredentialRefsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12-\n" +
 	"\x05value\x18\x02 \x01(\v2\x17.google.protobuf.StructR\x05value:\x028\x01B\n" +

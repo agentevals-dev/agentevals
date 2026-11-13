@@ -182,6 +182,10 @@ class EvaluationServicer(evaluation_pb2_grpc.EvaluationServiceServicer):
 
     @rpc()
     async def EvaluateTraces(self, request, context):  # noqa: N802
+        run_id = _uuid(request.run_id, "run_id") if request.run_id else None
+        run_service = self._context.run_service
+        if run_id is not None and run_service is not None and await run_service.get(run_id) is not None:
+            raise ApiError(grpc.StatusCode.ALREADY_EXISTS, "run_id already exists")
         traces, load_errors = await asyncio.to_thread(convert.load_trace_input, request.traces)
         eval_set_dict = convert.from_struct(request.adk_eval_set) if request.HasField("adk_eval_set") else None
         evaluation = Evaluation(
@@ -191,9 +195,10 @@ class EvaluationServicer(evaluation_pb2_grpc.EvaluationServiceServicer):
             credential_refs={name: convert.from_struct(ref) for name, ref in request.credential_refs.items()} or None,
             load_errors=load_errors,
             eval_set_dict=eval_set_dict,
+            run_id=str(run_id) if run_id else None,
         )
         try:
-            async for event in stream_evaluation(evaluation, run_service=self._context.run_service):
+            async for event in stream_evaluation(evaluation, run_service=run_service):
                 yield _evaluation_response(event)
         except CredentialResolutionError as exc:
             logger.info("EvaluateTraces: %s", exc)

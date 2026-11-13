@@ -211,6 +211,7 @@ async def run_evaluation(
     config: EvalRunConfig,
     progress_callback: ProgressCallback | None = None,
     trace_progress_callback: TraceProgressCallback | None = None,
+    run_id: str | None = None,
 ) -> RunResult:
     """Load trace files, then evaluate them with :func:`run_evaluation_from_traces`."""
     load_errors: list[str] = []
@@ -241,6 +242,7 @@ async def run_evaluation(
         eval_set=eval_set,
         progress_callback=progress_callback,
         trace_progress_callback=trace_progress_callback,
+        run_id=run_id,
     )
     if load_errors:
         result.errors = load_errors + result.errors

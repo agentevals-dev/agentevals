@@ -169,6 +169,7 @@ Each result is a `gen_ai.evaluation.result` log event attached to the span it sc
 | `gen_ai.evaluation.explanation` | Only with `AGENTEVALS_EVALUATION_EVENTS_EXPLANATION=true` |
 | `gen_ai.agent.name`, `gen_ai.conversation.id`, `gen_ai.response.id` | Copied from the evaluated span when present |
 | `agentevals.evaluator.type` | `llm_judge` or `deterministic` for built in metrics |
-| `agentevals.eval.run.id`, `agentevals.eval.case.id`, `agentevals.eval_set.id` | When known |
+| `agentevals.eval.run.id` | The run: a queued run, an evaluation recorded in run storage, or the `run_id` of an `EvaluateTraces` call |
+| `agentevals.eval.case.id`, `agentevals.eval_set.id` | When known |
 
 Events never contain prompts, responses or tool arguments. The explanation can, which is why it is off by default.

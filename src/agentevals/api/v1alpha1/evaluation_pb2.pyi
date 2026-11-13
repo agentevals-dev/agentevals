@@ -228,7 +228,7 @@ class RunResult(_message.Message):
     def __init__(self, trace_results: _Optional[_Iterable[_Union[TraceResult, _Mapping]]] = ..., errors: _Optional[_Iterable[str]] = ..., performance_metrics: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., run_id: _Optional[str] = ...) -> None: ...
 
 class EvaluateTracesRequest(_message.Message):
-    __slots__ = ("traces", "adk_eval_set", "params", "credential_refs")
+    __slots__ = ("traces", "adk_eval_set", "params", "credential_refs", "run_id")
     class CredentialRefsEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -240,11 +240,13 @@ class EvaluateTracesRequest(_message.Message):
     ADK_EVAL_SET_FIELD_NUMBER: _ClassVar[int]
     PARAMS_FIELD_NUMBER: _ClassVar[int]
     CREDENTIAL_REFS_FIELD_NUMBER: _ClassVar[int]
+    RUN_ID_FIELD_NUMBER: _ClassVar[int]
     traces: _common_pb2.TraceInput
     adk_eval_set: _struct_pb2.Struct
     params: EvalParams
     credential_refs: _containers.MessageMap[str, _struct_pb2.Struct]
-    def __init__(self, traces: _Optional[_Union[_common_pb2.TraceInput, _Mapping]] = ..., adk_eval_set: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., params: _Optional[_Union[EvalParams, _Mapping]] = ..., credential_refs: _Optional[_Mapping[str, _struct_pb2.Struct]] = ...) -> None: ...
+    run_id: str
+    def __init__(self, traces: _Optional[_Union[_common_pb2.TraceInput, _Mapping]] = ..., adk_eval_set: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., params: _Optional[_Union[EvalParams, _Mapping]] = ..., credential_refs: _Optional[_Mapping[str, _struct_pb2.Struct]] = ..., run_id: _Optional[str] = ...) -> None: ...
 
 class EvaluationProgress(_message.Message):
     __slots__ = ("message",)

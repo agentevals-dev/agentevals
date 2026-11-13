@@ -90,9 +90,10 @@ class RunService:
         trace_format: str | None,
         upload_filenames: list[str] | None,
         run_result: RunResult,
+        run_id: UUID | None = None,
     ) -> Run:
         """Persist a synchronously-completed ``/api/evaluate`` call as a Run
-        row plus Result rows.
+        row plus Result rows, under ``run_id`` when given.
 
         Builds an ``uploaded`` :class:`TraceTarget` from the request metadata,
         creates a queued run, persists results, then transitions the run to
@@ -114,7 +115,7 @@ class RunService:
             eval_set=eval_set_dict,
         )
 
-        run_id = uuid4()
+        run_id = run_id or uuid4()
         run = Run(
             run_id=run_id,
             status=RunStatus.QUEUED,

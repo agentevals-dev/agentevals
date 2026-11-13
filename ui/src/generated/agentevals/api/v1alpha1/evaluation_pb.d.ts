@@ -641,6 +641,15 @@ export declare type EvaluateTracesRequest = Message<"agentevals.api.v1alpha1.Eva
    * @generated from field: map<string, google.protobuf.Struct> credential_refs = 4;
    */
   credentialRefs: { [key: string]: JsonObject };
+
+  /**
+   * Optional. A UUID stamped as agentevals.eval.run.id on every gen_ai.evaluation.result record of
+   * this evaluation. With run storage the evaluation is recorded under this id, and an id that is
+   * already recorded is rejected; without it, storage picks the id and the records carry that.
+   *
+   * @generated from field: string run_id = 5;
+   */
+  runId: string;
 };
 
 /**

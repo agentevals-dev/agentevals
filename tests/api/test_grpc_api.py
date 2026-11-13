@@ -19,8 +19,10 @@ from google.rpc import error_details_pb2, status_pb2
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 from grpc_reflection.v1alpha import reflection_pb2, reflection_pb2_grpc
 from opentelemetry.proto.trace.v1 import trace_pb2
+from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 
 from agentevals import __version__
+from agentevals import evaluation_events as emit
 from agentevals.api.app import create_app
 from agentevals.api.rpc import convert, services
 from agentevals.api.rpc.server import start_api_server, stop_api_server
@@ -72,6 +74,20 @@ def context(repos, monkeypatch):
     for name in ("AGENTEVALS_API_TRACES", "AGENTEVALS_GRPC_REFLECTION"):
         monkeypatch.delenv(name, raising=False)
     return ApiContext(manager=LiveManager(), run_service=RunService(repos.runs, repos.results), ports=PORTS)
+
+
+@pytest.fixture
+def records(monkeypatch):
+    """The attributes of the evaluation result records emitted so far."""
+    exporter = InMemoryLogRecordExporter()
+    emitter = emit.EvaluationEmitter(exporter)
+    monkeypatch.setattr(emit, "get_emitter", lambda: emitter)
+
+    def finished() -> list[dict]:
+        emitter.flush()
+        return [dict(r.log_record.attributes) for r in exporter.get_finished_logs()]
+
+    return finished
 
 
 @pytest.fixture
@@ -437,6 +453,62 @@ class TestEvaluation:
             await _stream(evaluation_pb2_grpc.EvaluationServiceStub(channel).EvaluateTraces(request))
         assert error.value.code() == grpc.StatusCode.FAILED_PRECONDITION
         assert MARK not in error.value.details()
+
+    async def test_records_carry_the_requested_run_id_and_the_run_is_recorded_under_it(self, channel, records, repos):
+        run_id = str(uuid4())
+        request = evaluation_pb2.EvaluateTracesRequest(
+            traces=common_pb2.TraceInput(documents=[_document()]),
+            adk_eval_set=await _golden(channel),
+            params=_trajectory_params(),
+            run_id=run_id.upper(),
+        )
+        events = await _stream(evaluation_pb2_grpc.EvaluationServiceStub(channel).EvaluateTraces(request))
+        assert events[-1].done.run_id == run_id
+        assert await repos.runs.get(UUID(run_id)) is not None
+        stamped = [r.get("agentevals.eval.run.id") for r in records()]
+        assert stamped and set(stamped) == {run_id}
+
+    async def test_without_a_run_id_records_carry_the_recorded_one(self, channel, records):
+        request = evaluation_pb2.EvaluateTracesRequest(
+            traces=common_pb2.TraceInput(documents=[_document()]),
+            adk_eval_set=await _golden(channel),
+            params=_trajectory_params(),
+        )
+        events = await _stream(evaluation_pb2_grpc.EvaluationServiceStub(channel).EvaluateTraces(request))
+        stamped = [r.get("agentevals.eval.run.id") for r in records()]
+        assert events[-1].done.run_id and set(stamped) == {events[-1].done.run_id}
+
+    async def test_without_storage_the_requested_run_id_is_still_stamped(self, channel, context, records):
+        context.run_service = None
+        run_id = str(uuid4())
+        request = evaluation_pb2.EvaluateTracesRequest(
+            traces=common_pb2.TraceInput(documents=[_document()]),
+            adk_eval_set=await _golden(channel),
+            params=_trajectory_params(),
+            run_id=run_id,
+        )
+        events = await _stream(evaluation_pb2_grpc.EvaluationServiceStub(channel).EvaluateTraces(request))
+        assert events[-1].done.run_id == ""
+        assert {r.get("agentevals.eval.run.id") for r in records()} == {run_id}
+
+    async def test_a_run_id_that_is_not_a_uuid_is_invalid_argument(self, channel, records):
+        request = evaluation_pb2.EvaluateTracesRequest(
+            traces=common_pb2.TraceInput(documents=[_document()]), params=_trajectory_params(), run_id="run-1"
+        )
+        with pytest.raises(grpc.aio.AioRpcError) as error:
+            await _stream(evaluation_pb2_grpc.EvaluationServiceStub(channel).EvaluateTraces(request))
+        assert error.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+        assert records() == []
+
+    async def test_a_recorded_run_id_is_already_exists(self, channel, records):
+        run = (await runs_pb2_grpc.RunServiceStub(channel).SubmitRun(runs_pb2.SubmitRunRequest(spec=_run_spec()))).run
+        request = evaluation_pb2.EvaluateTracesRequest(
+            traces=common_pb2.TraceInput(documents=[_document()]), params=_trajectory_params(), run_id=run.run_id
+        )
+        with pytest.raises(grpc.aio.AioRpcError) as error:
+            await _stream(evaluation_pb2_grpc.EvaluationServiceStub(channel).EvaluateTraces(request))
+        assert error.value.code() == grpc.StatusCode.ALREADY_EXISTS
+        assert records() == []
 
     async def test_evaluator_without_a_kind_is_invalid_argument(self, channel):
         request = evaluation_pb2.EvaluateTracesRequest(
