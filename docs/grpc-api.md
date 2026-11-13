@@ -20,6 +20,10 @@ Sessions and conversations come back as views: turns with their user text, tool 
 
 Traces go in as OTLP protobuf (`TracesData` and `LogsData`) or as files (OTLP/JSON, OTLP/JSONL or Jaeger JSON), the same formats the REST API takes.
 
+`EvaluateTraces` lists the judged turns of each group in `turn_refs`. `evaluated_trace_id` and `evaluated_span_id` name the span the turn's results belong to, the same span agentevals attaches its own [evaluation result records](opentelemetry-pipeline.md#send-evaluation-results-from-agentevals) to. Use it when you attach results to telemetry yourself.
+
+`EvaluateTraces` takes an optional `run_id` (a UUID). Every result record of the call carries it as `agentevals.eval.run.id`, and with run storage the evaluation is recorded under it. An id that is already recorded is rejected with `ALREADY_EXISTS`. Without `run_id`, a call recorded in run storage stamps its records with the recorded run's id.
+
 ## Calling it
 
 With reflection on, `grpcurl` can list and call everything:

@@ -174,12 +174,16 @@ class MetricResult(_message.Message):
     def __init__(self, metric_name: _Optional[str] = ..., score: _Optional[float] = ..., eval_status: _Optional[_Union[EvalStatus, str]] = ..., per_invocation: _Optional[_Iterable[_Union[InvocationResult, _Mapping]]] = ..., error: _Optional[str] = ..., error_type: _Optional[str] = ..., details: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., duration_ms: _Optional[float] = ...) -> None: ...
 
 class TurnRef(_message.Message):
-    __slots__ = ("trace_id", "span_id")
+    __slots__ = ("trace_id", "span_id", "evaluated_trace_id", "evaluated_span_id")
     TRACE_ID_FIELD_NUMBER: _ClassVar[int]
     SPAN_ID_FIELD_NUMBER: _ClassVar[int]
+    EVALUATED_TRACE_ID_FIELD_NUMBER: _ClassVar[int]
+    EVALUATED_SPAN_ID_FIELD_NUMBER: _ClassVar[int]
     trace_id: str
     span_id: str
-    def __init__(self, trace_id: _Optional[str] = ..., span_id: _Optional[str] = ...) -> None: ...
+    evaluated_trace_id: str
+    evaluated_span_id: str
+    def __init__(self, trace_id: _Optional[str] = ..., span_id: _Optional[str] = ..., evaluated_trace_id: _Optional[str] = ..., evaluated_span_id: _Optional[str] = ...) -> None: ...
 
 class TraceResult(_message.Message):
     __slots__ = ("trace_id", "num_invocations", "metric_results", "conversion_warnings", "performance_metrics", "service_name", "agent_name", "trace_ids", "conversation_id", "group_key", "eval_case_id", "eval_case_match", "turn_refs")
@@ -224,7 +228,7 @@ class RunResult(_message.Message):
     def __init__(self, trace_results: _Optional[_Iterable[_Union[TraceResult, _Mapping]]] = ..., errors: _Optional[_Iterable[str]] = ..., performance_metrics: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., run_id: _Optional[str] = ...) -> None: ...
 
 class EvaluateTracesRequest(_message.Message):
-    __slots__ = ("traces", "adk_eval_set", "params", "credential_refs")
+    __slots__ = ("traces", "adk_eval_set", "params", "credential_refs", "run_id")
     class CredentialRefsEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -236,11 +240,13 @@ class EvaluateTracesRequest(_message.Message):
     ADK_EVAL_SET_FIELD_NUMBER: _ClassVar[int]
     PARAMS_FIELD_NUMBER: _ClassVar[int]
     CREDENTIAL_REFS_FIELD_NUMBER: _ClassVar[int]
+    RUN_ID_FIELD_NUMBER: _ClassVar[int]
     traces: _common_pb2.TraceInput
     adk_eval_set: _struct_pb2.Struct
     params: EvalParams
     credential_refs: _containers.MessageMap[str, _struct_pb2.Struct]
-    def __init__(self, traces: _Optional[_Union[_common_pb2.TraceInput, _Mapping]] = ..., adk_eval_set: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., params: _Optional[_Union[EvalParams, _Mapping]] = ..., credential_refs: _Optional[_Mapping[str, _struct_pb2.Struct]] = ...) -> None: ...
+    run_id: str
+    def __init__(self, traces: _Optional[_Union[_common_pb2.TraceInput, _Mapping]] = ..., adk_eval_set: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., params: _Optional[_Union[EvalParams, _Mapping]] = ..., credential_refs: _Optional[_Mapping[str, _struct_pb2.Struct]] = ..., run_id: _Optional[str] = ...) -> None: ...
 
 class EvaluationProgress(_message.Message):
     __slots__ = ("message",)

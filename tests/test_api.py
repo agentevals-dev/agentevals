@@ -7,6 +7,7 @@ see test_runner.py, test_converter.py, etc. for those tests.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import os
@@ -33,7 +34,9 @@ from agentevals.api.models import (
 from agentevals.api.routes import _camel_keys, router
 from agentevals.api.streaming_routes import streaming_router
 from agentevals.otel.decode import decode_bare_spans_json
+from agentevals.run.service import RunService
 from agentevals.runner import MetricResult, RunResult, TraceResult
+from agentevals.storage.repos.memory import MemoryRepos
 from agentevals.streaming.exports import EXPORT_DIR
 
 # ---------------------------------------------------------------------------
@@ -1350,6 +1353,26 @@ class TestStreamingEvaluateSessions:
         )
         results = body["data"]["results"]
         assert any(r.get("error") for r in results)
+
+    @patch("agentevals.api.streaming_routes.run_evaluation_from_traces", new_callable=AsyncMock)
+    @patch("agentevals.api.streaming_routes._do_create_eval_set", new_callable=AsyncMock)
+    def test_records_carry_the_recorded_run_id(self, mock_create_eval, mock_eval):
+        _reset(self.mgr)
+        _add_session(self.mgr, "golden")
+        _add_session(self.mgr, "other")
+        mock_create_eval.return_value = StandardResponse(
+            data=CreateEvalSetData(eval_set={"eval_set_id": "e1", "eval_cases": []}, num_invocations=1)
+        )
+        mock_eval.return_value = _make_run_result()
+        repos = MemoryRepos.create()
+        self.app.state.run_service = RunService(repos.runs, repos.results)
+        try:
+            client = TestClient(self.app)
+            client.post("/api/streaming/evaluate-sessions", json={"golden_session_id": "golden", "eval_set_id": "e1"})
+        finally:
+            del self.app.state.run_service
+        [run] = asyncio.run(repos.runs.list())
+        assert {c.kwargs.get("run_id") for c in mock_eval.await_args_list} == {str(run.run_id)}
 
 
 # ---------------------------------------------------------------------------

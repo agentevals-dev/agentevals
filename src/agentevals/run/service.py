@@ -38,6 +38,14 @@ class RunSubmitConflict(Exception):
         self.persisted = persisted
 
 
+class RunIdTaken(Exception):
+    """Raised when an evaluation is recorded under a run id another run already holds."""
+
+    def __init__(self, persisted: Run) -> None:
+        super().__init__(f"run {persisted.run_id} already exists")
+        self.persisted = persisted
+
+
 class RunService:
     def __init__(self, runs: RunRepository, results: ResultRepository) -> None:
         self._runs = runs
@@ -90,15 +98,19 @@ class RunService:
         trace_format: str | None,
         upload_filenames: list[str] | None,
         run_result: RunResult,
+        run_id: UUID | None = None,
     ) -> Run:
         """Persist a synchronously-completed ``/api/evaluate`` call as a Run
-        row plus Result rows.
+        row plus Result rows, under ``run_id`` when given.
 
         Builds an ``uploaded`` :class:`TraceTarget` from the request metadata,
         creates a queued run, persists results, then transitions the run to
         a terminal status. Two writes (create + update_status), but the
         public :class:`RunRepository` API stays clean of executor-only
         schema knowledge.
+
+        Raises :class:`RunIdTaken`, writing nothing, when another run holds
+        ``run_id``.
         """
         filenames = list(upload_filenames or [])
         target = TraceTarget(
@@ -114,7 +126,7 @@ class RunService:
             eval_set=eval_set_dict,
         )
 
-        run_id = uuid4()
+        run_id = run_id or uuid4()
         run = Run(
             run_id=run_id,
             status=RunStatus.QUEUED,
@@ -123,7 +135,11 @@ class RunService:
             worker_id="sync:/api/evaluate",
             started_at=datetime.now(timezone.utc),
         )
-        await self._runs.create(run)
+        # create() inserts only when the id is free and otherwise returns the run holding it, which
+        # never shares this start time.
+        persisted = await self._runs.create(run)
+        if persisted.started_at != run.started_at:
+            raise RunIdTaken(persisted)
 
         results = build_results(run_id, params, run_result)
         await self._results.upsert_many(run_id, results)

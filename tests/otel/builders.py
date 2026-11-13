@@ -38,7 +38,9 @@ def span(
     start: int = 1_000,
     end: int = 2_000,
     flags: int | None = None,
+    links: list[tuple[str, str]] = (),
 ) -> dict:
+    """``links`` are ``(trace, span_id)`` labels of the linked spans."""
     data = {
         "traceId": tid(trace),
         "spanId": sid(span_id),
@@ -52,6 +54,8 @@ def span(
         data["parentSpanId"] = sid(parent)
     if flags is not None:
         data["flags"] = flags
+    if links:
+        data["links"] = [{"traceId": tid(t), "spanId": sid(s), "attributes": []} for t, s in links]
     return data
 
 

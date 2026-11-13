@@ -191,7 +191,7 @@ def make_trace_request(
     if session_name:
         resource_attrs.append({"key": "agentevals.session_name", "value": {"stringValue": session_name}})
     if eval_set_id:
-        resource_attrs.append({"key": "agentevals.eval_set_id", "value": {"stringValue": eval_set_id}})
+        resource_attrs.append({"key": "agentevals.eval.set.id", "value": {"stringValue": eval_set_id}})
     return {
         "resourceSpans": [
             {

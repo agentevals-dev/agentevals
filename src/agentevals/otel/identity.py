@@ -2,7 +2,7 @@
 
 ``agentevals.session_name`` names a session (reruns of a finished name become ``name-2``).
 ``agentevals.session.run_id`` separates runs that reuse a name; only the SDK sets it.
-``agentevals.eval_set_id`` and ``agentevals.metadata.*`` are shown with the session.
+``agentevals.eval.set.id`` and ``agentevals.metadata.*`` are shown with the session.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from typing import Any
 
 SESSION_NAME = "agentevals.session_name"
 SESSION_RUN_ID = "agentevals.session.run_id"
-EVAL_SET_ID = "agentevals.eval_set_id"
+EVAL_SET_ID = "agentevals.eval.set.id"
 METADATA_PREFIX = "agentevals.metadata."
 
 # Instrumentation scope of the evaluation result records agentevals emits.

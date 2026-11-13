@@ -116,7 +116,7 @@ def main():
     os.environ.setdefault("OTEL_SERVICE_NAME", "ollama-agent")
     os.environ.setdefault(
         "OTEL_RESOURCE_ATTRIBUTES",
-        "agentevals.eval_set_id=langchain_local_ollama_openai_eval,agentevals.session_name=langchain-ollama-openai-zero-code",
+        "agentevals.eval.set.id=langchain_local_ollama_openai_eval,agentevals.session_name=langchain-ollama-openai-zero-code",
     )
     # A process level identity, so agentevals can tell a rerun of this script from the next turn.
     if "service.instance.id=" not in os.environ["OTEL_RESOURCE_ATTRIBUTES"]:

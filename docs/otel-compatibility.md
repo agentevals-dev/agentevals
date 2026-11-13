@@ -32,6 +32,8 @@ Working setups for each are in [examples/zero-code-examples](../examples/zero-co
 
 If a framework only instruments the model client (each model call is its own trace), agentevals joins a call that answers a tool result to the turn before it. This needs message content.
 
+If a runtime pauses a turn (for an approval or a question) and runs the rest as a new `invoke_agent` span, often in a new trace, add a span link from the new span to the `invoke_agent` span that started the turn. agentevals then scores both parts as one turn: the user input of the first, the final answer of the last, and the tools of both. Both spans must carry the same `gen_ai.agent.name`, and the new span no input messages of its own. Linked traces are evaluated together whatever the grouping.
+
 ## Sessions
 
 Live traces are grouped into sessions by the first key present:

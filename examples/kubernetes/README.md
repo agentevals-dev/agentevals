@@ -169,7 +169,7 @@ Body: Empty()
 Attributes:
      -> gen_ai.evaluation.name: Str(tool_trajectory_avg_score)
      -> agentevals.eval.case.id: Str(case_1)
-     -> agentevals.eval_set.id: Str(manual-1)
+     -> agentevals.eval.set.id: Str(manual-1)
      -> agentevals.evaluator.type: Str(deterministic)
      -> gen_ai.evaluation.score.value: Double(1)
      -> gen_ai.evaluation.score.label: Str(pass)

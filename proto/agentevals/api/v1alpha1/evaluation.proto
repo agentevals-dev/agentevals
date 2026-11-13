@@ -146,8 +146,13 @@ message MetricResult {
 }
 
 message TurnRef {
+  // The turn's anchor: its agent or workflow span, else the root span of its trace.
   string trace_id = 1;
   string span_id = 2;
+  // The span the turn's gen_ai.evaluation.result records attach to: the anchor, or the turn's
+  // final model call when the anchor is not a GenAI span. Attach results here.
+  string evaluated_trace_id = 3;
+  string evaluated_span_id = 4;
 }
 
 // The results of one evaluation group: a trace, or a conversation of several traces.
@@ -194,6 +199,10 @@ message EvaluateTracesRequest {
   // {"kind": "kubernetes", "namespace": "...", "name": "...", "key": "..."} or
   // {"kind": "env", "name": "..."}. Values are resolved per request and never returned.
   map<string, google.protobuf.Struct> credential_refs = 4;
+  // Optional. A UUID stamped as agentevals.eval.run.id on every gen_ai.evaluation.result record of
+  // this evaluation. With run storage the evaluation is recorded under this id, and an id that is
+  // already recorded is rejected; without it, storage picks the id and the records carry that.
+  string run_id = 5;
 }
 
 message EvaluationProgress {

@@ -25,6 +25,11 @@ Rules, in brief:
   puts each model call of a tool round in its own trace). When both sides carry call ids, the
   response must answer one of the requested calls. This reads message content; with
   content capture off the turns stay split and the later one carries a warning.
+* An agent anchored turn whose anchor records no input of its own and links to the anchor of an
+  earlier turn of the same named agent resumes that turn (a runtime that pauses a turn for an approval or
+  a question runs the rest of it as a new agent span, often in a new trace). The link is structural,
+  so this needs no message content. A tool call recorded in both parts counts once, preferring
+  the span that finished without error.
 
 Every walk is iterative, so adversarial nesting depth cannot exhaust the stack.
 """
@@ -40,6 +45,7 @@ from ..otel.model import (
     STATUS_OK,
     LogRecord,
     Span,
+    SpanRef,
     Trace,
     attr_float,
     attr_int,
@@ -713,10 +719,48 @@ def _maybe_continues(previous: Turn, turn: Turn) -> bool:
     )
 
 
+def resume_links(view: SpanView) -> list[SpanRef]:
+    """The spans an agent span may resume: its links, when it records no input of its own."""
+    if classify(view) != AGENT or view.messages(sc.INPUT_MESSAGES):
+        return []
+    return [SpanRef(link.trace_id, link.span_id) for link in view.span.links]
+
+
+def resumes(view: SpanView, origin: SpanView) -> bool:
+    """Whether ``view``, linked to ``origin``, continues the turn ``origin`` started. Both must name
+    the same agent: a link between unnamed agent spans establishes no identity."""
+    name = attr_str(view.attrs, sc.AGENT_NAME)
+    return (
+        bool(name)
+        and classify(origin) == AGENT
+        and origin.span.start_time_unix_nano < view.span.start_time_unix_nano
+        and attr_str(origin.attrs, sc.AGENT_NAME) == name
+    )
+
+
+def _join_span_tools(earlier: Sequence[ToolCall], later: Sequence[ToolCall]) -> list[ToolCall]:
+    """The tool spans of two parts of one turn. A call both parts recorded (same call id, tool and
+    agent: open at the pause, finished after it) counts once. The span that finished without error
+    wins, and keeps arguments or a result only the other one recorded."""
+    out = [t.model_copy() for t in earlier if t.ref is not None]
+    unmatched = {(t.call_id, t.name, t.agent_name): i for i, t in enumerate(out) if t.call_id}
+    for tool in (t.model_copy() for t in later if t.ref is not None):
+        index = unmatched.pop((tool.call_id, tool.name, tool.agent_name), None) if tool.call_id else None
+        if index is None:
+            out.append(tool)
+            continue
+        kept, other = (tool, out[index]) if out[index].is_error and not tool.is_error else (out[index], tool)
+        for key in ("arguments", "result"):
+            if _is_empty(getattr(kept, key)) and not _is_empty(getattr(other, key)):
+                setattr(kept, key, getattr(other, key))
+        out[index] = kept
+    return out
+
+
 def _merge(previous: Turn, turn: Turn) -> Turn:
     calls = sorted([*previous.llm_calls, *turn.llm_calls], key=lambda c: (c.start_ns, c.end_ns))
     warnings = [*previous.warnings, *turn.warnings]
-    span_tools = [t.model_copy() for t in (*previous.tool_calls, *turn.tool_calls) if t.ref is not None]
+    span_tools = _join_span_tools(previous.tool_calls, turn.tool_calls)
     if span_tools:
         tools = _fill_from_parts(span_tools, calls, warnings)
     else:
@@ -755,11 +799,47 @@ def _merge(previous: Turn, turn: Turn) -> Turn:
     )
 
 
-def _join_continuations(turns: list[Turn]) -> list[Turn]:
-    out: list[Turn] = []
+def _anchor_views(traces: Sequence[Trace], turns: Iterable[Turn]) -> dict[SpanRef, SpanView]:
+    """Views of the agent anchors that carry links, and of every span those links name."""
+    by_id = {t.trace_id: t for t in traces}
+
+    def view(ref: SpanRef) -> SpanView | None:
+        trace = by_id.get(ref.trace_id)
+        span = trace.spans.get(ref.span_id) if trace else None
+        return overlay(span, trace.logs_of(span)) if span else None
+
+    views: dict[SpanRef, SpanView] = {}
     for turn in turns:
+        if turn.anchor_kind != "agent" or (anchor := view(turn.ref)) is None or not anchor.span.links:
+            continue
+        views[turn.ref] = anchor
+        for ref in resume_links(anchor):
+            if ref not in views and (target := view(ref)) is not None:
+                views[ref] = target
+    return views
+
+
+def _join_continuations(turns: list[Turn], views: dict[SpanRef, SpanView]) -> list[Turn]:
+    out: list[Turn] = []
+    owner: dict[SpanRef, int] = {}
+    for turn in turns:
+        anchor = views.get(turn.ref)
+        links = resume_links(anchor) if anchor else []
+        origin = next((owner[r] for r in links if r in owner and resumes(anchor, views[r])), None)
+        if origin is not None:
+            out[origin] = _merge(out[origin], turn)
+            owner[turn.ref] = origin
+            continue
+        if links:
+            warning = Gap(
+                code=GAP_POSSIBLE_CONTINUATION,
+                reason=f"turn {turn.ref.span_id} has no input and links to no earlier turn of the same agent "
+                "in this evaluation; if it resumes a paused turn, evaluate both traces together",
+            )
+            turn = turn.model_copy(update={"warnings": [*turn.warnings, warning]})
         if out and _continues(out[-1], turn):
             out[-1] = _merge(out[-1], turn)
+            owner[turn.ref] = len(out) - 1
             continue
         if out and _maybe_continues(out[-1], turn):
             warning = Gap(
@@ -768,6 +848,7 @@ def _join_continuations(turns: list[Turn]) -> list[Turn]:
                 "but message content was not captured; kept as its own turn",
             )
             turn = turn.model_copy(update={"warnings": [*turn.warnings, warning]})
+        owner[turn.ref] = len(out)
         out.append(turn)
     return out
 
@@ -786,7 +867,8 @@ def conversation_from_turns(
     traces = list(traces)
     turns = [t for per_trace in turns_per_trace for t in per_trace]
     turns.sort(key=lambda t: (t.start_ns, t.ref.span_id))
-    turns = [t.model_copy(update={"index": i}) for i, t in enumerate(_join_continuations(turns))]
+    joined = _join_continuations(turns, _anchor_views(traces, turns))
+    turns = [t.model_copy(update={"index": i}) for i, t in enumerate(joined)]
     conversation_id = next((t.conversation_id for t in turns if t.conversation_id), None)
     starts: dict[str, int] = {}
     for trace in traces:

@@ -3,18 +3,24 @@
 from __future__ import annotations
 
 import logging
+import re
+from pathlib import Path
 
 import pytest
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 
+from agentevals import custom_evaluators
 from agentevals import evaluation_events as emit
-from agentevals.config import BuiltinMetricDef, CodeEvaluatorDef
+from agentevals.api.rpc import convert
+from agentevals.config import BuiltinMetricDef, CodeEvaluatorDef, EvalParams
 from agentevals.genai.extract import extract_conversation
+from agentevals.genai.matching import EVAL_CASE_ID
 from agentevals.otel.decode import decode_json_document
+from agentevals.otel.identity import EVAL_SET_ID
 from agentevals.otel.model import build_traces
-from agentevals.runner import MetricResult
+from agentevals.runner import MetricResult, run_evaluation_from_traces
 
-from .builders import agent, assistant, chat, request, sid, span, tid, user
+from .builders import agent, assistant, chat, request, sid, span, tid, tool_result, user
 
 ALLOWED = {
     "gen_ai.evaluation.name",
@@ -28,7 +34,7 @@ ALLOWED = {
     "agentevals.evaluator.type",
     "agentevals.eval.run.id",
     "agentevals.eval.case.id",
-    "agentevals.eval_set.id",
+    "agentevals.eval.set.id",
 }
 
 
@@ -112,7 +118,7 @@ class TestRecords:
         assert (
             attrs[0]["agentevals.eval.run.id"],
             attrs[0]["agentevals.eval.case.id"],
-            attrs[0]["agentevals.eval_set.id"],
+            attrs[0]["agentevals.eval.set.id"],
         ) == ("run-1", "case", "set")
         assert (attrs[0]["gen_ai.agent.name"], attrs[0]["gen_ai.conversation.id"], attrs[0]["gen_ai.response.id"]) == (
             "helper",
@@ -164,6 +170,25 @@ class TestRecords:
             (100.0, "informational"),
             (None, "not_evaluated"),
         ]
+
+    def test_every_label_is_documented(self):
+        doc = (Path(__file__).resolve().parents[2] / "docs" / "opentelemetry-pipeline.md").read_text()
+        table = doc.split("| Label | Meaning |")[1].split("\n\n")[0]
+        documented = set(re.findall(r"^\| `([a-z_]+)` \|", table, re.MULTILINE))
+        assert documented == {*emit._LABELS.values(), emit.LABEL_NOT_EVALUATED}
+
+    def test_ids_are_named_as_the_attributes_agentevals_reads(self):
+        conversation, index = _two_turns()
+        metric = MetricResult(metric_name="judge", score=1.0)
+        [record, *_] = _emit(
+            conversation,
+            index,
+            [metric],
+            [CodeEvaluatorDef(name="judge", path="j.py")],
+            eval_case_id="case",
+            eval_set_id="set",
+        )
+        assert (record.attributes[EVAL_CASE_ID], record.attributes[EVAL_SET_ID]) == ("case", "set")
 
     def test_records_never_carry_content(self):
         conversation, index = _two_turns()
@@ -222,6 +247,62 @@ class TestRecords:
             _emit(conversation, index, [MetricResult(metric_name=judge.name, score=1.0)], [judge])[0].attributes
         )
         assert attrs["agentevals.evaluator.type"] == "llm_judge"
+
+
+ROLL = ("call_1", "roll_die", {"sides": 20})
+SHAPES = {
+    "agent": ("a1", "a1", [agent(span_id="a1"), chat(parent="a1")]),
+    "non_genai_root": (
+        "http",
+        "c2",
+        [
+            span(span_id="http", name="POST /chat", start=1, end=9_000),
+            chat(span_id="c1", parent="http", start=100, end=200, outputs=[assistant("first")]),
+            chat(span_id="c2", parent="http", start=300, end=400, outputs=[assistant("second")]),
+        ],
+    ),
+    "continuation_across_traces": (
+        "http",
+        "c2",
+        [
+            span(trace="a", span_id="http", name="POST /chat", start=1, end=2_500),
+            chat(trace="a", span_id="c1", parent="http", inputs=[user("Roll")], outputs=[assistant(tool_calls=[ROLL])]),
+            chat(
+                trace="b",
+                span_id="c2",
+                start=3_000,
+                end=4_000,
+                inputs=[user("Roll"), assistant(tool_calls=[ROLL]), tool_result("call_1", "roll_die", 7)],
+                outputs=[assistant("You rolled 7")],
+            ),
+        ],
+    ),
+}
+
+
+class TestTurnRefs:
+    @pytest.mark.parametrize("shape", sorted(SHAPES))
+    async def test_the_api_names_the_span_the_record_attaches_to(self, monkeypatch, shape):
+        exporter = InMemoryLogRecordExporter()
+        emitter = emit.EvaluationEmitter(exporter)
+        monkeypatch.setattr(emit, "get_emitter", lambda: emitter)
+
+        async def judge(evaluator_def, **_):
+            return MetricResult(metric_name=evaluator_def.name, score=1.0, eval_status="PASSED")
+
+        monkeypatch.setattr(custom_evaluators, "evaluate_custom_evaluator", judge)
+        anchor, evaluated, spans = SHAPES[shape]
+        decoded = decode_json_document(request(spans, resource={"agentevals.session_name": "s"}), strict=True)
+        traces, _ = build_traces(decoded.spans, decoded.logs)
+        params = EvalParams(evaluators=[CodeEvaluatorDef(name="judge", path="j.py")])
+        result = await run_evaluation_from_traces(traces, params)
+        emitter.flush()
+
+        [trace_result] = result.trace_results
+        [ref] = convert.trace_result_to_pb(trace_result).turn_refs
+        [record] = [r.log_record for r in exporter.get_finished_logs()]
+        assert (ref.evaluated_trace_id, ref.evaluated_span_id) == _ref(record)
+        assert (ref.span_id, ref.evaluated_span_id) == (sid(anchor), sid(evaluated))
 
 
 class TestFailures:

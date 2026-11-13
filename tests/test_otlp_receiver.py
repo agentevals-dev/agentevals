@@ -104,7 +104,7 @@ def _request(spans, resource_attrs=None, scope_name="", scope_version="") -> dic
 def _named(name: str, eval_set_id: str | None = None) -> list[dict]:
     attrs = [_attr("agentevals.session_name", name)]
     if eval_set_id:
-        attrs.append(_attr("agentevals.eval_set_id", eval_set_id))
+        attrs.append(_attr("agentevals.eval.set.id", eval_set_id))
     return attrs
 
 
@@ -371,11 +371,11 @@ class TestDecodeProtobuf:
     def test_resource_and_scope_are_preserved(self):
         resource = [
             KeyValue(key="service.name", value=AnyValue(string_value="test-agent")),
-            KeyValue(key="agentevals.eval_set_id", value=AnyValue(string_value="eval-1")),
+            KeyValue(key="agentevals.eval.set.id", value=AnyValue(string_value="eval-1")),
         ]
         raw = _pb_request([_pb_span()], resource, "gcp.vertex.agent", "1.2.3").SerializeToString()
         span = decode_traces_protobuf(raw).spans[0]
-        assert span.resource.attributes == {"service.name": "test-agent", "agentevals.eval_set_id": "eval-1"}
+        assert span.resource.attributes == {"service.name": "test-agent", "agentevals.eval.set.id": "eval-1"}
         assert (span.scope.name, span.scope.version) == ("gcp.vertex.agent", "1.2.3")
 
     def test_multiple_spans(self):
@@ -410,7 +410,7 @@ class TestDecodeProtobuf:
 
 class TestSessionMetadata:
     def test_excludes_agentevals_attributes(self):
-        meta = session_metadata({"agentevals.eval_set_id": "e1", "service.name": "my-agent", "deployment.env": "dev"})
+        meta = session_metadata({"agentevals.eval.set.id": "e1", "service.name": "my-agent", "deployment.env": "dev"})
         assert meta == {"service.name": "my-agent", "deployment.env": "dev"}
 
     def test_unprefixes_sdk_metadata(self):
@@ -429,7 +429,7 @@ class TestSessionMetadata:
 
     def test_non_string_eval_set_id_is_ignored(self):
         store, _ = _store()
-        attrs = [*_named("s1"), {"key": "agentevals.eval_set_id", "value": {"kvlistValue": {"values": []}}}]
+        attrs = [*_named("s1"), {"key": "agentevals.eval.set.id", "value": {"kvlistValue": {"values": []}}}]
         _ingest(store, _request([_span()], attrs))
         assert store.sessions["s1"].eval_set_id is None
 
@@ -958,7 +958,7 @@ class TestInstallSharedExitHandler:
 def _pb_named(name: str, eval_set_id: str | None = None) -> list[KeyValue]:
     attrs = [KeyValue(key="agentevals.session_name", value=AnyValue(string_value=name))]
     if eval_set_id:
-        attrs.append(KeyValue(key="agentevals.eval_set_id", value=AnyValue(string_value=eval_set_id)))
+        attrs.append(KeyValue(key="agentevals.eval.set.id", value=AnyValue(string_value=eval_set_id)))
     return attrs
 
 

@@ -12,6 +12,7 @@ import tempfile
 from collections.abc import AsyncIterator
 from contextlib import contextmanager
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -490,18 +491,21 @@ async def evaluate_traces(
             len(trace_paths),
             [e.name for e in eval_config.evaluators],
         )
+        run_service = _run_service(request)
+        run_id = str(uuid4()) if run_service is not None else None
         resolved_creds = await _resolve_credentials(cred_refs)
         with _scoped_credentials(resolved_creds):
-            result = await run_evaluation(eval_config)
+            result = await run_evaluation(eval_config, run_id=run_id)
 
         run_id = await persist_evaluation(
-            _run_service(request),
+            run_service,
             Evaluation(
                 traces=[],
                 params=eval_config,
                 eval_set_dict=_load_eval_set_dict(eval_set_path),
                 trace_format=eval_config.trace_format,
                 upload_filenames=[tf.filename for tf in trace_files if tf.filename],
+                run_id=run_id,
             ),
             result,
         )

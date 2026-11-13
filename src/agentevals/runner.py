@@ -23,7 +23,7 @@ from .config import EvalParams, EvalRunConfig, EvaluatorDef
 from .genai.extract import extract_conversation
 from .genai.grouping import group_traces, has_session_name
 from .genai.matching import EVAL_CASE_ID, ExpectedConversation, select_case
-from .genai.model import Conversation
+from .genai.model import Conversation, Turn
 from .loader import load_traces
 from .otel.identity import coerce_key
 from .otel.model import Trace
@@ -61,10 +61,25 @@ class MetricResult(BaseModel):
 
 
 class TurnRef(BaseModel):
+    """A judged turn: its anchor span, and the span its results attach to (see
+    :func:`.evaluation_events.evaluated_span`)."""
+
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     trace_id: str
     span_id: str
+    evaluated_trace_id: str
+    evaluated_span_id: str
+
+    @classmethod
+    def of(cls, turn: Turn) -> TurnRef:
+        evaluated = emit.evaluated_span(turn)
+        return cls(
+            trace_id=turn.ref.trace_id,
+            span_id=turn.ref.span_id,
+            evaluated_trace_id=evaluated[0],
+            evaluated_span_id=evaluated[1],
+        )
 
 
 class TraceResult(BaseModel):
@@ -196,6 +211,7 @@ async def run_evaluation(
     config: EvalRunConfig,
     progress_callback: ProgressCallback | None = None,
     trace_progress_callback: TraceProgressCallback | None = None,
+    run_id: str | None = None,
 ) -> RunResult:
     """Load trace files, then evaluate them with :func:`run_evaluation_from_traces`."""
     load_errors: list[str] = []
@@ -226,6 +242,7 @@ async def run_evaluation(
         eval_set=eval_set,
         progress_callback=progress_callback,
         trace_progress_callback=trace_progress_callback,
+        run_id=run_id,
     )
     if load_errors:
         result.errors = load_errors + result.errors
@@ -258,7 +275,7 @@ async def _evaluate_group(
     trace_result.agent_name = identity["agent_name"]
     trace_result.num_invocations = len(conversation.turns)
     trace_result.conversation_id = conversation.conversation_id
-    trace_result.turn_refs = [TurnRef(trace_id=t.ref.trace_id, span_id=t.ref.span_id) for t in conversation.turns]
+    trace_result.turn_refs = [TurnRef.of(t) for t in conversation.turns]
     trace_result.conversion_warnings = sorted(
         {w for trace in traces for w in trace.warnings} | {w.reason for t in conversation.turns for w in t.warnings}
     )

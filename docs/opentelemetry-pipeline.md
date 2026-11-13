@@ -158,17 +158,29 @@ agentevals run traces.json -e eval_set.json -m tool_trajectory_avg_score --emit-
 
 `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` (with port 4317) switches to gRPC. `OTEL_SDK_DISABLED=true` or `OTEL_LOGS_EXPORTER=none` turns emitting off even when it is enabled. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` work as usual.
 
-Each result is a `gen_ai.evaluation.result` log event attached to the span it scores (the turn's agent span, or its last model call). Metrics that score each turn give one event per turn; others give one event on the last turn.
+Each result is a `gen_ai.evaluation.result` log event attached to the span it scores (the turn's agent span, or its last model call). Metrics that score each turn give one event per turn; others give one event on the last turn. The evaluation APIs name the same span in each turn reference (`evaluated_trace_id`, `evaluated_span_id`).
 
 | Attribute | Value |
 |---|---|
 | `gen_ai.evaluation.name` | Evaluator name |
 | `gen_ai.evaluation.score.value` | Score, when there is one |
-| `gen_ai.evaluation.score.label` | `pass`, `fail` or `not_evaluated` |
+| `gen_ai.evaluation.score.label` | `pass`, `fail`, `not_evaluated` or `informational`, see below |
 | `error.type` | Exception class when the evaluator failed (no score or label then) |
 | `gen_ai.evaluation.explanation` | Only with `AGENTEVALS_EVALUATION_EVENTS_EXPLANATION=true` |
 | `gen_ai.agent.name`, `gen_ai.conversation.id`, `gen_ai.response.id` | Copied from the evaluated span when present |
 | `agentevals.evaluator.type` | `llm_judge` or `deterministic` for built in metrics |
-| `agentevals.eval.run.id`, `agentevals.eval.case.id`, `agentevals.eval_set.id` | When known |
+| `agentevals.eval.run.id` | The run: a queued run, an evaluation recorded in run storage, or the `run_id` of an `EvaluateTraces` call |
+| `agentevals.eval.case.id`, `agentevals.eval.set.id` | When known |
+
+| Label | Meaning |
+|---|---|
+| `pass` | The score met the evaluator's threshold |
+| `fail` | The score missed the threshold |
+| `not_evaluated` | The evaluator gave no score, for example because the metric needs an eval set |
+| `informational` | A value to track that never passes or fails, such as `token_usage_v1` |
+
+The GenAI conventions give `pass` and `fail` as example labels and ask each implementation to document its own; `not_evaluated` and `informational` are agentevals values.
+
+The ids have the same names as the resource attributes you set: `agentevals.eval.set.id` (and `agentevals.eval.case.id`) mean the same thing on your telemetry and on these events.
 
 Events never contain prompts, responses or tool arguments. The explanation can, which is why it is off by default.

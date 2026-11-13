@@ -11,8 +11,9 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field, replace
+from typing import Any
+from uuid import UUID, uuid4
 
 from google.adk.evaluation.eval_set import EvalSet
 
@@ -20,11 +21,9 @@ from ..config import EvalParams
 from ..genai.extract import extract_conversation
 from ..otel.model import Trace
 from ..resolvers import reset_resolved_credentials, resolve_credential_refs, set_resolved_credentials
+from ..run.service import RunIdTaken, RunService
 from ..runner import RunResult, TraceResult, evaluation_groups, run_evaluation_from_traces
 from ..trace_metrics import extract_performance_metrics, extract_trace_metadata
-
-if TYPE_CHECKING:
-    from ..run.service import RunService
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +72,8 @@ class Evaluation:
     eval_set_dict: dict[str, Any] | None = None
     trace_format: str | None = None
     upload_filenames: list[str] | None = None
+    # Stamped on the evaluation result records, and the recorded run's id.
+    run_id: str | None = None
 
 
 def performance_events(traces: list[Trace], group_by: str, eval_set: EvalSet | None) -> list[Performance]:
@@ -99,7 +100,12 @@ async def stream_evaluation(
 
     Raises :class:`CredentialResolutionError` after the performance events when a credential
     reference cannot be resolved; nothing is evaluated then.
+
+    With ``run_service``, the run id is chosen before evaluating, so the records emitted during the
+    evaluation carry the id the run is recorded under.
     """
+    if run_service is not None and evaluation.run_id is None:
+        evaluation = replace(evaluation, run_id=str(uuid4()))
     for event in performance_events(evaluation.traces, evaluation.params.group_by, evaluation.eval_set):
         yield event
     resolved = await _resolve(evaluation.credential_refs)
@@ -122,6 +128,7 @@ async def stream_evaluation(
                     eval_set=evaluation.eval_set,
                     progress_callback=on_progress,
                     trace_progress_callback=on_group,
+                    run_id=evaluation.run_id,
                 )
             else:
                 result = RunResult(errors=["No traces loaded."])
@@ -181,6 +188,7 @@ async def persist_evaluation(
         return None
     try:
         run = await run_service.record_eval_run(
+            run_id=UUID(evaluation.run_id) if evaluation.run_id else None,
             params=evaluation.params,
             eval_set_dict=evaluation.eval_set_dict,
             trace_format=evaluation.trace_format,
@@ -188,6 +196,9 @@ async def persist_evaluation(
             run_result=result,
         )
         return str(run.run_id)
+    except RunIdTaken as exc:
+        logger.warning("Not recording the evaluation: %s", exc)
+        return None
     except Exception:
         logger.exception("Failed to record the evaluation as a run; the result is still returned")
         return None
