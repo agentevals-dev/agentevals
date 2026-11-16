@@ -296,8 +296,12 @@ def attach_case_rubrics(
     return attached, warnings
 
 
+def has_rubric_scores(eval_result: EvaluationResult) -> bool:
+    return bool(eval_result.overall_rubric_scores) or any(r.rubric_scores for r in eval_result.per_invocation_results)
+
+
 def extract_rubric_details(eval_result: EvaluationResult) -> dict[str, Any]:
-    """Per-rubric scores, per invocation and overall, from a rubric metric."""
+    """Per-rubric scores and rationale, per invocation and overall, from any metric that returns them."""
 
     def _score(rubric_score: Any) -> dict[str, Any]:
         return {
@@ -405,6 +409,10 @@ def get_evaluator(eval_metric: EvalMetric) -> Evaluator:
         "tool_trajectory_avg_score": (
             "google.adk.evaluation.trajectory_evaluator",
             "TrajectoryEvaluator",
+        ),
+        "final_response_match_v2": (
+            "agentevals.judges",
+            "FinalResponseMatchV2WithReasoning",
         ),
     }
 
@@ -609,7 +617,7 @@ async def evaluate_builtin_metric(
         details = None
         if metric_name == "tool_trajectory_avg_score":
             details = extract_trajectory_details(eval_result)
-        elif metric_name in RUBRIC_METRIC_TYPES:
+        elif metric_name in RUBRIC_METRIC_TYPES or has_rubric_scores(eval_result):
             details = extract_rubric_details(eval_result)
             if rubric_warnings:
                 details["warnings"] = rubric_warnings
