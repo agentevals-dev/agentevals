@@ -10,17 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.16.0",
+    "@bufbuild/protobuf": "^2.17.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "antd": "^6.7.0",
     "chart.js": "^4.6.1",
-    "framer-motion": "^14.9.1",
-    "lucide-react": "^1.68.0",
+    "framer-motion": "^14.12.0",
+    "lucide-react": "^1.72.0",
     "react": "^19.3.1",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.3.1",
-    "react-virtuoso": "^4.18.20"
+    "react-virtuoso": "^4.18.21"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -33,7 +33,7 @@
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.14.0",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.72.1",
-    "vite": "^7.3.7"
+    "typescript-eslint": "^8.72.2",
+    "vite": "^7.3.8"
   }
 }
