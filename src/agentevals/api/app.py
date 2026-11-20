@@ -137,7 +137,7 @@ def _build_lifespan():
             from .rpc.services import ApiContext
 
             context = ApiContext(manager=mgr, run_service=getattr(app.state, "run_service", None), ports=api_grpc.ports)
-            api_server = await start_api_server(context, api_grpc.host, api_grpc.port)
+            api_server = await start_api_server(context, api_grpc.host, api_grpc.port, api_grpc.auth)
 
         yield
 

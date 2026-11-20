@@ -169,6 +169,81 @@ def test_serve_api_grpc_only_from_env(monkeypatch):
     assert "gRPC API:  0.0.0.0:8002" in result.output
 
 
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["--api-grpc-auth", "kubernetes"], "needs at least one --api-grpc-auth-allowed-service-account"),
+        (["--api-grpc-auth-allowed-service-account", "team/caller"], "needs --api-grpc-auth kubernetes"),
+        (
+            ["--api-grpc-auth", "kubernetes", "--api-grpc-auth-allowed-service-account", "team"],
+            "expected a ServiceAccount as namespace/name",
+        ),
+        (
+            ["--api-grpc-auth", "kubernetes", "--api-grpc-auth-allowed-service-account", "team/caller"]
+            + ["--api-grpc-port", "0"],
+            "--api-grpc-auth needs the gRPC API",
+        ),
+    ],
+    ids=["empty-allowlist", "allowlist-without-auth", "malformed", "no-grpc-api"],
+)
+def test_serve_refuses_an_incomplete_auth_setup(monkeypatch, args, message):
+    run_servers = AsyncMock()
+    monkeypatch.setattr(cli, "_run_servers", run_servers)
+
+    result = CliRunner().invoke(cli.main, ["serve", *args])
+
+    assert result.exit_code == 2
+    assert message in result.output
+    run_servers.assert_not_called()
+
+
+def test_serve_refuses_to_start_without_a_kubernetes_client(monkeypatch):
+    from agentevals.api.rpc import auth
+
+    def no_cluster():
+        raise RuntimeError("no cluster configuration")
+
+    run_servers = AsyncMock()
+    monkeypatch.setattr(cli, "_run_servers", run_servers)
+    monkeypatch.setattr(auth, "kubernetes_token_reviews", no_cluster)
+
+    result = CliRunner().invoke(
+        cli.main, ["serve", "--api-grpc-auth", "kubernetes", "--api-grpc-auth-allowed-service-account", "team/caller"]
+    )
+
+    assert result.exit_code == 1
+    assert "cannot set up Kubernetes authentication: no cluster configuration" in result.output
+    run_servers.assert_not_called()
+
+
+def test_serve_reads_auth_from_env(monkeypatch):
+    from agentevals.api.rpc import auth
+
+    for name in ("AGENTEVALS_HEADLESS", "AGENTEVALS_LIVE"):
+        monkeypatch.setenv(name, "")
+    token_reviews = object()
+    run_servers = AsyncMock()
+    monkeypatch.setattr(cli, "_run_servers", run_servers)
+    monkeypatch.setattr(auth, "kubernetes_token_reviews", lambda: token_reviews)
+
+    result = CliRunner().invoke(
+        cli.main,
+        ["serve", "--headless"],
+        env={
+            "AGENTEVALS_API_GRPC_AUTH": "kubernetes",
+            "AGENTEVALS_API_GRPC_AUTH_AUDIENCE": "evals",
+            "AGENTEVALS_API_GRPC_AUTH_ALLOWED_SERVICE_ACCOUNTS": "team/caller, ops/runner",
+        },
+    )
+
+    assert result.exit_code == 0, result.output
+    settings = run_servers.call_args.kwargs["api_grpc_auth"]
+    assert settings.audience == "evals"
+    assert settings.allowed_service_accounts == {"team/caller", "ops/runner"}
+    assert settings.token_reviews is token_reviews
+    assert "stay unauthenticated on 0.0.0.0" in result.stderr
+
+
 def test_run_preserves_config_file_settings_when_flags_omitted(monkeypatch, tmp_path):
     trace_file = tmp_path / "trace.json"
     trace_file.write_text("{}", encoding="utf-8")
