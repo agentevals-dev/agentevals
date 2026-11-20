@@ -22,12 +22,14 @@ from agentevals.builtin_metrics import (
     build_eval_metric,
     evaluate_builtin_metric,
     extract_rubric_details,
+    get_evaluator,
     to_rubric_objects,
 )
 from agentevals.config import BuiltinMetricDef, RubricDef, apply_builtin_overrides
 from agentevals.custom_evaluators import evaluate_custom_evaluator
 from agentevals.eval_config_loader import load_eval_config
 from agentevals.genai.extract import extract_conversation
+from agentevals.judges import RubricBasedFinalResponseQualityV1WithHistory, format_preceding_dialogue
 from agentevals.runner import EvalRunConfig, run_evaluation
 from otel.builders import request, span
 from test_runner import _make_eval_set_json, _make_tool_trace
@@ -439,3 +441,81 @@ class TestDetails:
             }
         ]
         assert [r["rubric_id"] for r in details["overall_rubric_scores"]] == ["grounded", "corrected"]
+
+
+class TestPrecedingConversationContext:
+    def test_preceding_turns_are_provided_and_future_turns_excluded(self, monkeypatch):
+        captured_prompts: list[tuple[str, str]] = []
+        metric = build_eval_metric(METRIC, "gemini-2.5-flash", 0.5, rubrics=["Honors latest preference."])
+        evaluator = get_evaluator(metric)
+        assert isinstance(evaluator, RubricBasedFinalResponseQualityV1WithHistory)
+
+        orig_format = evaluator.format_auto_rater_prompt
+
+        def spy_format(actual, expected):
+            prompt = orig_format(actual, expected)
+            captured_prompts.append((actual.invocation_id, prompt))
+            return prompt
+
+        monkeypatch.setattr(evaluator, "format_auto_rater_prompt", spy_format)
+
+        async def fake_evaluate_sample(llm_request, actual, expected):
+            return PerInvocationResult(
+                actual_invocation=actual,
+                expected_invocation=expected,
+                score=1.0,
+                eval_status=EvalStatus.PASSED,
+                rubric_scores=[RubricScore(rubric_id="rubric_0", score=1.0, rationale="evidence found")],
+            )
+
+        monkeypatch.setattr(evaluator, "_evaluate_single_sample", fake_evaluate_sample)
+
+        t1 = _invocation("Turn 1 user request")
+        t1 = t1.model_copy(
+            update={
+                "final_response": genai_types.Content(
+                    role="model", parts=[genai_types.Part(text="Turn 1 assistant reply")]
+                )
+            }
+        )
+        t2 = _invocation("Turn 2 correction request")
+        t2 = t2.model_copy(
+            update={
+                "final_response": genai_types.Content(
+                    role="model", parts=[genai_types.Part(text="Turn 2 assistant completed reply")]
+                )
+            }
+        )
+
+        eval_result = asyncio.run(evaluator.evaluate_invocations([t1, t2]))
+        assert eval_result.overall_score == 1.0
+        assert len(captured_prompts) == 2
+
+        # Turn 1: No previous history, and must NOT leak Turn 2
+        id_1, prompt_1 = captured_prompts[0]
+        assert id_1 == t1.invocation_id
+        assert "None (this is the first turn)." in prompt_1
+        assert "Turn 2" not in prompt_1
+        assert "Turn 2 correction request" not in prompt_1
+
+        # Turn 2: Preceding history includes Turn 1
+        id_2, prompt_2 = captured_prompts[1]
+        assert id_2 == t2.invocation_id
+        assert "Turn 1:" in prompt_2
+        assert "User: Turn 1 user request" in prompt_2
+        assert "Assistant: Turn 1 assistant reply" in prompt_2
+        assert "Turn 2 correction request" in prompt_2
+
+    def test_format_preceding_dialogue_handles_empty_and_tools(self):
+        assert format_preceding_dialogue([]) == "None (this is the first turn)."
+        inv = _invocation("Hello")
+        inv = inv.model_copy(
+            update={
+                "final_response": genai_types.Content(role="model", parts=[genai_types.Part(text="Hi there")]),
+            }
+        )
+        formatted = format_preceding_dialogue([inv])
+        assert "Turn 1:" in formatted
+        assert "User: Hello" in formatted
+        assert "Assistant: Hi there" in formatted
+

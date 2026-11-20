@@ -414,6 +414,10 @@ def get_evaluator(eval_metric: EvalMetric) -> Evaluator:
             "agentevals.judges",
             "FinalResponseMatchV2WithReasoning",
         ),
+        "rubric_based_final_response_quality_v1": (
+            "agentevals.judges",
+            "RubricBasedFinalResponseQualityV1WithHistory",
+        ),
     }
 
     if name in _DIRECT_EVALUATORS:
