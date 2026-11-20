@@ -8,6 +8,7 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
+    {{- if not .Values.grpcApi.only }}
     - name: http
       port: {{ .Values.service.http.port }}
       targetPort: http
@@ -24,6 +25,7 @@ spec:
       port: {{ .Values.service.mcp.port }}
       targetPort: mcp
       protocol: TCP
+    {{- end }}
     {{- if .Values.grpcApi.enabled }}
     - name: grpc-api
       port: {{ .Values.service.grpcApi.port }}

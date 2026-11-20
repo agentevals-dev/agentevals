@@ -1,3 +1,6 @@
+{{- if .Values.grpcApi.only }}
+1. gRPC API (agentevals.api.v1alpha1): port {{ .Values.service.grpcApi.port }} (Service port name: grpc-api). It is the only port on the pod network; the web UI, REST API, OTLP receivers and MCP listen on 127.0.0.1 inside the pod.
+{{- else }}
 1. UI and API are available at port {{ .Values.service.http.port }} (Service port name: http).
 2. OTLP HTTP receiver: port {{ .Values.service.otlpHttp.port }} (OTEL_EXPORTER_OTLP_ENDPOINT=http://<service>:{{ .Values.service.otlpHttp.port }}).
 3. OTLP gRPC receiver: port {{ .Values.service.otlpGrpc.port }} (OTEL_EXPORTER_OTLP_ENDPOINT=<service>:{{ .Values.service.otlpGrpc.port }}, OTEL_EXPORTER_OTLP_PROTOCOL=grpc).
@@ -5,15 +8,30 @@
 {{- if .Values.grpcApi.enabled }}
 5. gRPC API (agentevals.api.v1alpha1): port {{ .Values.service.grpcApi.port }} (Service port name: grpc-api). Expose it only to trusted callers.
 {{- end }}
+{{- end }}
 {{- if .Values.ephemeralVolume.enabled }}
-{{ ternary 6 5 .Values.grpcApi.enabled }}. An emptyDir is mounted at /tmp with HOME=/tmp/agentevals-home (ephemeral; lost on pod restart). Set ephemeralVolume.enabled=false and readOnlyRootFilesystem=false if you need a writable root without this mount.
+{{ if .Values.grpcApi.only }}2{{ else }}{{ ternary 6 5 .Values.grpcApi.enabled }}{{ end }}. An emptyDir is mounted at /tmp with HOME=/tmp/agentevals-home (ephemeral; lost on pod restart). Set ephemeralVolume.enabled=false and readOnlyRootFilesystem=false if you need a writable root without this mount.
+{{- end }}
+{{- if .Values.grpcApi.auth.enabled }}
+
+gRPC API callers send a ServiceAccount token for audience "{{ .Values.grpcApi.auth.audience }}" as "authorization: Bearer <token>" metadata.
+Allowed ServiceAccounts: {{ join ", " .Values.grpcApi.auth.allowedServiceAccounts }}. Health checks need no token.
+{{- if not .Values.grpcApi.only }}
+WARNING: authentication covers only the gRPC API. The UI, REST API, OTLP receivers and MCP stay unauthenticated; set grpcApi.only=true to keep them on 127.0.0.1.
+{{- end }}
 {{- end }}
 
 Get the Service URL:
   export POD_NAME=$(kubectl get pods --namespace {{ include "agentevals.namespace" . }} -l "app.kubernetes.io/name={{ include "agentevals.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
   kubectl --namespace {{ include "agentevals.namespace" . }} port-forward $POD_NAME {{ .Values.service.http.port }}:{{ .Values.service.http.port }}
 
+{{- if .Values.grpcApi.only }}
+
+Health check: grpc.health.v1 on <pod-ip>:{{ .Values.service.grpcApi.containerPort }}
+{{- else }}
+
 Health check: GET http://<pod-ip>:{{ .Values.service.http.containerPort }}/api/health
+{{- end }}
 
 {{- if eq .Values.storage.backend "postgres" }}
 

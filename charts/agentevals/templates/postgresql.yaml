@@ -51,9 +51,8 @@ spec:
         {{- include "agentevals.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: database
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+      {{- with include "agentevals.imagePullSecrets" . }}
+      {{- . | nindent 6 }}
       {{- end }}
       serviceAccountName: {{ $fullname }}
       securityContext:
@@ -64,7 +63,7 @@ spec:
       containers:
         - name: postgresql
           image: {{ include "agentevals.postgresql.image" . }}
-          imagePullPolicy: {{ $pg.image.pullPolicy }}
+          imagePullPolicy: {{ include "agentevals.imagePullPolicy" (dict "root" $ "local" $pg.image.pullPolicy) }}
           securityContext:
             allowPrivilegeEscalation: false
           ports:
