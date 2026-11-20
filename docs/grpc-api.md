@@ -127,3 +127,13 @@ grpcApi:
 ```
 
 The chart then adds a ClusterRole and ClusterRoleBinding that let its ServiceAccount create TokenReviews. It refuses to render with an empty `allowedServiceAccounts`, or without `serviceAccount.create` or `serviceAccount.name`, so the permission never goes to the namespace's `default` ServiceAccount.
+
+Entries in `allowedServiceAccounts` are templates. A parent chart that ships agentevals as a subchart can name its own caller without knowing the namespace in advance:
+
+```yaml
+agentevals:
+  grpcApi:
+    auth:
+      allowedServiceAccounts:
+        - "{{ .Release.Namespace }}/{{ .Release.Name }}-controller"
+```

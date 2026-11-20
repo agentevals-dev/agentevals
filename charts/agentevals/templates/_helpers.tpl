@@ -26,10 +26,14 @@
 {{- define "agentevals.image" -}}
 {{- $registry := (.Values.global | default dict).imageRegistry | default .Values.image.registry | default .Values.registry -}}
 {{- $tag := .Values.image.tag | default .Values.tag | default .Chart.AppVersion -}}
+{{- $ref := printf "%s:%s" .Values.image.repository $tag -}}
+{{- if .Values.image.digest -}}
+{{- $ref = printf "%s@%s" .Values.image.repository .Values.image.digest -}}
+{{- end -}}
 {{- if $registry -}}
-{{- printf "%s/%s:%s" $registry .Values.image.repository $tag -}}
+{{- printf "%s/%s" $registry $ref -}}
 {{- else -}}
-{{- printf "%s:%s" .Values.image.repository $tag -}}
+{{- $ref -}}
 {{- end -}}
 {{- end }}
 
@@ -110,6 +114,18 @@ ClusterRole and ClusterRoleBinding name for TokenReviews; cluster scoped, so it 
 {{- end -}}
 
 {{/*
+grpcApi.auth.allowedServiceAccounts as a JSON list, each entry rendered with tpl, so a parent chart
+can name its own namespace and release in an entry.
+*/}}
+{{- define "agentevals.allowedServiceAccounts" -}}
+{{- $rendered := list -}}
+{{- range .Values.grpcApi.auth.allowedServiceAccounts -}}
+{{- $rendered = append $rendered (tpl (toString .) $ | trim) -}}
+{{- end -}}
+{{- toJson $rendered -}}
+{{- end -}}
+
+{{/*
 Fail the render on a gRPC API setup the server would refuse, or one that grants the TokenReview
 permission to the namespace's default ServiceAccount.
 */}}
@@ -128,9 +144,9 @@ permission to the namespace's default ServiceAccount.
 {{- if empty $api.auth.allowedServiceAccounts -}}
 {{- fail "grpcApi.auth.enabled needs grpcApi.auth.allowedServiceAccounts (namespace/name): any pod can mint a token for any audience, so the audience alone authorizes nothing" -}}
 {{- end -}}
-{{- range $api.auth.allowedServiceAccounts -}}
-{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?/[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$" (toString .)) -}}
-{{- fail (printf "grpcApi.auth.allowedServiceAccounts: %q is not namespace/name" (toString .)) -}}
+{{- range include "agentevals.allowedServiceAccounts" . | fromJsonArray -}}
+{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?/[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$" .) -}}
+{{- fail (printf "grpcApi.auth.allowedServiceAccounts: %q is not namespace/name" .) -}}
 {{- end -}}
 {{- end -}}
 {{- if and (not .Values.serviceAccount.create) (empty .Values.serviceAccount.name) -}}

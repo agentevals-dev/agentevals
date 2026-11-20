@@ -15,7 +15,7 @@
 {{- if .Values.grpcApi.auth.enabled }}
 
 gRPC API callers send a ServiceAccount token for audience "{{ .Values.grpcApi.auth.audience }}" as "authorization: Bearer <token>" metadata.
-Allowed ServiceAccounts: {{ join ", " .Values.grpcApi.auth.allowedServiceAccounts }}. Health checks need no token.
+Allowed ServiceAccounts: {{ include "agentevals.allowedServiceAccounts" . | fromJsonArray | join ", " }}. Health checks need no token.
 {{- if not .Values.grpcApi.only }}
 WARNING: authentication covers only the gRPC API. The UI, REST API, OTLP receivers and MCP stay unauthenticated; set grpcApi.only=true to keep them on 127.0.0.1.
 {{- end }}

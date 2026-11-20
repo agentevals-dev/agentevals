@@ -80,7 +80,7 @@ spec:
             - name: AGENTEVALS_API_GRPC_AUTH_AUDIENCE
               value: {{ .Values.grpcApi.auth.audience | quote }}
             - name: AGENTEVALS_API_GRPC_AUTH_ALLOWED_SERVICE_ACCOUNTS
-              value: {{ join "," .Values.grpcApi.auth.allowedServiceAccounts | quote }}
+              value: {{ include "agentevals.allowedServiceAccounts" . | fromJsonArray | join "," | quote }}
             {{- end }}
             {{- if .Values.ephemeralVolume.enabled }}
             - name: TMPDIR
