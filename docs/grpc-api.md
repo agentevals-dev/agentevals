@@ -50,12 +50,23 @@ Errors use standard gRPC status codes with a `google.rpc.ErrorInfo` detail whose
 | Setting | Purpose |
 |---------|---------|
 | `--api-grpc-port` or `AGENTEVALS_API_GRPC_PORT` | Port, default `8002`; `0` turns the API off |
+| `--api-grpc-only` or `AGENTEVALS_API_GRPC_ONLY=true` | Serve only the gRPC API on `--host`, see below |
 | `AGENTEVALS_GRPC_REFLECTION=true` | Turn on server reflection |
 | `AGENTEVALS_API_TRACES=true` | Export traces of the API server itself (see below) |
 
 Messages can be up to 16 MiB. Uploaded trace documents are limited to 10 MiB each, as in the REST API.
 
 The Helm chart has the same switches under `grpcApi`: `enabled`, `reflection`, and `grpcReadinessProbe` to check readiness with the gRPC health service. The Service exposes the port as `grpc-api`.
+
+### Serving only the gRPC API
+
+When one program is the only caller, run the server with `--api-grpc-only`. The gRPC API listens on `--host`. The web UI and REST API, both OTLP receivers and MCP listen on `127.0.0.1` only, so nothing else is reachable from the network:
+
+```bash
+uv run agentevals serve --api-grpc-only
+```
+
+Check health with `grpc.health.v1` on the gRPC API port; `/api/health` is only reachable from inside the host or pod. `kubectl port-forward` still reaches the web UI, because it connects to the pod's loopback address.
 
 ## Tracing the API server
 
