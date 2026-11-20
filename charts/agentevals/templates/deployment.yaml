@@ -1,3 +1,4 @@
+{{- include "agentevals.validateGrpcApi" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,9 +23,8 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+      {{- with include "agentevals.imagePullSecrets" . }}
+      {{- . | nindent 6 }}
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
@@ -52,7 +52,7 @@ spec:
       containers:
         - name: agentevals
           image: {{ include "agentevals.image" . | quote }}
-          imagePullPolicy: {{ .Values.image.pullPolicy | default .Values.imagePullPolicy }}
+          imagePullPolicy: {{ include "agentevals.imagePullPolicy" (dict "root" $ "local" .Values.image.pullPolicy) }}
           {{- if .Values.command }}
           command:
             {{- toYaml .Values.command | nindent 12 }}
@@ -69,6 +69,18 @@ spec:
             {{- if and .Values.grpcApi.enabled .Values.grpcApi.reflection }}
             - name: AGENTEVALS_GRPC_REFLECTION
               value: "true"
+            {{- end }}
+            {{- if .Values.grpcApi.only }}
+            - name: AGENTEVALS_API_GRPC_ONLY
+              value: "true"
+            {{- end }}
+            {{- if .Values.grpcApi.auth.enabled }}
+            - name: AGENTEVALS_API_GRPC_AUTH
+              value: "kubernetes"
+            - name: AGENTEVALS_API_GRPC_AUTH_AUDIENCE
+              value: {{ .Values.grpcApi.auth.audience | quote }}
+            - name: AGENTEVALS_API_GRPC_AUTH_ALLOWED_SERVICE_ACCOUNTS
+              value: {{ join "," .Values.grpcApi.auth.allowedServiceAccounts | quote }}
             {{- end }}
             {{- if .Values.ephemeralVolume.enabled }}
             - name: TMPDIR
@@ -111,6 +123,7 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           ports:
+            {{- if not .Values.grpcApi.only }}
             - name: http
               containerPort: {{ .Values.service.http.containerPort }}
               protocol: TCP
@@ -123,6 +136,7 @@ spec:
             - name: mcp
               containerPort: {{ .Values.service.mcp.containerPort }}
               protocol: TCP
+            {{- end }}
             {{- if .Values.grpcApi.enabled }}
             - name: grpc-api
               containerPort: {{ .Values.service.grpcApi.containerPort }}
@@ -136,15 +150,21 @@ spec:
             {{- $_ := set $sc "readOnlyRootFilesystem" false }}
             {{- end }}
             {{- toYaml $sc | nindent 12 }}
+          {{- /* In grpcApi.only mode /api/health listens on 127.0.0.1, out of the kubelet's reach. */}}
           startupProbe:
+            {{- if .Values.grpcApi.only }}
+            grpc:
+              port: {{ .Values.service.grpcApi.containerPort }}
+            {{- else }}
             httpGet:
               path: /api/health
               port: http
+            {{- end }}
             failureThreshold: 60
             periodSeconds: 10
             timeoutSeconds: 5
           readinessProbe:
-            {{- if and .Values.grpcApi.enabled .Values.grpcApi.grpcReadinessProbe }}
+            {{- if and .Values.grpcApi.enabled (or .Values.grpcApi.only .Values.grpcApi.grpcReadinessProbe) }}
             grpc:
               port: {{ .Values.service.grpcApi.containerPort }}
             {{- else }}
@@ -155,9 +175,14 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
+            {{- if .Values.grpcApi.only }}
+            grpc:
+              port: {{ .Values.service.grpcApi.containerPort }}
+            {{- else }}
             httpGet:
               path: /api/health
               port: http
+            {{- end }}
             initialDelaySeconds: 15
             periodSeconds: 20
           {{- if or .Values.ephemeralVolume.enabled .Values.extraVolumeMounts }}

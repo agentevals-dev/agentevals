@@ -59,7 +59,7 @@ Errors use standard gRPC status codes with a `google.rpc.ErrorInfo` detail whose
 
 Messages can be up to 16 MiB. Uploaded trace documents are limited to 10 MiB each, as in the REST API.
 
-The Helm chart has the same switches under `grpcApi`: `enabled`, `reflection`, and `grpcReadinessProbe` to check readiness with the gRPC health service. The Service exposes the port as `grpc-api`.
+The Helm chart has the same switches under `grpcApi`: `enabled`, `reflection`, `grpcReadinessProbe` to check readiness with the gRPC health service, `only`, and `auth`. The Service exposes the port as `grpc-api`.
 
 ### Serving only the gRPC API
 
@@ -70,6 +70,8 @@ uv run agentevals serve --api-grpc-only
 ```
 
 Check health with `grpc.health.v1` on the gRPC API port; `/api/health` is only reachable from inside the host or pod. `kubectl port-forward` still reaches the web UI, because it connects to the pod's loopback address.
+
+In the Helm chart, `grpcApi.only=true` does the same. The Service then exposes only `grpc-api`, and the startup, readiness and liveness probes use the gRPC health service.
 
 ## Tracing the API server
 
@@ -109,3 +111,19 @@ Callers send a ServiceAccount token minted for the audience as `authorization: B
 The list is required: any pod can mint a token for any audience, so the audience alone proves nothing. The server refuses to start with an empty list, and never lets a call through when a check fails. A successful check is cached for up to 30 seconds and never past the token's expiry. Health checks need no token. Reflection, when turned on, needs one like every other call: `grpcurl -H "authorization: Bearer $TOKEN" ...`.
 
 Authentication covers only the gRPC API. Combine it with `--api-grpc-only` so the REST API, the OTLP receivers and MCP stay on `127.0.0.1`; without it the server prints a warning.
+
+With the Helm chart:
+
+```yaml
+serviceAccount:
+  create: true
+grpcApi:
+  only: true
+  auth:
+    enabled: true
+    audience: agentevals
+    allowedServiceAccounts:
+      - evals/controller
+```
+
+The chart then adds a ClusterRole and ClusterRoleBinding that let its ServiceAccount create TokenReviews. It refuses to render with an empty `allowedServiceAccounts`, or without `serviceAccount.create` or `serviceAccount.name`, so the permission never goes to the namespace's `default` ServiceAccount.

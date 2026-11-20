@@ -2,6 +2,18 @@
 # Global
 # ==============================================================================
 
+# Values a parent chart can share with this one.
+global:
+  # -- Registry for every image of this chart, including the bundled Postgres.
+  # Takes precedence over registry, image.registry and
+  # database.postgres.bundled.image.registry.
+  imageRegistry: ""
+  # -- Pull secrets for every pod of this chart, merged (union) with
+  # imagePullSecrets.
+  imagePullSecrets: []
+  # -- Fallback pull policy where neither the image nor imagePullPolicy sets one.
+  imagePullPolicy: ""
+
 # -- Number of replicas. Keep 1 when agents or a Collector send OTLP to this
 # release: live sessions are held in the memory of the pod that receives them,
 # so with more replicas one session's traces and logs end up split across pods.
@@ -9,16 +21,18 @@
 # replicas (SELECT FOR UPDATE SKIP LOCKED claims), not live sessions.
 replicaCount: 1
 
-# -- Global container image registry (prepended to image.repository)
+# -- Container image registry (prepended to image.repository). global.imageRegistry
+# takes precedence.
 registry: ghcr.io
 
 # -- Global image tag override (defaults to Chart.appVersion)
 tag: ""
 
-# -- Global image pull policy
-imagePullPolicy: IfNotPresent
+# -- Image pull policy for every container. Empty falls back to
+# global.imagePullPolicy, then IfNotPresent.
+imagePullPolicy: ""
 
-# -- Image pull secrets
+# -- Image pull secrets, merged with global.imagePullSecrets
 imagePullSecrets: []
 
 # -- Override the chart name
@@ -41,7 +55,7 @@ image:
   repository: agentevals-dev/agentevals
   # -- Container image tag (defaults to global tag, then Chart.appVersion)
   tag: ""
-  # -- Container image pull policy (defaults to global imagePullPolicy)
+  # -- Container image pull policy (defaults to imagePullPolicy)
   pullPolicy: ""
 
 # ==============================================================================
@@ -159,6 +173,24 @@ grpcApi:
   # -- Check readiness with the gRPC health service on the gRPC API port instead of HTTP
   # /api/health
   grpcReadinessProbe: false
+  # -- Serve only the gRPC API on the pod network (--api-grpc-only). The web UI and
+  # REST API, the OTLP receivers and MCP listen on 127.0.0.1 inside the pod, where
+  # kubectl port-forward still reaches them. The Service exposes only grpc-api and
+  # every probe uses the gRPC health service.
+  only: false
+  auth:
+    # -- Require a Kubernetes ServiceAccount token on every gRPC API call except
+    # health checks (--api-grpc-auth kubernetes). Renders a ClusterRole and
+    # ClusterRoleBinding that let the chart's ServiceAccount create TokenReviews,
+    # so it needs serviceAccount.create or serviceAccount.name. Covers only the
+    # gRPC API: combine it with grpcApi.only.
+    enabled: false
+    # -- Audience the callers' tokens must be minted for
+    audience: agentevals
+    # -- ServiceAccounts allowed to call the API, as namespace/name. Required when
+    # enabled: any pod can mint a token for any audience, so the audience alone
+    # authorizes nothing.
+    allowedServiceAccounts: []
 
 # ==============================================================================
 # Resources
@@ -273,8 +305,8 @@ database:
         name: postgres
         # -- Bundled Postgres image tag
         tag: "18.3-alpine"
-        # -- Bundled Postgres image pull policy
-        pullPolicy: IfNotPresent
+        # -- Bundled Postgres image pull policy (defaults to imagePullPolicy)
+        pullPolicy: ""
       # -- PersistentVolumeClaim size for the bundled Postgres data
       storage: 1Gi
       # -- StorageClass for the PVC. Defaults to the cluster default when empty.

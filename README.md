@@ -213,7 +213,7 @@ docker run -p 8001:8001 -p 8002:8002 -p 4317:4317 -p 4318:4318 agentevals
 helm install agentevals oci://ghcr.io/agentevals-dev/agentevals/helm/agentevals
 ```
 
-The chart runs in memory by default. `--set storage.backend=postgres` with a bundled or external Postgres enables the async `/api/runs` pipeline and the Run History view. That storage layer is a preview and its schema may change between minor versions. See [Run History](docs/run-history.md) and the [Kubernetes example](examples/kubernetes/README.md) for a full walkthrough with kagent and an OpenTelemetry Collector.
+The chart runs in memory by default. A parent chart can redirect every image with `global.imageRegistry` and add pull secrets with `global.imagePullSecrets`. `--set storage.backend=postgres` with a bundled or external Postgres enables the async `/api/runs` pipeline and the Run History view. That storage layer is a preview and its schema may change between minor versions. See [Run History](docs/run-history.md) and the [Kubernetes example](examples/kubernetes/README.md) for a full walkthrough with kagent and an OpenTelemetry Collector.
 
 ## Examples
 
