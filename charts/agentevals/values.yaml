@@ -55,6 +55,8 @@ image:
   repository: agentevals-dev/agentevals
   # -- Container image tag (defaults to global tag, then Chart.appVersion)
   tag: ""
+  # -- Container image digest, e.g. "sha256:...". Takes precedence over the tag.
+  digest: ""
   # -- Container image pull policy (defaults to imagePullPolicy)
   pullPolicy: ""
 
@@ -189,7 +191,8 @@ grpcApi:
     audience: agentevals
     # -- ServiceAccounts allowed to call the API, as namespace/name. Required when
     # enabled: any pod can mint a token for any audience, so the audience alone
-    # authorizes nothing.
+    # authorizes nothing. Entries are templates, so a parent chart can write
+    # "{{ .Release.Namespace }}/{{ .Release.Name }}-caller".
     allowedServiceAccounts: []
 
 # ==============================================================================

@@ -3,5 +3,5 @@ name: agentevals
 description: agentevals web UI, gRPC API, OTLP HTTP+gRPC receivers, and MCP (Streamable HTTP)
 type: application
 # The release workflow sets version and appVersion to the release tag when it publishes the chart.
-version: 0.14.1
-appVersion: "0.14.1"
+version: 0.15.0
+appVersion: "0.15.0"
