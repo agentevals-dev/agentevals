@@ -114,6 +114,61 @@ async def test_run_servers_shares_one_trace_manager_across_live_servers(monkeypa
     fake_stop_grpc.assert_awaited_once_with(fake_grpc_server)
 
 
+@pytest.mark.asyncio
+async def test_run_servers_api_grpc_only_binds_everything_else_to_loopback(monkeypatch):
+    created_servers: list[_FakeUvicornServer] = []
+    otlp_grpc_hosts: list[str] = []
+
+    def fake_create_otlp_grpc_server(*, host, port, manager):
+        otlp_grpc_hosts.append(host)
+        return _FakeGrpcServer()
+
+    def fake_server_factory(config):
+        server = _FakeUvicornServer(config)
+        created_servers.append(server)
+        return server
+
+    fake_uvicorn = ModuleType("uvicorn")
+    fake_uvicorn.Config = _FakeUvicornConfig
+    fake_uvicorn.Server = fake_server_factory
+
+    monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
+    monkeypatch.setattr(cli, "create_otlp_grpc_server", fake_create_otlp_grpc_server)
+    monkeypatch.setattr(cli, "stop_otlp_grpc_server", AsyncMock())
+
+    await cli._run_servers("0.0.0.0", 8001, 4318, 4317, api_grpc_port=8002, api_grpc_only=True)
+
+    assert [s.config.kwargs["host"] for s in created_servers] == ["127.0.0.1", "127.0.0.1"]
+    assert otlp_grpc_hosts == ["127.0.0.1"]
+    api_grpc = created_servers[0].config.app.state.api_grpc
+    assert (api_grpc.host, api_grpc.port) == ("0.0.0.0", 8002)
+
+
+def test_serve_api_grpc_only_needs_the_grpc_api(monkeypatch):
+    run_servers = AsyncMock()
+    monkeypatch.setattr(cli, "_run_servers", run_servers)
+
+    result = CliRunner().invoke(cli.main, ["serve", "--api-grpc-only", "--api-grpc-port", "0"])
+
+    assert result.exit_code == 2
+    assert "--api-grpc-only needs the gRPC API" in result.output
+    run_servers.assert_not_called()
+
+
+def test_serve_api_grpc_only_from_env(monkeypatch):
+    for name in ("AGENTEVALS_HEADLESS", "AGENTEVALS_LIVE"):
+        monkeypatch.setenv(name, "")
+    run_servers = AsyncMock()
+    monkeypatch.setattr(cli, "_run_servers", run_servers)
+
+    result = CliRunner().invoke(cli.main, ["serve", "--headless"], env={"AGENTEVALS_API_GRPC_ONLY": "true"})
+
+    assert result.exit_code == 0, result.output
+    assert run_servers.call_args.kwargs["api_grpc_only"] is True
+    assert "agentevals API:  http://127.0.0.1:8001/api" in result.output
+    assert "gRPC API:  0.0.0.0:8002" in result.output
+
+
 def test_run_preserves_config_file_settings_when_flags_omitted(monkeypatch, tmp_path):
     trace_file = tmp_path / "trace.json"
     trace_file.write_text("{}", encoding="utf-8")

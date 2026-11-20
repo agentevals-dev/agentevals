@@ -21,6 +21,8 @@ import click
 from . import __version__
 from .api.otlp_grpc import create_otlp_grpc_server, stop_otlp_grpc_server
 
+LOOPBACK_HOST = "127.0.0.1"
+
 
 def _relative_time(iso_str: str | None) -> str:
     """Format an ISO 8601 timestamp as a human-readable relative time string."""
@@ -541,10 +543,13 @@ async def _run_servers(
     otlp_grpc_port: int,
     *,
     api_grpc_port: int = 0,
+    api_grpc_only: bool = False,
     mcp_port: int | None = None,
     log_level: str = "warning",
 ) -> None:
-    """Start the REST API and UI, the gRPC API, the OTLP HTTP and gRPC receivers, and optional MCP."""
+    """Start the REST API and UI, the gRPC API, the OTLP HTTP and gRPC receivers, and optional MCP.
+
+    With ``api_grpc_only`` only the gRPC API binds ``host``; every other listener binds loopback."""
     import uvicorn
 
     from .api.app import create_app
@@ -554,8 +559,9 @@ async def _run_servers(
     from .api.rpc.services import Ports
     from .streaming.manager import LiveManager
 
+    side_host = LOOPBACK_HOST if api_grpc_only else host
     shared_kwargs: dict = {
-        "host": host,
+        "host": side_host,
         "log_level": log_level,
     }
 
@@ -586,7 +592,7 @@ async def _run_servers(
         backend = (os.environ.get("AGENTEVALS_SERVER_URL") or f"http://127.0.0.1:{port}").rstrip("/")
         mcp_instance = create_mcp_server(
             server_url=backend,
-            host=host,
+            host=side_host,
             port=mcp_port,
         )
         mcp_app = mcp_instance.streamable_http_app()
@@ -594,7 +600,7 @@ async def _run_servers(
         mcp_uvicorn = uvicorn.Server(uvicorn.Config(mcp_app, **mcp_kwargs))
         uvicorn_servers.append(mcp_uvicorn)
 
-    otlp_grpc_server = create_otlp_grpc_server(host=host, port=otlp_grpc_port, manager=mgr)
+    otlp_grpc_server = create_otlp_grpc_server(host=side_host, port=otlp_grpc_port, manager=mgr)
     await otlp_grpc_server.start()
 
     _install_shared_exit_handler(
@@ -648,6 +654,16 @@ async def _run_servers(
     help="Port for the gRPC API (default: 8002; 0 turns it off). Expose it only to trusted callers.",
 )
 @click.option(
+    "--api-grpc-only",
+    is_flag=True,
+    envvar="AGENTEVALS_API_GRPC_ONLY",
+    show_envvar=True,
+    help=(
+        "Serve only the gRPC API on --host. The web UI and REST API, the OTLP receivers and MCP listen "
+        "on 127.0.0.1. Check health with grpc.health.v1 on the gRPC API port."
+    ),
+)
+@click.option(
     "--mcp-port",
     default=None,
     type=int,
@@ -686,6 +702,7 @@ def serve(
     otlp_http_port: int,
     otlp_grpc_port: int,
     api_grpc_port: int,
+    api_grpc_only: bool,
     mcp_port: int | None,
     eval_sets: str | None,
     headless: bool,
@@ -697,6 +714,9 @@ def serve(
     Use --dev to enable live streaming mode for agent development.
     """
     from pathlib import Path
+
+    if api_grpc_only and not api_grpc_port:
+        raise click.UsageError("--api-grpc-only needs the gRPC API; set --api-grpc-port to a port other than 0")
 
     level = logging.WARNING
     if verbose == 1:
@@ -731,23 +751,24 @@ def serve(
             click.echo('MCP HTTP requires the live extras: pip install "agentevals[live]"', err=True)
             raise SystemExit(1) from None
 
+    side_host = LOOPBACK_HOST if api_grpc_only else host
     if dev:
         click.echo("agentevals dev server starting...")
-        click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}  (OTEL_EXPORTER_OTLP_ENDPOINT default)")
-        click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}  (OTEL_EXPORTER_OTLP_PROTOCOL=grpc)")
-        click.echo(f"  API:       http://{host}:{port}/api")
+        click.echo(f"  OTLP HTTP: http://{side_host}:{otlp_http_port}  (OTEL_EXPORTER_OTLP_ENDPOINT default)")
+        click.echo(f"  OTLP gRPC: {side_host}:{otlp_grpc_port}  (OTEL_EXPORTER_OTLP_PROTOCOL=grpc)")
+        click.echo(f"  API:       http://{side_host}:{port}/api")
     elif has_ui and not headless:
-        click.echo(f"agentevals: http://{host}:{port}")
-        click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}")
-        click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}")
+        click.echo(f"agentevals: http://{side_host}:{port}")
+        click.echo(f"  OTLP HTTP: http://{side_host}:{otlp_http_port}")
+        click.echo(f"  OTLP gRPC: {side_host}:{otlp_grpc_port}")
     else:
-        click.echo(f"agentevals API:  http://{host}:{port}/api")
-        click.echo(f"  OTLP HTTP: http://{host}:{otlp_http_port}")
-        click.echo(f"  OTLP gRPC: {host}:{otlp_grpc_port}")
+        click.echo(f"agentevals API:  http://{side_host}:{port}/api")
+        click.echo(f"  OTLP HTTP: http://{side_host}:{otlp_http_port}")
+        click.echo(f"  OTLP gRPC: {side_host}:{otlp_grpc_port}")
     if api_grpc_port:
         click.echo(f"  gRPC API:  {host}:{api_grpc_port}")
     if mcp_port is not None:
-        click.echo(f"  MCP:       http://{host}:{mcp_port}/mcp")
+        click.echo(f"  MCP:       http://{side_host}:{mcp_port}/mcp")
     if dev:
         click.echo("  Web UI:    http://localhost:5173")
         if eval_sets:
@@ -764,6 +785,7 @@ def serve(
             otlp_http_port,
             otlp_grpc_port,
             api_grpc_port=api_grpc_port,
+            api_grpc_only=api_grpc_only,
             mcp_port=mcp_port,
             log_level="info" if dev else "warning",
         )
