@@ -51,6 +51,9 @@ Errors use standard gRPC status codes with a `google.rpc.ErrorInfo` detail whose
 |---------|---------|
 | `--api-grpc-port` or `AGENTEVALS_API_GRPC_PORT` | Port, default `8002`; `0` turns the API off |
 | `--api-grpc-only` or `AGENTEVALS_API_GRPC_ONLY=true` | Serve only the gRPC API on `--host`, see below |
+| `--api-grpc-auth` or `AGENTEVALS_API_GRPC_AUTH` | `none` (default) or `kubernetes`, see [Security](#security) |
+| `--api-grpc-auth-audience` or `AGENTEVALS_API_GRPC_AUTH_AUDIENCE` | Token audience, default `agentevals` |
+| `--api-grpc-auth-allowed-service-account` or `AGENTEVALS_API_GRPC_AUTH_ALLOWED_SERVICE_ACCOUNTS` | Allowed ServiceAccount as `namespace/name`; repeat the flag, or comma separate the env var |
 | `AGENTEVALS_GRPC_REFLECTION=true` | Turn on server reflection |
 | `AGENTEVALS_API_TRACES=true` | Export traces of the API server itself (see below) |
 
@@ -81,6 +84,28 @@ AGENTEVALS_API_TRACES=true OTEL_TRACES_EXPORTER=console uv run agentevals serve
 
 ## Security
 
-The API has no authentication. Any caller that can reach the port can read sessions, run evaluations with the server's credentials, and submit runs. Expose port 8002 only to trusted callers, for example inside a cluster behind a NetworkPolicy, and put authentication in front of it when you need it.
+By default the API has no authentication. Any caller that can reach the port can read sessions, run evaluations with the server's credentials, and submit runs. Expose port 8002 only to trusted callers.
 
 On a laptop `agentevals serve` listens on all interfaces. Pass `--host 127.0.0.1` to keep every port local.
+
+### Kubernetes ServiceAccount authentication
+
+Inside a cluster, the server can admit only the ServiceAccounts you name:
+
+```bash
+agentevals serve --api-grpc-only \
+  --api-grpc-auth kubernetes \
+  --api-grpc-auth-allowed-service-account evals/controller
+```
+
+Callers send a ServiceAccount token minted for the audience as `authorization: Bearer <token>` metadata, for example a [projected token](https://kubernetes.io/docs/concepts/storage/projected-volumes/#serviceaccounttoken) with `audience: agentevals`. The server checks it with a TokenReview, so its own ServiceAccount needs `create` on `tokenreviews.authentication.k8s.io`.
+
+| Result | Status |
+|--------|--------|
+| No token, a malformed or expired token, a token for another audience, or a user that is not a ServiceAccount | `UNAUTHENTICATED` |
+| A valid ServiceAccount that is not on the list | `PERMISSION_DENIED` |
+| The TokenReview fails, for example because the Kubernetes API is down | `UNAVAILABLE` |
+
+The list is required: any pod can mint a token for any audience, so the audience alone proves nothing. The server refuses to start with an empty list, and never lets a call through when a check fails. A successful check is cached for up to 30 seconds and never past the token's expiry. Health checks need no token. Reflection, when turned on, needs one like every other call: `grpcurl -H "authorization: Bearer $TOKEN" ...`.
+
+Authentication covers only the gRPC API. Combine it with `--api-grpc-only` so the REST API, the OTLP receivers and MCP stay on `127.0.0.1`; without it the server prints a warning.

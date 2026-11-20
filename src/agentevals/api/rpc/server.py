@@ -2,7 +2,8 @@
 opt in tracing with the upstream gRPC instrumentation.
 
 A browser cannot speak native gRPC (no HTTP/2 trailers from ``fetch``), so this listener is out of
-reach of web pages. Every caller that can reach it is trusted: expose it only to trusted callers.
+reach of web pages. Without ``auth`` every caller that can reach it is trusted: expose it only to
+trusted callers.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
 from ...telemetry import api_tracer_provider, env_flag
 from ..otlp_grpc import listen_address
+from .auth import KubernetesAuth, build_interceptor
 from .policy import check_policies
 from .services import ApiContext, Ports, servicers
 
@@ -41,6 +43,7 @@ class ApiGrpcSettings:
     host: str
     port: int
     ports: Ports
+    auth: KubernetesAuth | None = None
 
 
 @dataclass(slots=True)
@@ -51,7 +54,7 @@ class ApiServer:
     port: int
 
 
-async def start_api_server(context: ApiContext, host: str, port: int) -> ApiServer:
+async def start_api_server(context: ApiContext, host: str, port: int, auth: KubernetesAuth | None = None) -> ApiServer:
     tracer_provider = api_tracer_provider()
     interceptors = []
     if tracer_provider is not None:
@@ -59,6 +62,8 @@ async def start_api_server(context: ApiContext, host: str, port: int) -> ApiServ
 
         noise = filters.any_of(filters.health_check(), filters.service_prefix("grpc.reflection."))
         interceptors.append(aio_server_interceptor(tracer_provider=tracer_provider, filter_=filters.negate(noise)))
+    if auth is not None:
+        interceptors.append(build_interceptor(auth))
 
     server = grpc.aio.server(
         interceptors=interceptors, options=SERVER_OPTIONS, maximum_concurrent_rpcs=MAX_CONCURRENT_RPCS
@@ -85,10 +90,13 @@ async def start_api_server(context: ApiContext, host: str, port: int) -> ApiServ
         raise RuntimeError(f"Failed to bind the API gRPC server to {address}")
     await server.start()
     logger.info(
-        "API gRPC server on %s (reflection %s, tracing %s)",
+        "API gRPC server on %s (reflection %s, tracing %s, auth %s)",
         listen_address(host, bound),
         "on" if env_flag(REFLECTION_ENV) else "off",
         "on" if tracer_provider is not None else "off",
+        f"kubernetes, audience {auth.audience}, {len(auth.allowed_service_accounts)} allowed ServiceAccounts"
+        if auth is not None
+        else "off",
     )
     return ApiServer(server=server, health=health_servicer, tracer_provider=tracer_provider, port=bound)
 

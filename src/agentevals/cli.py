@@ -15,11 +15,15 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import click
 
 from . import __version__
 from .api.otlp_grpc import create_otlp_grpc_server, stop_otlp_grpc_server
+
+if TYPE_CHECKING:
+    from .api.rpc.auth import KubernetesAuth
 
 LOOPBACK_HOST = "127.0.0.1"
 
@@ -544,6 +548,7 @@ async def _run_servers(
     *,
     api_grpc_port: int = 0,
     api_grpc_only: bool = False,
+    api_grpc_auth: KubernetesAuth | None = None,
     mcp_port: int | None = None,
     log_level: str = "warning",
 ) -> None:
@@ -576,6 +581,7 @@ async def _run_servers(
             host=host,
             port=api_grpc_port,
             ports=Ports(http=port, otlp_http=otlp_http_port, otlp_grpc=otlp_grpc_port, api_grpc=api_grpc_port),
+            auth=api_grpc_auth,
         )
         if api_grpc_port
         else None,
@@ -614,6 +620,40 @@ async def _run_servers(
         # The shared exit handler only requests gRPC shutdown on SIGINT/SIGTERM.
         # We still await a final stop here so non-signal exits also clean up.
         await stop_otlp_grpc_server(otlp_grpc_server)
+
+
+def _service_accounts(values: tuple[str, ...]) -> frozenset[str]:
+    from .api.rpc.auth import parse_service_account
+
+    try:
+        return frozenset(parse_service_account(item) for value in values for item in value.split(",") if item.strip())
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--api-grpc-auth-allowed-service-account") from None
+
+
+def _api_grpc_auth(mode: str, audience: str, allowed: frozenset[str], *, api_grpc_port: int) -> KubernetesAuth | None:
+    """Validate the auth options and connect to the Kubernetes API, refusing to start on any doubt."""
+    if mode == "none":
+        if allowed:
+            raise click.UsageError("--api-grpc-auth-allowed-service-account needs --api-grpc-auth kubernetes")
+        return None
+    if not api_grpc_port:
+        raise click.UsageError("--api-grpc-auth needs the gRPC API; set --api-grpc-port to a port other than 0")
+    if not audience.strip():
+        raise click.UsageError("--api-grpc-auth-audience must not be empty")
+    if not allowed:
+        raise click.UsageError(
+            "--api-grpc-auth kubernetes needs at least one --api-grpc-auth-allowed-service-account: "
+            "any pod can mint a token for any audience, so the audience alone authorizes nothing"
+        )
+
+    from .api.rpc.auth import KubernetesAuth, kubernetes_token_reviews
+
+    try:
+        token_reviews = kubernetes_token_reviews()
+    except Exception as exc:
+        raise click.ClickException(f"cannot set up Kubernetes authentication: {exc}") from None
+    return KubernetesAuth(audience=audience.strip(), allowed_service_accounts=allowed, token_reviews=token_reviews)
 
 
 @main.command("serve")
@@ -664,6 +704,36 @@ async def _run_servers(
     ),
 )
 @click.option(
+    "--api-grpc-auth",
+    type=click.Choice(["none", "kubernetes"]),
+    default="none",
+    show_default=True,
+    envvar="AGENTEVALS_API_GRPC_AUTH",
+    show_envvar=True,
+    help=(
+        "Authenticate gRPC API callers. 'kubernetes' verifies ServiceAccount bearer tokens with a "
+        "TokenReview and admits only --api-grpc-auth-allowed-service-account. Health checks stay open."
+    ),
+)
+@click.option(
+    "--api-grpc-auth-audience",
+    default="agentevals",
+    show_default=True,
+    envvar="AGENTEVALS_API_GRPC_AUTH_AUDIENCE",
+    show_envvar=True,
+    help="Audience the callers' ServiceAccount tokens must be minted for.",
+)
+@click.option(
+    "--api-grpc-auth-allowed-service-account",
+    "api_grpc_auth_allowed_service_accounts",
+    multiple=True,
+    metavar="NAMESPACE/NAME",
+    envvar="AGENTEVALS_API_GRPC_AUTH_ALLOWED_SERVICE_ACCOUNTS",
+    show_envvar=True,
+    callback=lambda ctx, param, values: _service_accounts(values),
+    help="ServiceAccount allowed to call the gRPC API; repeat for more. The env var takes a comma separated list.",
+)
+@click.option(
     "--mcp-port",
     default=None,
     type=int,
@@ -703,6 +773,9 @@ def serve(
     otlp_grpc_port: int,
     api_grpc_port: int,
     api_grpc_only: bool,
+    api_grpc_auth: str,
+    api_grpc_auth_audience: str,
+    api_grpc_auth_allowed_service_accounts: frozenset[str],
     mcp_port: int | None,
     eval_sets: str | None,
     headless: bool,
@@ -717,6 +790,15 @@ def serve(
 
     if api_grpc_only and not api_grpc_port:
         raise click.UsageError("--api-grpc-only needs the gRPC API; set --api-grpc-port to a port other than 0")
+    auth = _api_grpc_auth(
+        api_grpc_auth, api_grpc_auth_audience, api_grpc_auth_allowed_service_accounts, api_grpc_port=api_grpc_port
+    )
+    if auth is not None and not api_grpc_only:
+        click.echo(
+            f"warning: --api-grpc-auth covers only the gRPC API; the REST API, the OTLP receivers and MCP "
+            f"stay unauthenticated on {host}. Add --api-grpc-only to keep them on 127.0.0.1.",
+            err=True,
+        )
 
     level = logging.WARNING
     if verbose == 1:
@@ -766,7 +848,7 @@ def serve(
         click.echo(f"  OTLP HTTP: http://{side_host}:{otlp_http_port}")
         click.echo(f"  OTLP gRPC: {side_host}:{otlp_grpc_port}")
     if api_grpc_port:
-        click.echo(f"  gRPC API:  {host}:{api_grpc_port}")
+        click.echo(f"  gRPC API:  {host}:{api_grpc_port}" + ("  (auth: kubernetes)" if auth is not None else ""))
     if mcp_port is not None:
         click.echo(f"  MCP:       http://{side_host}:{mcp_port}/mcp")
     if dev:
@@ -786,6 +868,7 @@ def serve(
             otlp_grpc_port,
             api_grpc_port=api_grpc_port,
             api_grpc_only=api_grpc_only,
+            api_grpc_auth=auth,
             mcp_port=mcp_port,
             log_level="info" if dev else "warning",
         )
