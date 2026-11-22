@@ -14,11 +14,13 @@ Prompts:
 | `claude_native_1turn_subagent.json` | Claude harness | 1 | Claude Code native spans only, with an `Agent` subagent. |
 | `claude_native_2turn.json` | Claude harness | 2 | Claude Code native spans only. Spans with `session.id` export before kagent's `invoke_agent`. |
 | `claude_recipe_2turn.json` | Claude harness | 2 | `transform/claude_code` from `examples/kubernetes/otel-collector.yaml` applied: tool calls by name without arguments, model calls with usage. |
+| `claude_recipe_1turn_subagent.json` | Claude harness | 1 | `claude_native_1turn_subagent.json` with the same recipe applied: the `Agent` call has `{"subagent_type":"general-purpose"}` as its arguments, the subagent's tool calls stay inside the turn. |
 
 Changes from the download:
 
 * The `agentevals.*` resource attributes the download endpoint stamps are removed, since `agentevals.session_name` would override session keying.
 * Written as compact JSON. Claude Code `tool.output` span event outputs are cut to 500 characters.
 * `claude_recipe_2turn` was recorded with an earlier recipe that left out cache tokens. Its `claude_code.*` attributes are the output of today's recipe on Collector contrib 0.162.0. Ids, timestamps, parents and resources are as recorded.
+* `claude_recipe_1turn_subagent` is `claude_native_1turn_subagent` sent through today's recipe on Collector contrib 0.162.0 (only `transform/claude_code` in the pipeline, file exporter). The empty `status` objects the Collector adds to spans without a status are removed. Nothing else differs from the native file but the `gen_ai.*` attributes the recipe adds.
 
 Content: cluster namespaces, pod and service names, the agent system prompt and the answers. No credentials.
