@@ -54,6 +54,7 @@ data:
               - set(span.attributes["gen_ai.usage.cache_read.input_tokens"], span.attributes["cache_read_tokens"]) where span.name == "claude_code.llm_request"
               - set(span.attributes["gen_ai.usage.cache_write.input_tokens"], span.attributes["cache_creation_tokens"]) where span.name == "claude_code.llm_request"
               - set(span.attributes["gen_ai.usage.output_tokens"], span.attributes["output_tokens"]) where span.name == "claude_code.llm_request"
+              - set(span.attributes["gen_ai.tool.call.arguments"], {"subagent_type":span.attributes["subagent_type"]}) where span.name == "claude_code.tool" and span.attributes["subagent_type"] != nil
 
       filter/not_from_agentevals:
         error_mode: ignore
@@ -104,7 +105,7 @@ spec:
         app: otel-collector
       annotations:
         # bump to restart the Collector after editing the ConfigMap
-        config-revision: "2"
+        config-revision: "3"
     spec:
       containers:
         - name: otelcol

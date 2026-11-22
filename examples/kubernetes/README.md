@@ -199,8 +199,9 @@ The `transform/claude_code` processor in `otel-collector.yaml` fills part of the
 
 * `claude_code.tool` becomes `execute_tool`, with `gen_ai.tool.name` taken from `tool_name` (minus the `mcp__<server>__` prefix)
 * `claude_code.llm_request` becomes `chat`, with the model and token usage, cache reads and writes included
+* the `Agent` tool's `subagent_type` becomes the call's `gen_ai.tool.call.arguments` when Claude Code runs with `OTEL_LOG_TOOL_DETAILS=1`
 
-Tool arguments stay missing, since Claude Code doesn't put them on its spans. From `v1.0.0-alpha12` on, the runtime writes its own GenAI spans and marks its resource with `kagent.genai.producer`. The recipe skips those processes, so calls are never counted twice, and you can drop it from the Collector config.
+Other tool arguments stay missing, since Claude Code doesn't put them on its spans. From `v1.0.0-alpha12` on, the runtime writes its own GenAI spans and marks its resource with `kagent.genai.producer`. The recipe skips those processes, so calls are never counted twice, and you can drop it from the Collector config.
 
 ## Clean up
 
