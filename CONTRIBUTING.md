@@ -7,9 +7,8 @@ Thank you for your interest in contributing to agentevals! This document covers 
 ## Ways to Contribute
 
 - **Report bugs or request features** — use [GitHub Issues](https://github.com/agentevals-dev/agentevals/issues). Search existing issues before opening a new one.
-- **Fix a bug** — open a PR with a test that reproduces the issue.
-- **Add a feature** — open an issue first to discuss the approach, then submit a PR.
-- **Improve docs** — PRs for documentation fixes and improvements are always welcome.
+- **Fix a bug or add a feature**: open an issue first and wait for a maintainer to agree on the approach. See [Issue first](#issue-first).
+- **Fix a typo or broken link**: open a PR directly.
 
 ## Development Setup
 
@@ -67,6 +66,16 @@ uv run pytest
 
 ## Contributing Code
 
+### Issue first
+
+Every PR needs a linked issue where a maintainer has agreed to the change. This applies to bug fixes too, no matter how small. The only exception is typo and broken link fixes.
+
+1. Open an issue describing the problem and the change you want to make
+2. Wait for a maintainer to confirm the approach in the issue
+3. Open a PR that links the issue (`Fixes #123`)
+
+PRs without an agreed issue are closed without review. This is not a judgement on the code: it keeps maintainer time for changes the project has agreed to take.
+
 ### Workflow
 
 1. Create a branch from `main`: `git checkout -b feature/my-change`
@@ -76,18 +85,7 @@ uv run pytest
 5. Commit with a clear message (see [Commit Messages](#commit-messages))
 6. Push to your fork and open a PR against `main`
 
-### Small Changes
-
-For bug fixes or minor improvements (< 100 lines), open a PR directly with tests.
-
-### Large Changes
-
-For new features, refactors, or anything that touches multiple files:
-
-1. **Open an issue** describing the change and your proposed approach
-2. **Get alignment** before investing significant effort
-3. **Open a draft PR** early to get feedback
-4. Iterate based on review
+For larger changes, open a draft PR early once the issue is agreed, so the approach can be reviewed before it is finished.
 
 ## Code Style
 
@@ -132,6 +130,9 @@ test: add coverage for OTLP trace parsing
 
 ### PR Checklist
 
+The [PR template](.github/pull_request_template.md) includes this checklist.
+
+- [ ] Links an issue a maintainer agreed to
 - [ ] Tests added or updated
 - [ ] All tests pass (`uv run pytest`)
 - [ ] Documentation updated (if applicable)
@@ -182,6 +183,7 @@ We welcome contributors who use AI tools to assist their work, but we ask that y
 - **Do not generate issues, comments, or PR descriptions with AI.** These should be written by you in your own words. Maintainers need to communicate with the person behind the contribution, not a language model.
 - **Do not "vibe code."** AI should assist and accelerate code that you (the human!) would write on your own. You are expected to understand every line of code you submit. If you cannot explain a change during review, it will not be merged.
 - **Indicate non-trivial AI assistance.** If AI played a significant role in writing your code (beyond autocomplete or minor suggestions), mention it in your PR description. This helps reviewers calibrate their review.
+- **Do not let agents open issues or PRs for you.** Autonomous agents and bots opening issues or PRs will be closed and may be blocked. Instructions for coding agents are in [AGENTS.md](AGENTS.md).
 
 ## Getting Help
 
