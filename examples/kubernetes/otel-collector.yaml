@@ -6,10 +6,6 @@
 # filter/kagent_taskstore drops kagent's TaskStore gRPC spans: one per streamed chunk, up to
 # 99% of a turn's spans. Without it a long turn passes the 10,000 spans per trace that
 # agentevals keeps, and the turn loses its invoke_agent span.
-#
-# transform/claude_code is a workaround for Claude Code native telemetry on kagent before
-# v1.0.0-alpha12, checked with Claude Code 2.1.285. It skips processes whose resource has
-# kagent.genai.producer, where the runtime writes its own chat and execute_tool spans.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -35,25 +31,7 @@ data:
         error_mode: ignore
         traces:
           span:
-            - IsMatch(span.attributes["rpc.method"], "^kagent\\.api\\.v1alpha1\\.TaskStoreService/")
-
-      transform/claude_code:
-        error_mode: ignore
-        trace_statements:
-          - context: span
-            # One condition on purpose: entries of this list are ORed.
-            conditions:
-              - instrumentation_scope.name == "com.anthropic.claude_code.tracing" and resource.attributes["kagent.genai.producer"] == nil
-            statements:
-              - set(span.attributes["gen_ai.operation.name"], "execute_tool") where span.name == "claude_code.tool"
-              - set(span.attributes["gen_ai.tool.name"], span.attributes["tool_name"]) where span.name == "claude_code.tool"
-              - replace_pattern(span.attributes["gen_ai.tool.name"], "^mcp__.+?__", "")
-              - set(span.attributes["gen_ai.operation.name"], "chat") where span.name == "claude_code.llm_request"
-              - set(span.attributes["gen_ai.response.model"], span.attributes["model"]) where span.name == "claude_code.llm_request"
-              - set(span.attributes["gen_ai.usage.input_tokens"], span.attributes["input_tokens"] + span.attributes["cache_read_tokens"] + span.attributes["cache_creation_tokens"]) where span.name == "claude_code.llm_request"
-              - set(span.attributes["gen_ai.usage.cache_read.input_tokens"], span.attributes["cache_read_tokens"]) where span.name == "claude_code.llm_request"
-              - set(span.attributes["gen_ai.usage.cache_write.input_tokens"], span.attributes["cache_creation_tokens"]) where span.name == "claude_code.llm_request"
-              - set(span.attributes["gen_ai.usage.output_tokens"], span.attributes["output_tokens"]) where span.name == "claude_code.llm_request"
+            - IsMatch(span.attributes["rpc.method"], "^kagent\\.runtime\\.v1\\.TaskStoreService/")
 
       filter/not_from_agentevals:
         error_mode: ignore
@@ -77,7 +55,7 @@ data:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, filter/kagent_taskstore, transform/claude_code]
+          processors: [memory_limiter, filter/kagent_taskstore]
           exporters: [otlp_http/agentevals]
         logs/agentevals:
           receivers: [otlp]
@@ -104,7 +82,7 @@ spec:
         app: otel-collector
       annotations:
         # bump to restart the Collector after editing the ConfigMap
-        config-revision: "2"
+        config-revision: "3"
     spec:
       containers:
         - name: otelcol
