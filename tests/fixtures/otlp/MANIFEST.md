@@ -8,7 +8,7 @@ Real and hand built telemetry with the turns agentevals must extract from it. `t
 |---|---|
 | `adk_py/<mode>/<scenario>.json` | Google ADK (Python 2.10) recordings, traces and logs in one OTLP/JSON document. One directory per telemetry mode (`v1_*` / `v2_*` schema, span or event content, content off, `_contrib` with the OpenAI v2 instrumentation underneath, `v2proj_*` the projected upstream shape). Scenarios S1 to S6b: single turn, tools, multi turn, AgentTool delegate, transfer, failures. |
 | `samples/*.json` | kagent Jaeger exports (`helm*`, `k8s`) and a Tempo export, as captured. |
-| `kagent/<version>/*.json` | kagent recordings per release: Go ADK and the Claude harness, with and without the Collector recipe from `examples/kubernetes`. Each directory has a `README.md` with the commit, versions and prompts. |
+| `kagent/<version>/*.json` | kagent recordings per release: Go ADK and the Claude harness, with and without the Claude Code Collector recipe that `examples/kubernetes` had before kagent v1.x. Each directory has a `README.md` with the commit, versions and prompts. |
 | `hand/*.json` | Hand built shapes: cycles, duplicate ids, remote parents, content off, deprecated keys, the three event name forms for evaluation results, OpenAI v2 logs with and without span ids, Strands span events, multi trace conversations, upstream parts, the MCP client and server spans of one tool call. |
 | `*.truth.json` | The expected turns for the fixture next to it. |
 

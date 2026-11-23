@@ -13,7 +13,7 @@ Prompts:
 | `adk_go_2turn.json` | Go ADK | 2 | Sent through the Collector. kagent's TaskStore gRPC spans arrive before the root when batched per process. |
 | `claude_native_1turn_subagent.json` | Claude harness | 1 | Claude Code native spans only, with an `Agent` subagent. |
 | `claude_native_2turn.json` | Claude harness | 2 | Claude Code native spans only. Spans with `session.id` export before kagent's `invoke_agent`. |
-| `claude_recipe_2turn.json` | Claude harness | 2 | `transform/claude_code` from `examples/kubernetes/otel-collector.yaml` applied: tool calls by name without arguments, model calls with usage. |
+| `claude_recipe_2turn.json` | Claude harness | 2 | `transform/claude_code` applied, a Collector recipe that `examples/kubernetes/otel-collector.yaml` had before the example moved to kagent v1.x: tool calls by name without arguments, model calls with usage. |
 
 Changes from the download:
 
