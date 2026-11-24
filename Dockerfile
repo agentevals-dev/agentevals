@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 
-ARG BASE_IMAGE_REGISTRY=cgr.dev
-ARG UV_VERSION=0.12.11
+# Base images are pinned by digest so the layer cache survives upstream tag moves
+# and builds stay reproducible. Keep the references literal: Dependabot does not
+# resolve ARGs in FROM lines and silently skips images that use them.
+FROM ghcr.io/astral-sh/uv:0.12.11@sha256:79c6f4776b851471cc73b7d21d0cc834bb94383c292e83640d27eff512864df7 AS uv-bin
 
-FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
-
-FROM node:26-bookworm-slim AS ui
+FROM node:26-bookworm-slim@sha256:b822af76043e2656ffc172072036fe0968a3c09a692e4ad05eb9348ad5dbdf4c AS ui
 WORKDIR /build/ui
 COPY ui/package.json ui/package-lock.json ./
 # Skip lifecycle scripts during ci, then rebuild esbuild in its own layer — avoids ETXTBSY when
@@ -15,12 +15,15 @@ RUN npm rebuild esbuild
 COPY ui/ ./
 RUN npm run build
 
-FROM ${BASE_IMAGE_REGISTRY}/chainguard/wolfi-base:latest
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:6ab86c5e059da41ff1454b6f69ecd7422b94af41969f4e231aa23244e47d4a81
 
 ARG PYTHON_VERSION=3.14
 # Shared libraries the compiled wheels in the venv link against (scikit-learn and
-# tokenizers need libstdc++); tzdata backs zoneinfo lookups.
-RUN apk add --no-cache python-${PYTHON_VERSION} ca-certificates libstdc++ \
+# tokenizers need libstdc++); tzdata backs zoneinfo lookups. The upgrade pulls
+# base package fixes (glibc, openssl) newer than the pinned digest whenever this
+# layer rebuilds, so uncached release builds do not wait on a digest bump.
+RUN apk upgrade --no-cache \
+    && apk add --no-cache python-${PYTHON_VERSION} ca-certificates libstdc++ \
         zlib libffi sqlite-libs bzip2 xz tzdata
 
 WORKDIR /app
